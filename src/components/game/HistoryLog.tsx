@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { Symbol } from './Symbol';
 import { FeedbackPegs } from './FeedbackPegs';
-import type { AttemptResult } from '@/hooks/useGame';
+import { SYMBOLS, type AttemptResult } from '@/hooks/useGame';
 
 interface HistoryLogProps {
   history: AttemptResult[];
@@ -9,13 +9,15 @@ interface HistoryLogProps {
 
 /**
  * HistoryLog
- * 
- * Exibe o histórico de tentativas com feedback CONGELADO.
- * O feedback foi calculado no momento do submit e armazenado no history.
- * NÃO recalcula o feedback ao renderizar.
+ *
+ * Blindagem:
+ * - Nunca faz .map em algo potencialmente null/undefined
+ * - Cada item do histórico segue { guess: string[], whites, blacks }
  */
 export function HistoryLog({ history }: HistoryLogProps) {
-  if (history.length === 0) {
+  const safeHistory = Array.isArray(history) ? history : [];
+
+  if (safeHistory.length === 0) {
     return (
       <div className="text-center py-4 text-muted-foreground text-sm">
         Nenhuma tentativa ainda
@@ -26,30 +28,38 @@ export function HistoryLog({ history }: HistoryLogProps) {
   return (
     <div className="space-y-2 max-h-32 overflow-y-auto">
       <AnimatePresence>
-        {history.map((attempt, index) => (
-          <motion.div
-            key={history.length - index}
-            initial={{ x: -20, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 20, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className="flex items-center justify-between gap-3 p-2 rounded-xl bg-muted/20"
-          >
-            <div className="flex gap-1.5">
-              {attempt.guess.map((symbol, i) => (
-                <div key={i} className="history-symbol">
-                  <Symbol symbol={symbol} size="sm" />
-                </div>
-              ))}
-            </div>
-            {/* Usa feedback CONGELADO do histórico */}
-            <FeedbackPegs 
-              correctPosition={attempt.feedback.exact} 
-              correctSymbol={attempt.feedback.present} 
-            />
-          </motion.div>
-        ))}
+        {safeHistory.map((attempt, index) => {
+          const guessIds = Array.isArray(attempt.guess) ? attempt.guess : [];
+          const whites = Number.isFinite(attempt.whites) ? attempt.whites : 0;
+          const blacks = Number.isFinite(attempt.blacks) ? attempt.blacks : 0;
+
+          return (
+            <motion.div
+              key={`${safeHistory.length - index}`}
+              initial={{ x: -20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: 20, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+              className="flex items-center justify-between gap-3 p-2 rounded-xl bg-muted/20"
+            >
+              <div className="flex gap-1.5">
+                {guessIds.map((id, i) => {
+                  const symbol = SYMBOLS.find(s => s.id === id);
+
+                  return (
+                    <div key={`${id}-${i}`} className="history-symbol">
+                      {symbol ? <Symbol symbol={symbol} size="sm" /> : null}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <FeedbackPegs correctPosition={whites} correctSymbol={blacks} />
+            </motion.div>
+          );
+        })}
       </AnimatePresence>
     </div>
   );
 }
+

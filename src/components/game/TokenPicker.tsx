@@ -9,17 +9,20 @@ interface TokenPickerProps {
   selectedIds?: string[];
 }
 
-export function TokenPicker({ 
-  symbols, 
-  onSelect, 
-  disabled, 
+export function TokenPicker({
+  symbols,
+  onSelect,
+  disabled,
   selectedIds = [],
 }: TokenPickerProps) {
+  const safeSymbols = Array.isArray(symbols) ? symbols : [];
+  const safeSelected = Array.isArray(selectedIds) ? selectedIds : [];
+
   return (
     <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 justify-center max-w-xs sm:max-w-sm mx-auto">
-      {symbols.map((symbol, index) => {
-        const isUsed = selectedIds.includes(symbol.id);
-        
+      {safeSymbols.map((symbol, index) => {
+        const isUsed = safeSelected.includes(symbol.id);
+
         return (
           <motion.button
             key={symbol.id}

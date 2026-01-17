@@ -77,34 +77,36 @@ export function evaluateGuess(secret: Symbol[], guess: Symbol[]): EvaluationResu
     throw new Error(`Secret e guess devem ter exatamente ${CODE_LENGTH} símbolos`);
   }
 
-  // cópias mutáveis para marcar com null (sem modificar inputs)
-  const secretWork: Array<Symbol | null> = secret.map(s => ({ ...s }));
-  const guessWork: Array<Symbol | null> = guess.map(s => ({ ...s }));
+  // REGRA: nunca mutar o secret/guess originais.
+  // Usar SEMPRE cópias locais que podem ser marcadas como null.
+  const secretCopy: Array<Symbol | null> = [...secret];
+  const guessCopy: Array<Symbol | null> = [...guess];
 
   let exact = 0;
   let present = 0;
 
-  // PASSO 1 — BRANCOS (exatos)
+  // PASSO 1 — BRANCOS (símbolo correto na posição correta)
   for (let i = 0; i < CODE_LENGTH; i++) {
-    const s = secretWork[i];
-    const g = guessWork[i];
+    const s = secretCopy?.[i] ?? null;
+    const g = guessCopy?.[i] ?? null;
+
     if (s && g && s.id === g.id) {
       exact++;
-      secretWork[i] = null;
-      guessWork[i] = null;
+      secretCopy[i] = null;
+      guessCopy[i] = null;
     }
   }
 
-  // PASSO 2 — CINZAS (presentes)
+  // PASSO 2 — CINZAS (símbolo correto na posição errada)
   for (let i = 0; i < CODE_LENGTH; i++) {
-    const g = guessWork[i];
+    const g = guessCopy?.[i] ?? null;
     if (!g) continue;
 
-    const j = secretWork.findIndex(s => s !== null && s.id === g.id);
+    const j = secretCopy.findIndex(s => s !== null && s.id === g.id);
     if (j !== -1) {
       present++;
-      secretWork[j] = null; // remove UMA ocorrência
-      guessWork[i] = null;
+      secretCopy[j] = null; // remove UMA ocorrência
+      guessCopy[i] = null;
     }
   }
 
