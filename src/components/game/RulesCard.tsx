@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { SYMBOLS } from '@/hooks/useGame';
+import { UI_SYMBOLS } from '@/hooks/useGame';
 import { Symbol } from './Symbol';
 
 export function RulesCard() {
@@ -39,7 +39,7 @@ export function RulesCard() {
       <div className="pt-2 border-t border-border/30">
         <h3 className="text-xs font-medium mb-2 text-foreground">Símbolos:</h3>
         <div className="flex flex-wrap gap-2 justify-center">
-          {SYMBOLS.map(symbol => (
+          {UI_SYMBOLS.map(symbol => (
             <div key={symbol.id} className="w-8 h-8 flex items-center justify-center">
               <Symbol symbol={symbol} size="md" />
             </div>
