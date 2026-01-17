@@ -69,6 +69,10 @@ export function useGame() {
   const [history, setHistory] = useState<AttemptResult[]>([]);
   const [currentGuess, setCurrentGuess] = useState<GuessSlot[]>([null, null, null, null]);
 
+  // Mantém o palpite mais recente disponível de forma síncrona
+  // (evita depender de timing de render/batching para calcular feedback)
+  const currentGuessRef = useRef<GuessSlot[]>([null, null, null, null]);
+
   const attempts = history.length;
 
   // ==================== AÇÕES ====================
@@ -81,10 +85,13 @@ export function useGame() {
   const startGame = useCallback(() => {
     const secret = generateSecret();
     secretRef.current = [...secret]; // Cópia para garantir imutabilidade
-    
+
+    const cleared: GuessSlot[] = [null, null, null, null];
+    currentGuessRef.current = cleared;
+
     setStatus('playing');
     setHistory([]);
-    setCurrentGuess([null, null, null, null]);
+    setCurrentGuess(cleared);
   }, []);
 
   /**
@@ -92,9 +99,13 @@ export function useGame() {
    */
   const newGame = useCallback(() => {
     secretRef.current = null;
+
+    const cleared: GuessSlot[] = [null, null, null, null];
+    currentGuessRef.current = cleared;
+
     setStatus('notStarted');
     setHistory([]);
-    setCurrentGuess([null, null, null, null]);
+    setCurrentGuess(cleared);
   }, []);
 
   /**
@@ -107,15 +118,22 @@ export function useGame() {
 
     setCurrentGuess(prev => {
       // Bloqueia se símbolo já está no palpite
-      if (prev.some(s => s?.id === symbol.id)) return prev;
+      if (prev.some(s => s?.id === symbol.id)) {
+        currentGuessRef.current = prev;
+        return prev;
+      }
 
       // Encontra próximo slot vazio
       const emptyIndex = prev.findIndex(s => s === null);
-      if (emptyIndex === -1) return prev;
+      if (emptyIndex === -1) {
+        currentGuessRef.current = prev;
+        return prev;
+      }
 
       // Retorna nova array com símbolo inserido
       const next = [...prev];
       next[emptyIndex] = { ...symbol };
+      currentGuessRef.current = next;
       return next;
     });
   }, [status]);
@@ -130,6 +148,7 @@ export function useGame() {
     setCurrentGuess(prev => {
       const next = [...prev];
       next[index] = null;
+      currentGuessRef.current = next;
       return next;
     });
   }, [status]);
@@ -146,8 +165,8 @@ export function useGame() {
     if (status !== 'playing') return;
     if (!secretRef.current) return;
 
-    // SNAPSHOT IMEDIATO - captura estado no momento do clique
-    const guessSnapshot: GuessSlot[] = currentGuess.map(s => s ? { ...s } : null);
+    // SNAPSHOT IMEDIATO - captura o palpite mais recente no momento do clique
+    const guessSnapshot: GuessSlot[] = currentGuessRef.current.map(s => (s ? { ...s } : null));
     const secretSnapshot: string[] = [...secretRef.current];
 
     // Extrai IDs do palpite a partir do snapshot
@@ -162,7 +181,7 @@ export function useGame() {
     // Verifica limite de tentativas usando histórico atual
     if (history.length >= MAX_ATTEMPTS) return;
 
-    // Calcula feedback usando snapshots (nunca state direto)
+    // Calcula feedback usando snapshots
     const result = evaluateGuess(secretSnapshot, guessIds);
 
     // Cria entrada no histórico com ID único e dados imutáveis
@@ -190,8 +209,10 @@ export function useGame() {
     }
 
     // Limpa palpite para próxima tentativa
-    setCurrentGuess([null, null, null, null]);
-  }, [status, currentGuess, history]);
+    const cleared: GuessSlot[] = [null, null, null, null];
+    currentGuessRef.current = cleared;
+    setCurrentGuess(cleared);
+  }, [status, history]);
 
   // ==================== DADOS DERIVADOS ====================
 
