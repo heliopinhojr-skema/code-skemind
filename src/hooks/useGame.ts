@@ -60,28 +60,36 @@ function generateSecret(): GameSymbol[] {
   return shuffled.slice(0, CODE_LENGTH);
 }
 
-function calculateFeedback(code: GameSymbol[], guess: GameSymbol[]): { correctPosition: number; correctSymbol: number } {
+function calculateFeedback(secret: GameSymbol[], guess: GameSymbol[]): { correctPosition: number; correctSymbol: number } {
+  // Step 1: Find exact matches (correct position)
   let correctPosition = 0;
-  let correctSymbol = 0;
-  const codeRemaining: GameSymbol[] = [];
-  const guessRemaining: GameSymbol[] = [];
+  const secretRemaining: string[] = [];
+  const guessRemaining: string[] = [];
 
   for (let i = 0; i < CODE_LENGTH; i++) {
-    if (code[i].id === guess[i].id) {
+    if (secret[i].id === guess[i].id) {
       correctPosition++;
     } else {
-      codeRemaining.push(code[i]);
-      guessRemaining.push(guess[i]);
+      // Only add non-matched symbols to remaining pools
+      secretRemaining.push(secret[i].id);
+      guessRemaining.push(guess[i].id);
     }
   }
 
-  guessRemaining.forEach(symbol => {
-    const idx = codeRemaining.findIndex(s => s.id === symbol.id);
-    if (idx > -1) {
+  // Step 2: Find partial matches (correct symbol, wrong position)
+  // Each symbol can only generate one feedback point
+  let correctSymbol = 0;
+  const usedSecretIndices: Set<number> = new Set();
+
+  for (const guessId of guessRemaining) {
+    const secretIdx = secretRemaining.findIndex(
+      (secretId, idx) => secretId === guessId && !usedSecretIndices.has(idx)
+    );
+    if (secretIdx !== -1) {
       correctSymbol++;
-      codeRemaining.splice(idx, 1);
+      usedSecretIndices.add(secretIdx);
     }
-  });
+  }
 
   return { correctPosition, correctSymbol };
 }
