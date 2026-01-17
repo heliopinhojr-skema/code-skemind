@@ -61,12 +61,12 @@ export interface GameState {
 
 // Símbolos do jogo (mesma ordem da engine, com shapes para UI)
 export const SYMBOLS: GameSymbol[] = [
-  { id: 'triangle', color: '#E53935', shape: 'triangle' },
-  { id: 'square', color: '#1E88E5', shape: 'square' },
-  { id: 'circle', color: '#FDD835', shape: 'circle' },
-  { id: 'diamond', color: '#43A047', shape: 'diamond' },
-  { id: 'star', color: '#8E24AA', shape: 'star' },
-  { id: 'hexagon', color: '#FF7043', shape: 'hexagon' },
+  { id: 'circle', color: '#E53935', shape: 'circle' },     // círculo vermelho
+  { id: 'square', color: '#1E88E5', shape: 'square' },     // quadrado azul
+  { id: 'triangle', color: '#43A047', shape: 'triangle' }, // triângulo verde
+  { id: 'diamond', color: '#FDD835', shape: 'diamond' },   // losango amarelo
+  { id: 'star', color: '#8E24AA', shape: 'star' },         // estrela roxa
+  { id: 'hexagon', color: '#00BCD4', shape: 'hexagon' },   // hexágono ciano
 ];
 
 export const MAX_ATTEMPTS = 8;

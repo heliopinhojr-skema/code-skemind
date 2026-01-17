@@ -49,12 +49,12 @@ export interface EvaluationResult {
 export const CODE_LENGTH = 4;
 
 export const SYMBOLS: readonly Symbol[] = [
-  { id: 'triangle', label: '▲', color: '#E53935' },
-  { id: 'square', label: '■', color: '#1E88E5' },
-  { id: 'circle', label: '●', color: '#FDD835' },
-  { id: 'diamond', label: '◆', color: '#43A047' },
-  { id: 'star', label: '★', color: '#8E24AA' },
-  { id: 'hexagon', label: '⬡', color: '#FF7043' },
+  { id: 'circle', label: '●', color: '#E53935' },     // círculo vermelho
+  { id: 'square', label: '■', color: '#1E88E5' },     // quadrado azul
+  { id: 'triangle', label: '▲', color: '#43A047' },   // triângulo verde
+  { id: 'diamond', label: '◆', color: '#FDD835' },    // losango amarelo
+  { id: 'star', label: '★', color: '#8E24AA' },       // estrela roxa
+  { id: 'hexagon', label: '⬡', color: '#00BCD4' },    // hexágono ciano
 ] as const;
 
 // ═══════════════════════════════════════════════════════════════════════════
