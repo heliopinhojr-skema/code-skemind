@@ -72,12 +72,14 @@ export function useGame() {
   // (evita depender de timing de render/batching para calcular feedback)
   const currentGuessRef = useRef<GuessSlot[]>([null, null, null, null]);
 
+  // Evita submit duplo (double-click) no mesmo frame
+  const submitLockRef = useRef(false);
+
   const attempts = history.length;
 
   // Mantém histórico mais recente disponível de forma síncrona
   // (evita depender de timing de render/batching)
   const historyRef = useRef<AttemptResult[]>([]);
-
   // ==================== AÇÕES ====================
 
   /**
@@ -174,48 +176,56 @@ export function useGame() {
     if (status !== 'playing') return;
     if (!secretRef.current) return;
 
-    // snapshots IMEDIATOS (nunca usar state direto para avaliar)
-    const guessSnapshot: GuessSlot[] = currentGuessRef.current.map(s => (s ? { ...s } : null));
-    const secretSnapshot: string[] = [...secretRef.current];
+    // Bloqueia double-click / double submit no mesmo tick
+    if (submitLockRef.current) return;
+    submitLockRef.current = true;
 
-    // precisa estar completo (4 slots) e sem repetição
-    if (guessSnapshot.some(s => s === null)) return;
-    const guessIds = guessSnapshot.map(s => (s as GameSymbol).id);
-    if (!isValidGuess(guessIds)) return;
+    try {
+      // snapshots IMEDIATOS (nunca usar state direto para avaliar)
+      const guessSnapshot: GuessSlot[] = currentGuessRef.current.map(s => (s ? { ...s } : null));
+      const secretSnapshot: string[] = [...secretRef.current];
 
-    // limite de tentativas (sincrono via ref)
-    const attemptsBefore = historyRef.current.length;
-    if (attemptsBefore >= MAX_ATTEMPTS) return;
+      // precisa estar completo (4 slots) e sem repetição
+      if (guessSnapshot.some(s => s === null)) return;
+      const guessIds = guessSnapshot.map(s => (s as GameSymbol).id);
+      if (!isValidGuess(guessIds)) return;
 
-    // feedback 100% puro: apenas secret fixo + palpite daquele clique
-    const result = evaluateGuess(secretSnapshot, [...guessIds]);
+      // limite de tentativas (sincrono via ref)
+      const attemptsBefore = historyRef.current.length;
+      if (attemptsBefore >= MAX_ATTEMPTS) return;
 
-    const entry: AttemptResult = {
-      id: crypto.randomUUID(),
-      guess: [...guessIds],
-      whites: result.whites,
-      grays: result.grays,
-    };
+      // feedback 100% puro: apenas secret fixo + palpite daquele clique
+      const result = evaluateGuess(secretSnapshot, [...guessIds]);
 
-    const nextHistory = [entry, ...historyRef.current];
-    historyRef.current = nextHistory;
-    setHistory(nextHistory);
+      const entry: AttemptResult = {
+        id: crypto.randomUUID(),
+        guess: [...guessIds],
+        whites: result.whites,
+        grays: result.grays,
+      };
 
-    // vitória/derrota
-    if (result.whites === CODE_LENGTH) {
-      setStatus('won');
-      return;
+      const nextHistory = [entry, ...historyRef.current];
+      historyRef.current = nextHistory;
+      setHistory(nextHistory);
+
+      // vitória/derrota
+      if (result.whites === CODE_LENGTH) {
+        setStatus('won');
+        return;
+      }
+
+      if (attemptsBefore + 1 >= MAX_ATTEMPTS) {
+        setStatus('lost');
+        return;
+      }
+
+      // próxima tentativa
+      const cleared: GuessSlot[] = [null, null, null, null];
+      currentGuessRef.current = cleared;
+      setCurrentGuess(cleared);
+    } finally {
+      submitLockRef.current = false;
     }
-
-    if (attemptsBefore + 1 >= MAX_ATTEMPTS) {
-      setStatus('lost');
-      return;
-    }
-
-    // próxima tentativa
-    const cleared: GuessSlot[] = [null, null, null, null];
-    currentGuessRef.current = cleared;
-    setCurrentGuess(cleared);
   }, [status]);
 
   // ==================== DADOS DERIVADOS ====================
