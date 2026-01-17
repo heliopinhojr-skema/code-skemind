@@ -7,11 +7,18 @@ interface HistoryLogProps {
   history: AttemptResult[];
 }
 
+/**
+ * HistoryLog
+ * 
+ * Exibe o histórico de tentativas com feedback CONGELADO.
+ * O feedback foi calculado no momento do submit e armazenado no history.
+ * NÃO recalcula o feedback ao renderizar.
+ */
 export function HistoryLog({ history }: HistoryLogProps) {
   if (history.length === 0) {
     return (
       <div className="text-center py-4 text-muted-foreground text-sm">
-        No attempts yet
+        Nenhuma tentativa ainda
       </div>
     );
   }
@@ -35,9 +42,10 @@ export function HistoryLog({ history }: HistoryLogProps) {
                 </div>
               ))}
             </div>
+            {/* Usa feedback CONGELADO do histórico */}
             <FeedbackPegs 
-              correctPosition={attempt.correctPosition} 
-              correctSymbol={attempt.correctSymbol} 
+              correctPosition={attempt.feedback.exact} 
+              correctSymbol={attempt.feedback.present} 
             />
           </motion.div>
         ))}
