@@ -48,7 +48,7 @@ export interface GameState {
   score: number;
   remainingSeconds: number;
   startTime: number;
-  gameStatus: 'playing' | 'won' | 'lost' | 'timeout';
+  gameStatus: 'playing' | 'victory' | 'defeat' | 'timeout';
 }
 
 function generateRoundId(): string {
@@ -222,7 +222,7 @@ function logRound(state: GameState, endTime: number): RoundLog {
     start_time: new Date(state.startTime).toISOString(),
     end_time: new Date(endTime).toISOString(),
     attempts_used: state.attempts,
-    solved: state.gameStatus === 'won',
+    solved: state.gameStatus === 'victory',
     total_time_ms: endTime - state.startTime,
     final_score: state.score,
   };
@@ -236,15 +236,10 @@ function logRound(state: GameState, endTime: number): RoundLog {
 
 export function useGame() {
   // Secret must be created once at round start and remain stable for the whole round.
-  // We store it in React state for persistence, and mirror it in a ref so submit() always
-  // reads the current value without depending on re-renders.
+  // We store it in React state for persistence, and keep a ref as the authoritative
+  // source used by submit() (so evaluation never depends on render timing).
   const [secret, setSecret] = useState<GameSymbol[]>(() => generateSecret());
   const secretRef = useRef<GameSymbol[]>(secret);
-
-  // Keep ref in sync with state (no regeneration here)
-  useEffect(() => {
-    secretRef.current = secret;
-  }, [secret]);
 
   function createInitialState(roundId: string, startTime: number): GameState {
     return {
@@ -302,9 +297,14 @@ export function useGame() {
       timerRef.current = window.setInterval(() => {
         setState(s => {
           if (s.roundId !== currentRoundIdRef.current) return s;
+          // If the round already ended (victory/defeat/timeout), the timer must not mutate state.
+          if (s.gameStatus !== 'playing') return s;
 
           if (s.remainingSeconds <= 1) {
-            if (timerRef.current) clearInterval(timerRef.current);
+            if (timerRef.current) {
+              clearInterval(timerRef.current);
+              timerRef.current = null;
+            }
             return { ...s, remainingSeconds: 0, gameStatus: 'timeout', score: 0 };
           }
 
@@ -377,7 +377,10 @@ export function useGame() {
       const elapsedMs = Date.now() - s.startTime;
 
       if (feedback.correctPosition === CODE_LENGTH) {
-        if (timerRef.current) clearInterval(timerRef.current);
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
         const finalScore = calculateScore(newAttempts, elapsedMs, true);
         return {
           ...s,
@@ -385,19 +388,22 @@ export function useGame() {
           history: newHistory,
           guess: [null, null, null, null],
           score: finalScore,
-          gameStatus: 'won' as const,
+          gameStatus: 'victory' as const,
         };
       }
 
       if (newAttempts >= MAX_ATTEMPTS) {
-        if (timerRef.current) clearInterval(timerRef.current);
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
         return {
           ...s,
           attempts: newAttempts,
           history: newHistory,
           guess: [null, null, null, null],
           score: 0,
-          gameStatus: 'lost' as const,
+          gameStatus: 'defeat' as const,
         };
       }
 
@@ -412,8 +418,8 @@ export function useGame() {
 
   return {
     state,
-    // Expose for UI reveal only; still not stored in React state.
-    secretCode: secretRef.current ?? [],
+    // Exposed only for end-of-round reveal; value is stable for the whole round.
+    secretCode: secret,
     actions: {
       newGame,
       selectSymbol,

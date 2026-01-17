@@ -50,7 +50,7 @@ export function GameBoard({
       style={backgroundStyle}
     >
       {/* Game Status Messages */}
-      {state.gameStatus === 'won' && (
+      {state.gameStatus === 'victory' && (
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -63,7 +63,7 @@ export function GameBoard({
         </motion.div>
       )}
 
-      {state.gameStatus === 'lost' && (
+      {state.gameStatus === 'defeat' && (
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
