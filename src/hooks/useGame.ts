@@ -75,16 +75,21 @@ function isDebugMode(): boolean {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Gera código secreto com 4 símbolos (COM DUPLICATAS PERMITIDAS).
+ * Gera código secreto com 4 símbolos ÚNICOS (SEM DUPLICATAS).
+ * Usa Fisher-Yates shuffle para selecionar aleatoriamente.
  * CHAMADO APENAS POR startNewRound()
  */
 function generateSecret(): GameSymbol[] {
-  const secret: GameSymbol[] = [];
-  for (let i = 0; i < CODE_LENGTH; i++) {
-    const randomIndex = Math.floor(Math.random() * SYMBOLS.length);
-    secret.push(SYMBOLS[randomIndex]);
+  const pool = [...SYMBOLS];
+  
+  // Fisher-Yates shuffle
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
   }
-  return secret;
+  
+  // Retorna os primeiros 4 (todos únicos)
+  return pool.slice(0, CODE_LENGTH);
 }
 
 /**
