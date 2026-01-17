@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 // INVARIANTES MATEMÁTICOS:
 // 1. O secret é gerado UMA ÚNICA VEZ em startNewRound()
 // 2. O secret é armazenado em useRef e NUNCA muda durante a rodada
-// 3. DUPLICATAS SÃO PERMITIDAS no secret (sorteio independente por posição)
+// 3. O secret NÃO pode ter símbolos repetidos (sem duplicatas)
 // 4. O feedback segue o algoritmo clássico do Mastermind (2 passes)
 // 5. Nenhum símbolo é contado duas vezes no feedback
 //
@@ -78,7 +78,6 @@ function isDebugMode(): boolean {
 
 /**
  * Retorna um símbolo aleatório do pool.
- * Cada chamada é independente (permite duplicatas).
  */
 function randomSymbol(): GameSymbol {
   const index = Math.floor(Math.random() * SYMBOLS.length);
@@ -86,18 +85,30 @@ function randomSymbol(): GameSymbol {
 }
 
 /**
- * Gera código secreto com 4 símbolos.
- * SORTEIO INDEPENDENTE para cada posição - DUPLICATAS SÃO PERMITIDAS.
+ * Gera código secreto com 4 símbolos SEM REPETIÇÃO.
  * 
- * CHAMADO APENAS POR startNewRound()
+ * Regras atendidas:
+ * - NÃO usa Fisher-Yates
+ * - Usa sorteios aleatórios e re-sorteia se repetir
+ * - CHAMADO APENAS POR startNewRound()
  */
 function generateSecret(): GameSymbol[] {
-  return [
-    randomSymbol(),
-    randomSymbol(),
-    randomSymbol(),
-    randomSymbol(),
-  ];
+  const used = new Set<string>();
+  const secret: GameSymbol[] = [];
+
+  while (secret.length < CODE_LENGTH) {
+    const candidate = randomSymbol();
+    if (used.has(candidate.id)) continue;
+    used.add(candidate.id);
+    secret.push(candidate);
+  }
+
+  return secret;
+}
+
+// Export apenas para testes unitários (não usado pela UI)
+export function generateSecretForTest(): GameSymbol[] {
+  return generateSecret();
 }
 
 /**
@@ -247,7 +258,7 @@ export function useGame() {
     }
     
     // ═══════════════════════════════════════════════════════════════════════
-    // GERA NOVO SECRET (COM DUPLICATAS PERMITIDAS)
+    // GERA NOVO SECRET (SEM REPETIÇÃO)
     // Este é o ÚNICO lugar onde o secret é criado/modificado
     // ═══════════════════════════════════════════════════════════════════════
     const newSecret = generateSecret();

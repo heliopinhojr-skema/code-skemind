@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateFeedback, GameSymbol, CODE_LENGTH } from '@/hooks/useGame';
+import { calculateFeedback, generateSecretForTest, GameSymbol, CODE_LENGTH } from '@/hooks/useGame';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -61,11 +61,25 @@ describe('Mastermind Feedback Algorithm', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TESTE 2: DUPLICATAS NO SECRET (CASOS CRÍTICOS)
+// TESTE 2: GERAÇÃO DO SECRET (SEM REPETIÇÃO)
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('Duplicatas no Secret', () => {
-  
+describe('Geração do Secret', () => {
+  it('Nunca repete símbolos (4 únicos)', () => {
+    for (let k = 0; k < 200; k++) {
+      const secret = generateSecretForTest();
+      const ids = secret.map(s => s.id);
+      expect(ids).toHaveLength(CODE_LENGTH);
+      expect(new Set(ids).size).toBe(CODE_LENGTH);
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TESTE 3: DUPLICATAS NO FEEDBACK (CASOS CRÍTICOS)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Duplicatas no Feedback', () => {
   it('Secret [A,A,B,C] vs Guess [A,B,A,A] → 1 exact, 2 present', () => {
     const secret = makeArray(['A', 'A', 'B', 'C']);
     const guess = makeArray(['A', 'B', 'A', 'A']);
