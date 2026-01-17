@@ -29,7 +29,7 @@ export function GameBoard({
 }: GameBoardProps) {
   const isPlaying = state.status === 'playing';
   const isNotStarted = state.status === 'notStarted';
-  const isGameOver = state.status === 'won' || state.status === 'lost' || state.status === 'timeup';
+  const isGameOver = state.status === 'won' || state.status === 'lost';
   const canSubmit = isPlaying && !state.currentGuess.includes(null);
   
   // IDs selecionados (para highlight, mas não impede duplicação no guess)
@@ -78,33 +78,16 @@ export function GameBoard({
         </motion.div>
       )}
 
-      {/* Defeat Message */}
+      {/* Defeat Message (inclui tempo esgotado) */}
       {state.status === 'lost' && (
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           className="p-4 rounded-xl bg-destructive/20 border border-destructive/50 text-center"
         >
-          <p className="text-xl font-bold text-destructive">💔 Derrota!</p>
-          <p className="text-xs text-muted-foreground mt-2">O código era:</p>
-          <div className="flex justify-center gap-2 mt-2">
-            {secretCode.map((symbol, i) => (
-              <div key={i} className="w-10 h-10 flex items-center justify-center bg-muted/30 rounded-lg">
-                <Symbol symbol={symbol} size="md" />
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      )}
-
-      {/* Time Up Message */}
-      {state.status === 'timeup' && (
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="p-4 rounded-xl bg-destructive/20 border border-destructive/50 text-center"
-        >
-          <p className="text-xl font-bold text-destructive">⏰ Tempo Esgotado!</p>
+          <p className="text-xl font-bold text-destructive">
+            {state.timeLeft <= 0 ? '⏰ Tempo Esgotado!' : '💔 Derrota!'}
+          </p>
           <p className="text-xs text-muted-foreground mt-2">O código era:</p>
           <div className="flex justify-center gap-2 mt-2">
             {secretCode.map((symbol, i) => (
