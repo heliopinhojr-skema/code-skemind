@@ -188,8 +188,8 @@ export function useGame() {
     const entry: AttemptResult = {
       id: crypto.randomUUID(),
       guess: [...guessIds],
-      whites: result.exact,
-      grays: result.present,
+      whites: result.whites,
+      grays: result.grays,
     };
 
     const nextHistory = [entry, ...historyRef.current];
@@ -197,7 +197,7 @@ export function useGame() {
     setHistory(nextHistory);
 
     // vitória/derrota
-    if (result.exact === CODE_LENGTH) {
+    if (result.whites === CODE_LENGTH) {
       setStatus('won');
       return;
     }
