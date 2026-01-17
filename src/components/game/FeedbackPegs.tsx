@@ -4,6 +4,7 @@ interface FeedbackPegsProps {
   correctPosition: number; // Exact matches (símbolo certo na posição certa)
   correctSymbol: number;   // Partial matches (símbolo certo na posição errada)
   total?: number;
+  attemptId?: string;      // ID único da tentativa para keys estáveis
 }
 
 /**
@@ -17,18 +18,21 @@ interface FeedbackPegsProps {
  * A ORDEM dos pegs NÃO revela qual símbolo acertou (comportamento clássico)
  * O total de pegs nunca ultrapassa 4
  */
-export function FeedbackPegs({ correctPosition, correctSymbol, total = 4 }: FeedbackPegsProps) {
+export function FeedbackPegs({ correctPosition, correctSymbol, total = 4, attemptId = '' }: FeedbackPegsProps) {
   // Garantir que nunca ultrapassamos o total
   const safeExact = Math.min(correctPosition, total);
   const safePartial = Math.min(correctSymbol, total - safeExact);
   const empty = Math.max(0, total - safeExact - safePartial);
+
+  // Prefixo único para keys baseado no attemptId
+  const keyPrefix = attemptId || crypto.randomUUID();
   
   return (
     <div className="flex gap-1.5 items-center">
       {/* Acertos EXATOS primeiro (branco) */}
       {Array.from({ length: safeExact }).map((_, i) => (
         <motion.div
-          key={`exact-${i}`}
+          key={`${keyPrefix}-exact-${i}`}
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ delay: i * 0.08, type: 'spring', stiffness: 400 }}
@@ -39,7 +43,7 @@ export function FeedbackPegs({ correctPosition, correctSymbol, total = 4 }: Feed
       {/* Acertos PARCIAIS depois (cinza) */}
       {Array.from({ length: safePartial }).map((_, i) => (
         <motion.div
-          key={`partial-${i}`}
+          key={`${keyPrefix}-partial-${i}`}
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ delay: (safeExact + i) * 0.08, type: 'spring', stiffness: 400 }}
@@ -50,7 +54,7 @@ export function FeedbackPegs({ correctPosition, correctSymbol, total = 4 }: Feed
       {/* Vazios por último */}
       {Array.from({ length: empty }).map((_, i) => (
         <motion.div
-          key={`empty-${i}`}
+          key={`${keyPrefix}-empty-${i}`}
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ delay: (safeExact + safePartial + i) * 0.08 }}
