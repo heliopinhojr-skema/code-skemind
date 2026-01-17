@@ -75,20 +75,24 @@ export function evaluateGuess(
   const secretRemainder: string[] = [];
   const guessRemainder: string[] = [];
 
-  // PASSO 1 — BRANCOS
+  // PASSO 1 — BRANCOS (somente quando ambos são strings válidas)
   for (let i = 0; i < CODE_LENGTH; i++) {
-    if (guessCopy[i] === secretCopy[i]) {
+    const s = secretCopy[i];
+    const g = guessCopy[i];
+
+    if (typeof s === 'string' && typeof g === 'string' && g === s) {
       whites++;
-    } else {
-      // remove da comparação: só entra nos 'restantes'
-      if (typeof secretCopy[i] === 'string') secretRemainder.push(secretCopy[i]);
-      if (typeof guessCopy[i] === 'string') guessRemainder.push(guessCopy[i]);
+      continue;
     }
+
+    // remove da comparação: só entra nos 'restantes'
+    if (typeof s === 'string') secretRemainder.push(s);
+    if (typeof g === 'string') guessRemainder.push(g);
   }
 
   // PASSO 2 — CINZAS
   // Para cada símbolo restante no guess, procura 1 ocorrência no secret restante
-  // e remove (splice) para garantir que nunca conta duas vezes.
+  // e remove para garantir que nunca conta duas vezes.
   let grays = 0;
   const secretBag = [...secretRemainder];
   for (const g of guessRemainder) {

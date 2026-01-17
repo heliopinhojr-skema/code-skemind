@@ -117,46 +117,48 @@ export function useGame() {
    * Seleciona símbolo para o palpite
    * - Bloqueia duplicados
    * - Preenche próximo slot vazio
+   *
+   * IMPORTANTE: atualiza o ref de forma síncrona (sem depender do timing do React)
    */
-  const selectSymbol = useCallback((symbol: GameSymbol) => {
-    if (status !== 'playing') return;
+  const selectSymbol = useCallback(
+    (symbol: GameSymbol) => {
+      if (status !== 'playing') return;
 
-    setCurrentGuess(prev => {
+      const prev = currentGuessRef.current;
+
       // Bloqueia se símbolo já está no palpite
-      if (prev.some(s => s?.id === symbol.id)) {
-        currentGuessRef.current = prev;
-        return prev;
-      }
+      if (prev.some(s => s?.id === symbol.id)) return;
 
       // Encontra próximo slot vazio
       const emptyIndex = prev.findIndex(s => s === null);
-      if (emptyIndex === -1) {
-        currentGuessRef.current = prev;
-        return prev;
-      }
+      if (emptyIndex === -1) return;
 
-      // Retorna nova array com símbolo inserido
       const next = [...prev];
       next[emptyIndex] = { ...symbol };
+
       currentGuessRef.current = next;
-      return next;
-    });
-  }, [status]);
+      setCurrentGuess(next);
+    },
+    [status],
+  );
 
   /**
-   * Limpa slot específico
+   * Limpa slot específico (síncrono via ref)
    */
-  const clearSlot = useCallback((index: number) => {
-    if (status !== 'playing') return;
-    if (index < 0 || index >= CODE_LENGTH) return;
+  const clearSlot = useCallback(
+    (index: number) => {
+      if (status !== 'playing') return;
+      if (index < 0 || index >= CODE_LENGTH) return;
 
-    setCurrentGuess(prev => {
+      const prev = currentGuessRef.current;
       const next = [...prev];
       next[index] = null;
+
       currentGuessRef.current = next;
-      return next;
-    });
-  }, [status]);
+      setCurrentGuess(next);
+    },
+    [status],
+  );
 
   /**
    * Envia palpite
