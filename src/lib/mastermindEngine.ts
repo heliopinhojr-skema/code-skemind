@@ -5,8 +5,8 @@
  * - CODE_LENGTH = 4
  * - Sem repetição no secret
  * - Feedback em 2 passos (obrigatório):
- *   PASSO 1: brancos (símbolo certo, posição certa) e marcar como null
- *   PASSO 2: cinzas (símbolo certo, posição errada) removendo só 1 ocorrência
+ *   PASSO 1: brancos (símbolo certo, posição certa)
+ *   PASSO 2: cinzas (símbolo certo, posição errada)
  */
 
 export interface Symbol {
@@ -39,90 +39,96 @@ export const SYMBOLS: readonly Symbol[] = [
 ] as const;
 
 /**
- * Gera o secret SOMENTE quando chamado (ex.: ao clicar "Iniciar Jogo").
+ * Gera o secret SOMENTE quando chamado.
  * - Exatamente 4 símbolos
  * - Sem repetição
  */
 export function generateSecret(): Symbol[] {
-  const used = new Set<string>();
+  const available = [...SYMBOLS];
   const out: Symbol[] = [];
 
-  while (out.length < CODE_LENGTH) {
-    const idx = Math.floor(Math.random() * SYMBOLS.length);
-    const candidate = SYMBOLS[idx];
-    if (used.has(candidate.id)) continue;
-    used.add(candidate.id);
-    out.push(candidate);
+  for (let i = 0; i < CODE_LENGTH; i++) {
+    const idx = Math.floor(Math.random() * available.length);
+    out.push(available[idx]);
+    available.splice(idx, 1); // remove para evitar repetição
   }
 
   return out;
 }
 
 /**
- * Avalia guess contra secret seguindo ESTRITAMENTE o algoritmo exigido:
- *
- * PASSO 1:
- * - comparar secret[i] === guess[i]
- * - contar branco
- * - marcar secret[i] = null e guess[i] = null
- *
- * PASSO 2:
- * - para cada símbolo restante em guess
- *   - se existir em secret
- *     - contar cinza
- *     - remover UMA ocorrência do símbolo no secret (marcar como null)
+ * Avalia guess contra secret.
+ * 
+ * ALGORITMO EM 2 PASSOS:
+ * 
+ * PASSO 1 — BRANCOS:
+ * - Para cada posição i: se secret[i].id === guess[i].id
+ *   - incrementa exact
+ *   - marca ambas posições como "usadas"
+ * 
+ * PASSO 2 — CINZAS:
+ * - Para cada símbolo restante em guess:
+ *   - Se existir no secret restante (não usado)
+ *     - incrementa present
+ *     - marca como usado no secret
+ * 
+ * NUNCA muta os arrays originais — trabalha apenas com IDs.
  */
 export function evaluateGuess(secret: Symbol[], guess: Symbol[]): EvaluationResult {
   if (secret.length !== CODE_LENGTH || guess.length !== CODE_LENGTH) {
     throw new Error(`Secret e guess devem ter exatamente ${CODE_LENGTH} símbolos`);
   }
 
-  // REGRA: nunca mutar o secret/guess originais.
-  // Usar SEMPRE cópias locais que podem ser marcadas como null.
-  const secretCopy: Array<Symbol | null> = [...secret];
-  const guessCopy: Array<Symbol | null> = [...guess];
+  // Trabalha só com IDs (strings) para evitar qualquer problema de referência
+  const secretIds = secret.map(s => s.id);
+  const guessIds = guess.map(g => g.id);
+
+  // Marca posições já usadas
+  const secretUsed = [false, false, false, false];
+  const guessUsed = [false, false, false, false];
 
   let exact = 0;
   let present = 0;
 
-  // PASSO 1 — BRANCOS (símbolo correto na posição correta)
+  // PASSO 1 — BRANCOS (posição correta)
   for (let i = 0; i < CODE_LENGTH; i++) {
-    const s = secretCopy?.[i] ?? null;
-    const g = guessCopy?.[i] ?? null;
-
-    if (s && g && s.id === g.id) {
+    if (secretIds[i] === guessIds[i]) {
       exact++;
-      secretCopy[i] = null;
-      guessCopy[i] = null;
+      secretUsed[i] = true;
+      guessUsed[i] = true;
     }
   }
 
-  // PASSO 2 — CINZAS (símbolo correto na posição errada)
+  // PASSO 2 — CINZAS (símbolo correto, posição errada)
   for (let i = 0; i < CODE_LENGTH; i++) {
-    const g = guessCopy?.[i] ?? null;
-    if (!g) continue;
+    if (guessUsed[i]) continue; // já contou como branco
 
-    const j = secretCopy.findIndex(s => s !== null && s.id === g.id);
-    if (j !== -1) {
-      present++;
-      secretCopy[j] = null; // remove UMA ocorrência
-      guessCopy[i] = null;
+    // Procura esse símbolo no secret (que ainda não foi usado)
+    for (let j = 0; j < CODE_LENGTH; j++) {
+      if (secretUsed[j]) continue; // já foi usado
+      
+      if (guessIds[i] === secretIds[j]) {
+        present++;
+        secretUsed[j] = true; // marca como usado
+        break; // só conta uma vez
+      }
     }
   }
 
-  const feedback: Feedback = { exact, present };
-  const isVictory = exact === CODE_LENGTH;
-  return { feedback, isVictory };
+  return {
+    feedback: { exact, present },
+    isVictory: exact === CODE_LENGTH,
+  };
 }
 
-/** Utilitário (testes) */
+/** Utilitário para testes */
 export function createSymbol(id: string): Symbol {
   const found = SYMBOLS.find(s => s.id === id);
   if (found) return found;
   return { id, label: id.charAt(0).toUpperCase(), color: '#888888' };
 }
 
-/** Utilitário (testes) */
+/** Utilitário para testes */
 export function createSymbolArray(ids: string[]): Symbol[] {
   return ids.map(createSymbol);
 }

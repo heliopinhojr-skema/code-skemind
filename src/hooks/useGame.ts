@@ -1,16 +1,8 @@
 /**
- * useGame — SKEMIND (Mastermind) reconstruído conforme especificação.
- *
- * REGRAS:
- * - Secret só é gerado ao clicar "Iniciar Jogo"
- * - Secret tem 4 símbolos distintos e não muda durante a partida
- * - Máximo 8 tentativas
- * - Feedback (branco/cinza) vem da engine com algoritmo obrigatório em 2 passos
- * - Debug panel: habilitado por ?debug=1 (SEM useMemo com deps vazias)
+ * useGame — SKEMIND (Mastermind) hook simplificado
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useCallback, useRef, useState } from "react";
 
 import {
   CODE_LENGTH,
@@ -31,11 +23,9 @@ export interface GameSymbol {
 export type GuessSlot = GameSymbol | null;
 
 export interface AttemptResult {
-  // obrigatório: histórico armazena APENAS ids (string[])
   guess: string[];
-  // obrigatório: feedback sempre existe
-  whites: number;
-  blacks: number;
+  whites: number;  // exact matches
+  blacks: number;  // present but wrong position
 }
 
 export interface GameState {
@@ -48,7 +38,6 @@ export interface GameState {
 export { CODE_LENGTH };
 export const MAX_ATTEMPTS = 8;
 
-// Símbolos disponíveis (UI)
 export const SYMBOLS: readonly GameSymbol[] = [
   { id: 'circle', color: '#E53935', shape: 'circle' },
   { id: 'square', color: '#1E88E5', shape: 'square' },
@@ -60,80 +49,20 @@ export const SYMBOLS: readonly GameSymbol[] = [
 
 function engineToUiSymbol(sym: EngineSymbol): GameSymbol {
   const found = SYMBOLS.find(s => s.id === sym.id);
-  return (
-    found ?? {
-      id: sym.id,
-      color: sym.color,
-      shape: 'circle',
-    }
-  );
+  return found ?? { id: sym.id, color: sym.color, shape: 'circle' };
 }
 
 function uiToEngineSymbol(sym: GameSymbol): EngineSymbol {
   const found = ENGINE_SYMBOLS.find(s => s.id === sym.id);
-  return (
-    found ?? {
-      id: sym.id,
-      label: sym.id.charAt(0).toUpperCase(),
-      color: sym.color,
-    }
-  );
-}
-
-function isDistinctCompleteGuess(guess: GuessSlot[]): guess is GameSymbol[] {
-  if (guess.length !== CODE_LENGTH) return false;
-  if (guess.some(s => s === null)) return false;
-  const ids = guess.map(s => (s as GameSymbol).id);
-  return new Set(ids).size === CODE_LENGTH;
+  return found ?? { id: sym.id, label: sym.id.charAt(0).toUpperCase(), color: sym.color };
 }
 
 export function useGame() {
-  const location = useLocation();
-  
-  // Debug mode — estado reativo que re-verifica sempre
-  const [debugMode, setDebugMode] = useState(false);
-  
-  useEffect(() => {
-    const checkDebug = () => {
-      // Prioridade 1: location.search do react-router
-      if (location.search) {
-        const found = new URLSearchParams(location.search).get('debug') === '1';
-        setDebugMode(found);
-        return;
-      }
-      // Prioridade 2: window.location.search
-      if (typeof window !== 'undefined' && window.location.search) {
-        const found = new URLSearchParams(window.location.search).get('debug') === '1';
-        setDebugMode(found);
-        return;
-      }
-      // Prioridade 3: query embutida no pathname (ex.: "/?debug=1" malformado)
-      if (typeof window !== 'undefined' && window.location.pathname.includes('?')) {
-        const embeddedQuery = window.location.pathname.split('?')[1] || '';
-        const found = new URLSearchParams(embeddedQuery).get('debug') === '1';
-        setDebugMode(found);
-        return;
-      }
-      // Prioridade 4: parse href completo
-      if (typeof window !== 'undefined') {
-        try {
-          const url = new URL(window.location.href);
-          setDebugMode(url.searchParams.get('debug') === '1');
-          return;
-        } catch {
-          // ignore
-        }
-      }
-      setDebugMode(false);
-    };
-    
-    checkDebug();
-    // Também escuta popstate para mudanças de URL
-    window.addEventListener('popstate', checkDebug);
-    return () => window.removeEventListener('popstate', checkDebug);
-  }, [location.search, location.pathname]);
+  // Debug mode simples
+  const debugMode = typeof window !== 'undefined' && 
+    new URLSearchParams(window.location.search).get('debug') === '1';
 
-  // Secret travado (NUNCA muda durante a partida)
+  // Secret fixo durante a partida
   const secretRef = useRef<EngineSymbol[] | null>(null);
 
   const [status, setStatus] = useState<GameStatus>('notStarted');
@@ -143,86 +72,76 @@ export function useGame() {
   const attempts = history.length;
 
   const startGame = useCallback(() => {
-    // ÚNICO local onde o secret é gerado
     const secret = generateSecret();
     secretRef.current = secret;
-
     setStatus('playing');
     setHistory([]);
     setCurrentGuess([null, null, null, null]);
-
-    if (debugMode) {
-      // eslint-disable-next-line no-console
-      console.log('[DEBUG] startGame secret=', secret.map(s => s.id));
-    }
-  }, [debugMode]);
+    
+    // eslint-disable-next-line no-console
+    console.log('[GAME] Secret gerado:', secret.map(s => s.id));
+  }, []);
 
   const newGame = useCallback(() => {
-    // Volta ao estado inicial
     secretRef.current = null;
     setStatus('notStarted');
     setHistory([]);
     setCurrentGuess([null, null, null, null]);
   }, []);
 
-  const selectSymbol = useCallback(
-    (symbol: GameSymbol) => {
-      if (status !== 'playing') return;
+  const selectSymbol = useCallback((symbol: GameSymbol) => {
+    if (status !== 'playing') return;
 
-      setCurrentGuess(prev => {
-        // não permitir duplicação
-        if (prev.some(s => s?.id === symbol.id)) return prev;
+    setCurrentGuess(prev => {
+      // Não permitir duplicação
+      if (prev.some(s => s?.id === symbol.id)) return prev;
 
-        const next = [...prev];
-        const emptyIndex = next.findIndex(s => s === null);
-        if (emptyIndex === -1) return prev;
-        next[emptyIndex] = symbol;
-        return next;
-      });
-    },
-    [status],
-  );
+      const next = [...prev];
+      const emptyIndex = next.findIndex(s => s === null);
+      if (emptyIndex === -1) return prev;
+      next[emptyIndex] = symbol;
+      return next;
+    });
+  }, [status]);
 
-  const clearSlot = useCallback(
-    (index: number) => {
-      if (status !== 'playing') return;
-      setCurrentGuess(prev => {
-        const next = [...prev];
-        next[index] = null;
-        return next;
-      });
-    },
-    [status],
-  );
+  const clearSlot = useCallback((index: number) => {
+    if (status !== 'playing') return;
+    setCurrentGuess(prev => {
+      const next = [...prev];
+      next[index] = null;
+      return next;
+    });
+  }, [status]);
 
   const submit = useCallback(() => {
     if (status !== 'playing') return;
     if (!secretRef.current) return;
     if (attempts >= MAX_ATTEMPTS) return;
 
-    if (!isDistinctCompleteGuess(currentGuess)) {
-      if (debugMode) {
-        // eslint-disable-next-line no-console
-        console.warn('[DEBUG] submit bloqueado: guess incompleto ou com repetição', currentGuess);
-      }
-      return;
-    }
+    // Verificar se palpite está completo (4 símbolos distintos)
+    const filledGuess = currentGuess.filter((s): s is GameSymbol => s !== null);
+    if (filledGuess.length !== CODE_LENGTH) return;
+    
+    const ids = filledGuess.map(s => s.id);
+    if (new Set(ids).size !== CODE_LENGTH) return;
 
-    const secret = secretRef.current;
-    const guess = currentGuess;
+    // Converter para engine symbols e avaliar
+    const engineGuess = filledGuess.map(uiToEngineSymbol);
+    const result = evaluateGuess(secretRef.current, engineGuess);
 
-    const engineGuess = guess.map(uiToEngineSymbol);
-    const result = evaluateGuess(secret, engineGuess);
+    // eslint-disable-next-line no-console
+    console.log('[GAME] Avaliação:', {
+      secret: secretRef.current.map(s => s.id),
+      guess: ids,
+      whites: result.feedback.exact,
+      blacks: result.feedback.present,
+    });
 
-    // obrigatório: histórico no formato { guess: string[], whites, blacks }
-    const guessIds = (Array.isArray(guess) ? guess : []).map(s => s.id);
-    const whites = Number.isFinite(result.feedback.exact) ? result.feedback.exact : 0;
-    const blacks = Number.isFinite(result.feedback.present) ? result.feedback.present : 0;
-
+    // Adicionar ao histórico
     const entry: AttemptResult = {
-      guess: guessIds,
-      whites,
-      blacks,
+      guess: ids,
+      whites: result.feedback.exact,
+      blacks: result.feedback.present,
     };
 
     const nextHistory = [entry, ...history];
@@ -238,25 +157,14 @@ export function useGame() {
       return;
     }
 
-    // continua jogando
+    // Limpar para próximo palpite
     setCurrentGuess([null, null, null, null]);
+  }, [attempts, currentGuess, history, status]);
 
-    if (debugMode) {
-      // eslint-disable-next-line no-console
-      console.log('[DEBUG] submit', {
-        guess: guessIds,
-        secret: (Array.isArray(secret) ? secret : []).map(s => s.id),
-        whites,
-        blacks,
-      });
-    }
-  }, [attempts, currentGuess, debugMode, history, status]);
-
-  const secretCode: GameSymbol[] = useMemo(() => {
-    const secret = secretRef.current;
-    if (!secret) return [];
-    return secret.map(engineToUiSymbol);
-  }, [status]);
+  // Secret para exibição (UI)
+  const secretCode: GameSymbol[] = secretRef.current 
+    ? secretRef.current.map(engineToUiSymbol) 
+    : [];
 
   const state: GameState = {
     status,
@@ -265,19 +173,11 @@ export function useGame() {
     history,
   };
 
-  const actions = {
-    startGame,
-    newGame,
-    selectSymbol,
-    clearSlot,
-    submit,
+  return {
+    state,
+    actions: { startGame, newGame, selectSymbol, clearSlot, submit },
+    constants: { CODE_LENGTH, MAX_ATTEMPTS, SYMBOLS },
+    secretCode,
+    debugMode,
   };
-
-  const constants = {
-    CODE_LENGTH,
-    MAX_ATTEMPTS,
-    SYMBOLS,
-  } as const;
-
-  return { state, actions, constants, secretCode, debugMode };
 }
