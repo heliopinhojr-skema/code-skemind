@@ -86,6 +86,9 @@ export function useGame() {
    * - Reseta estado
    */
   const startGame = useCallback(() => {
+    // Blindagem: evita gerar outro secret por clique duplo antes do React re-renderizar
+    if (secretRef.current) return;
+
     const secret = generateSecret(UI_SYMBOLS.map(s => s.id));
     secretRef.current = [...secret]; // imutável
 
