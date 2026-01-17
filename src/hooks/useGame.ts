@@ -1,16 +1,14 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SKEMIND - FINITE STATE MACHINE ARCHITECTURE
+// SKEMIND - CLEAN MASTERMIND IMPLEMENTATION
 // ═══════════════════════════════════════════════════════════════════════════
-// 
-// INVARIANTS:
-// 1. Secret is created ONLY inside startNewRound()
-// 2. No hook, effect, timer, or render can generate or modify secret
-// 3. Secret is completely immutable during a round
-// 4. Game always starts with status = "playing"
-// 5. When status !== "playing", all input is locked, no state changes allowed
-// 6. "New Round" button is the ONLY entry point to create a new secret
+//
+// INVARIANTES ABSOLUTOS:
+// 1. O secret é gerado APENAS em startNewRound()
+// 2. O secret é IMUTÁVEL durante toda a rodada
+// 3. Nenhum render, timer, submit ou effect pode alterar o secret
+// 4. Apenas o botão "New Round" pode criar novo secret
 //
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -24,33 +22,31 @@ export interface GameSymbol {
   shape: 'circle' | 'square' | 'triangle' | 'diamond' | 'star' | 'hexagon';
 }
 
-export type GameStatus = 'playing' | 'victory' | 'timeout';
+export type GameStatus = 'playing' | 'victory' | 'defeat';
 
 export type GuessSlot = GameSymbol | null;
 
 export interface AttemptResult {
   guess: GameSymbol[];
-  correctPosition: number; // Black pegs (exact match)
-  correctSymbol: number;   // White pegs (wrong position)
+  correctPosition: number; // Pino branco (exato)
+  correctSymbol: number;   // Pino cinza (parcial)
 }
 
 /**
- * Core game round state - Finite State Machine
- * The secret lives ONLY here and is set ONLY by startNewRound()
+ * Estado central do jogo - Máquina de Estados Finitos
  */
 export interface GameRound {
-  readonly id: string;
-  readonly secret: readonly GameSymbol[];
+  id: string;
+  secret: GameSymbol[];
   status: GameStatus;
   attempts: number;
   history: AttemptResult[];
   currentGuess: GuessSlot[];
-  score: number;
   remainingSeconds: number;
   startTime: number;
 }
 
-// Legacy type alias for backward compatibility
+// Alias para compatibilidade com componentes existentes
 export interface GameState {
   roundId: string;
   guess: GuessSlot[];
@@ -79,7 +75,7 @@ export const CODE_LENGTH = 4;
 export const ROUND_DURATION_SECONDS = 180;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PURE FUNCTIONS (No side effects, deterministic)
+// PURE FUNCTIONS
 // ─────────────────────────────────────────────────────────────────────────────
 
 function generateRoundId(): string {
@@ -87,10 +83,8 @@ function generateRoundId(): string {
 }
 
 /**
- * Generate secret code with exactly CODE_LENGTH DIFFERENT symbols.
- * Uses Fisher-Yates shuffle for unbiased randomization.
- * 
- * IMPORTANT: This function is called ONLY by startNewRound()
+ * Gera código secreto com 4 símbolos diferentes.
+ * CHAMADO APENAS POR startNewRound()
  */
 function generateSecret(): GameSymbol[] {
   const pool = [...SYMBOLS];
@@ -101,32 +95,31 @@ function generateSecret(): GameSymbol[] {
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
   
-  return Object.freeze(pool.slice(0, CODE_LENGTH)) as GameSymbol[];
+  return pool.slice(0, CODE_LENGTH);
 }
 
 /**
- * Classic Mastermind feedback algorithm.
+ * Algoritmo clássico Mastermind para feedback.
  * 
- * PHASE 1 - Exact matches (correctPosition):
- *   Same symbol AND same position.
+ * FASE 1 - Acertos exatos (pino branco):
+ *   Mesmo símbolo E mesma posição.
  * 
- * PHASE 2 - Partial matches (correctSymbol):
- *   Symbol exists but at different position.
+ * FASE 2 - Acertos parciais (pino cinza):
+ *   Símbolo existe mas em posição diferente.
  * 
- * Each symbol generates at most ONE feedback point.
+ * Cada símbolo gera NO MÁXIMO um feedback.
  */
 function calculateFeedback(
-  secret: readonly GameSymbol[],
-  guess: readonly GameSymbol[]
+  secret: GameSymbol[],
+  guess: GameSymbol[]
 ): { correctPosition: number; correctSymbol: number } {
-  // Create mutable copies - never touch originals
   const secretCopy: (string | null)[] = secret.map(s => s.id);
   const guessCopy: (string | null)[] = guess.map(g => g.id);
   
   let exactMatches = 0;
   let partialMatches = 0;
   
-  // PHASE 1: Exact matches
+  // FASE 1: Acertos exatos
   for (let i = 0; i < CODE_LENGTH; i++) {
     if (guessCopy[i] !== null && guessCopy[i] === secretCopy[i]) {
       exactMatches++;
@@ -135,7 +128,7 @@ function calculateFeedback(
     }
   }
   
-  // PHASE 2: Partial matches
+  // FASE 2: Acertos parciais
   for (let i = 0; i < CODE_LENGTH; i++) {
     if (guessCopy[i] === null) continue;
     
@@ -153,143 +146,96 @@ function calculateFeedback(
   return { correctPosition: exactMatches, correctSymbol: partialMatches };
 }
 
-function calculateScore(attempts: number, elapsedMs: number, solved: boolean): number {
-  if (!solved) return 0;
-  
-  const baseScore = 1000;
-  const attemptBonus = Math.max(0, (MAX_ATTEMPTS - attempts) * 100);
-  const elapsedSeconds = elapsedMs / 1000;
-  const timeBonus = Math.max(0, Math.floor(ROUND_DURATION_SECONDS - elapsedSeconds));
-  
-  return baseScore + attemptBonus + timeBonus;
-}
-
 /**
- * Create a fresh game round.
- * This is the ONLY place where a secret is generated.
+ * Cria uma nova rodada com secret fresco.
+ * Esta é a ÚNICA função que gera um secret.
  */
 function createNewRound(): GameRound {
-  const secret = generateSecret();
-  
-  return Object.freeze({
+  return {
     id: generateRoundId(),
-    secret: secret,
-    status: 'playing' as GameStatus,
+    secret: generateSecret(),
+    status: 'playing',
     attempts: 0,
     history: [],
     currentGuess: [null, null, null, null],
-    score: 0,
     remainingSeconds: ROUND_DURATION_SECONDS,
     startTime: Date.now(),
-  }) as GameRound;
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GAME HOOK - Finite State Machine Controller
+// GAME HOOK
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function useGame() {
-  // The round state is the single source of truth.
-  // Secret lives inside round and is NEVER regenerated except by startNewRound().
+  // Estado central - o secret vive aqui e é IMUTÁVEL durante a rodada
   const [round, setRound] = useState<GameRound>(() => createNewRound());
   
-  // Timer reference (does NOT affect secret or game logic)
+  // Timer reference
   const timerRef = useRef<number | null>(null);
-  const roundIdRef = useRef<string>(round.id);
+  const currentRoundIdRef = useRef<string>(round.id);
 
   // ───────────────────────────────────────────────────────────────────────────
-  // ACTION: Start New Round
-  // This is the ONLY function that creates a new secret.
+  // TIMER EFFECT
   // ───────────────────────────────────────────────────────────────────────────
-  const startNewRound = useCallback(() => {
-    // Clear any existing timer
+  useEffect(() => {
+    // Limpa timer anterior
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    
-    // Create completely fresh round with new secret
-    const newRound = createNewRound();
-    roundIdRef.current = newRound.id;
-    setRound(newRound);
-    
-    // Start countdown timer
-    timerRef.current = window.setInterval(() => {
-      setRound(prev => {
-        // Guard: Only tick if this is the current round and still playing
-        if (prev.id !== roundIdRef.current) return prev;
-        if (prev.status !== 'playing') {
-          if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
-          }
-          return prev;
-        }
-        
-        if (prev.remainingSeconds <= 1) {
-          if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
-          }
-          return {
-            ...prev,
-            remainingSeconds: 0,
-            status: 'timeout' as GameStatus,
-            score: 0,
-          };
-        }
-        
-        return { ...prev, remainingSeconds: prev.remainingSeconds - 1 };
-      });
-    }, 1000);
-  }, []);
 
-  // Start timer on initial mount (using useEffect, not useState)
-  useEffect(() => {
-    roundIdRef.current = round.id;
+    // Só inicia timer se estiver jogando
+    if (round.status !== 'playing') return;
+
+    currentRoundIdRef.current = round.id;
+
     timerRef.current = window.setInterval(() => {
       setRound(prev => {
-        if (prev.id !== roundIdRef.current) return prev;
-        if (prev.status !== 'playing') {
-          if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
-          }
-          return prev;
-        }
-        
+        // Guard: verifica se ainda é a mesma rodada
+        if (prev.id !== currentRoundIdRef.current) return prev;
+        if (prev.status !== 'playing') return prev;
+
         if (prev.remainingSeconds <= 1) {
           if (timerRef.current) {
             clearInterval(timerRef.current);
             timerRef.current = null;
           }
-          return {
-            ...prev,
-            remainingSeconds: 0,
-            status: 'timeout' as GameStatus,
-            score: 0,
-          };
+          return { ...prev, remainingSeconds: 0, status: 'defeat' };
         }
-        
+
         return { ...prev, remainingSeconds: prev.remainingSeconds - 1 };
       });
     }, 1000);
-    
+
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [round.id, round.status]);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // ACTION: Start New Round
+  // ÚNICO ponto onde um novo secret é criado
+  // ───────────────────────────────────────────────────────────────────────────
+  const startNewRound = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    
+    const newRound = createNewRound();
+    currentRoundIdRef.current = newRound.id;
+    setRound(newRound);
+  }, []);
 
   // ───────────────────────────────────────────────────────────────────────────
   // ACTION: Select Symbol
-  // Only works when status === "playing"
   // ───────────────────────────────────────────────────────────────────────────
   const selectSymbol = useCallback((symbol: GameSymbol) => {
     setRound(prev => {
-      // Guard: Only allow when playing
       if (prev.status !== 'playing') return prev;
       
       const newGuess = [...prev.currentGuess];
@@ -303,7 +249,6 @@ export function useGame() {
 
   // ───────────────────────────────────────────────────────────────────────────
   // ACTION: Clear Slot
-  // Only works when status === "playing"
   // ───────────────────────────────────────────────────────────────────────────
   const clearSlot = useCallback((index: number) => {
     setRound(prev => {
@@ -317,23 +262,15 @@ export function useGame() {
 
   // ───────────────────────────────────────────────────────────────────────────
   // ACTION: Submit Guess
-  // Only works when status === "playing"
-  // Compares guess against the IMMUTABLE secret from round state
+  // Compara contra o secret IMUTÁVEL da rodada
   // ───────────────────────────────────────────────────────────────────────────
   const submitGuess = useCallback(() => {
     setRound(prev => {
-      // Guard: Only allow when playing
       if (prev.status !== 'playing') return prev;
-      
-      // Guard: All slots must be filled
       if (prev.currentGuess.includes(null)) return prev;
       
-      // The secret is read directly from the round state - it cannot change
-      const secret = prev.secret;
       const guess = prev.currentGuess as GameSymbol[];
-      
-      // Calculate feedback using classic Mastermind algorithm
-      const feedback = calculateFeedback(secret, guess);
+      const feedback = calculateFeedback(prev.secret, guess);
       
       const newAttempts = prev.attempts + 1;
       const newHistory: AttemptResult[] = [
@@ -345,43 +282,37 @@ export function useGame() {
         ...prev.history,
       ];
       
-      const elapsedMs = Date.now() - prev.startTime;
-      
-      // Check for victory (all correct positions)
+      // Vitória: todos os 4 corretos
       if (feedback.correctPosition === CODE_LENGTH) {
         if (timerRef.current) {
           clearInterval(timerRef.current);
           timerRef.current = null;
         }
-        
         return {
           ...prev,
           attempts: newAttempts,
           history: newHistory,
           currentGuess: [null, null, null, null],
-          score: calculateScore(newAttempts, elapsedMs, true),
           status: 'victory' as GameStatus,
         };
       }
       
-      // Check for max attempts reached
+      // Derrota: 8 tentativas esgotadas
       if (newAttempts >= MAX_ATTEMPTS) {
         if (timerRef.current) {
           clearInterval(timerRef.current);
           timerRef.current = null;
         }
-        
         return {
           ...prev,
           attempts: newAttempts,
           history: newHistory,
           currentGuess: [null, null, null, null],
-          score: 0,
-          status: 'timeout' as GameStatus,
+          status: 'defeat' as GameStatus,
         };
       }
       
-      // Continue playing
+      // Continua jogando
       return {
         ...prev,
         attempts: newAttempts,
@@ -395,24 +326,22 @@ export function useGame() {
   // PUBLIC API
   // ───────────────────────────────────────────────────────────────────────────
   return {
-    // Current round state (includes secret for end-game reveal)
     round,
     
-    // Derived state for UI convenience
+    // Estado derivado para UI
     state: {
       roundId: round.id,
       guess: round.currentGuess,
       attempts: round.attempts,
       history: round.history,
-      score: round.score,
+      score: round.status === 'victory' ? 1000 : 0,
       remainingSeconds: round.remainingSeconds,
       gameStatus: round.status,
     },
     
-    // Secret code (for reveal at game end)
+    // Secret para reveal no fim
     secretCode: round.secret,
     
-    // Actions
     actions: {
       newGame: startNewRound,
       selectSymbol,
@@ -420,7 +349,6 @@ export function useGame() {
       submit: submitGuess,
     },
     
-    // Constants for UI
     constants: {
       SYMBOLS,
       MAX_ATTEMPTS,
@@ -428,38 +356,4 @@ export function useGame() {
       ROUND_DURATION_SECONDS,
     },
   };
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// DEVELOPMENT TESTS - Run on module load
-// ═══════════════════════════════════════════════════════════════════════════
-
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-  const [A, B, C, D, E, F] = SYMBOLS;
-  
-  const runTest = (
-    name: string,
-    secret: GameSymbol[],
-    guess: GameSymbol[],
-    expectedExact: number,
-    expectedPartial: number
-  ) => {
-    const result = calculateFeedback(secret, guess);
-    const passed = result.correctPosition === expectedExact && result.correctSymbol === expectedPartial;
-    if (!passed) {
-      console.error(`❌ TEST FAILED: ${name}`);
-      console.error(`   Expected: ${expectedExact} exact, ${expectedPartial} partial`);
-      console.error(`   Got:      ${result.correctPosition} exact, ${result.correctSymbol} partial`);
-    }
-    return passed;
-  };
-  
-  console.log('═══ MASTERMIND FEEDBACK TESTS ═══');
-  runTest('All exact', [A, B, C, D], [A, B, C, D], 4, 0);
-  runTest('All partial', [A, B, C, D], [B, C, D, A], 0, 4);
-  runTest('All wrong', [A, B, C, D], [E, F, E, F], 0, 0);
-  runTest('1 exact, 2 partial', [A, B, C, D], [A, C, D, E], 1, 2);
-  runTest('2 exact, 0 partial', [A, B, C, D], [A, B, E, F], 2, 0);
-  runTest('Swapped pairs', [A, B, C, D], [B, A, D, C], 0, 4);
-  console.log('═════════════════════════════════');
 }
