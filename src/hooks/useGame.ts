@@ -93,11 +93,13 @@ export function useGame() {
     const key = Array.isArray(secretRef.current) ? secretRef.current.join('|') : null;
 
     if (secretInvariantRef.current && key && secretInvariantRef.current !== key) {
-      console.error('[SKEMIND] SECRET_CHANGED_UNEXPECTEDLY', {
-        prev: secretInvariantRef.current,
-        next: key,
-        status,
-      });
+      const errorMsg = `[SKEMIND] SECRET_CHANGED_UNEXPECTEDLY: prev=${secretInvariantRef.current} next=${key} status=${status}`;
+      console.error(errorMsg);
+
+      // DEV ONLY: dispara erro para parar exatamente no ponto do bug
+      if (import.meta.env.DEV) {
+        throw new Error(errorMsg);
+      }
     }
 
     secretInvariantRef.current = key;
