@@ -235,9 +235,16 @@ function logRound(state: GameState, endTime: number): RoundLog {
 }
 
 export function useGame() {
-  // Secret code must be generated ONLY inside newGame() and remain immutable during the round.
-  // useRef guarantees it won't be recreated by renders/timers.
-  const secretRef = useRef<GameSymbol[] | null>(null);
+  // Secret must be created once at round start and remain stable for the whole round.
+  // We store it in React state for persistence, and mirror it in a ref so submit() always
+  // reads the current value without depending on re-renders.
+  const [secret, setSecret] = useState<GameSymbol[]>(() => generateSecret());
+  const secretRef = useRef<GameSymbol[]>(secret);
+
+  // Keep ref in sync with state (no regeneration here)
+  useEffect(() => {
+    secretRef.current = secret;
+  }, [secret]);
 
   function createInitialState(roundId: string, startTime: number): GameState {
     return {
@@ -252,14 +259,10 @@ export function useGame() {
     };
   }
 
-  // Create initial round synchronously; secret is stored in secretRef (NOT React state).
+  // Initial round state (does NOT touch secret beyond the initializer above)
   const [state, setState] = useState<GameState>(() => {
     const now = Date.now();
     const roundId = generateRoundId();
-
-    // Generate secret EXACTLY once at round start (and ONLY when a round starts)
-    secretRef.current = generateSecret();
-
     return createInitialState(roundId, now);
   });
 
@@ -276,8 +279,9 @@ export function useGame() {
       timerRef.current = null;
     }
 
-    // Generate secret EXACTLY once per round, only when starting a new round.
-    secretRef.current = generateSecret();
+    const newSecret = generateSecret();
+    setSecret(newSecret);
+    secretRef.current = newSecret;
 
     const now = Date.now();
     const roundId = generateRoundId();
@@ -354,7 +358,8 @@ export function useGame() {
 
       // ALWAYS compare against the same secret for this round
       const currentSecret = secretRef.current;
-      if (!currentSecret) return s;
+      // Guard clause: secret must exist before any evaluation
+      if (!currentSecret || currentSecret.length !== CODE_LENGTH) return s;
 
       // Create deep immutable copy of guess for evaluation
       const validGuess: GameSymbol[] = s.guess.map(g => ({ ...g! }));
