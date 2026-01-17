@@ -59,13 +59,17 @@
     @apply border-border;
   }
 
+  html, body, #root {
+    height: 100%;
+    overflow: hidden;
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Space Grotesk', system-ui, sans-serif;
     background: 
       radial-gradient(ellipse 1200px 800px at 20% 0%, hsl(226 50% 18% / 0.6), transparent),
       hsl(var(--background));
-    min-height: 100vh;
   }
 }
 
@@ -84,27 +88,38 @@
     box-shadow: var(--shadow-glow-accent);
   }
 
-  .token-slot {
-    @apply w-14 h-14 rounded-xl flex items-center justify-center text-3xl cursor-pointer transition-all duration-200;
+  .guess-slot {
+    @apply w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center cursor-pointer transition-all duration-150;
     background: hsl(var(--muted) / 0.3);
     border: 2px dashed hsl(var(--border));
+    -webkit-tap-highlight-color: transparent;
   }
 
-  .token-slot.filled {
+  .guess-slot.filled {
     border-style: solid;
     border-color: hsl(var(--primary) / 0.5);
+    background: hsl(var(--muted) / 0.4);
   }
 
-  .token-picker {
-    @apply w-14 h-14 rounded-xl flex items-center justify-center text-3xl cursor-pointer transition-all duration-200;
-    background: hsl(var(--muted) / 0.2);
+  .symbol-picker {
+    @apply w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center cursor-pointer transition-all duration-150;
+    background: hsl(var(--muted) / 0.25);
     border: 1px solid hsl(var(--border));
+    -webkit-tap-highlight-color: transparent;
   }
 
-  .token-picker:hover {
+  .symbol-picker:hover:not(:disabled) {
     background: hsl(var(--primary) / 0.15);
     border-color: hsl(var(--primary) / 0.5);
-    transform: scale(1.08);
+  }
+
+  .symbol-picker:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+
+  .history-symbol {
+    @apply w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center;
+    background: hsl(var(--background) / 0.8);
   }
 
   .peg {
@@ -112,21 +127,16 @@
   }
 
   .peg-black {
-    background: hsl(0 0% 0%);
-    box-shadow: 0 0 6px hsl(0 0% 0% / 0.8);
+    background: hsl(0 0% 8%);
+    box-shadow: 0 0 6px hsl(0 0% 0% / 0.8), inset 0 1px 2px hsl(0 0% 30%);
   }
 
   .peg-white {
-    background: hsl(0 0% 100%);
+    background: hsl(0 0% 95%);
     box-shadow: 0 0 6px hsl(0 0% 100% / 0.5);
   }
 
   .peg-empty {
     background: hsl(var(--muted) / 0.3);
-  }
-
-  .log-mini {
-    @apply w-8 h-8 rounded-lg flex items-center justify-center text-lg;
-    background: hsl(var(--background) / 0.8);
   }
 }

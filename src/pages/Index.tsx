@@ -7,26 +7,30 @@ const Index = () => {
   const { state, actions, constants } = useGame();
 
   return (
-    <div className="min-h-screen pb-10">
+    <div className="h-screen flex flex-col overflow-hidden">
       <StatsBar 
         attempts={state.attempts}
         maxAttempts={constants.MAX_ATTEMPTS}
-        elapsedSeconds={state.elapsedSeconds}
+        remainingSeconds={state.remainingSeconds}
         score={state.score}
+        gameStatus={state.gameStatus}
       />
 
-      <main className="max-w-4xl mx-auto px-4 pt-6">
-        <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-4">
-          <GameBoard
-            state={state}
-            tokens={constants.TOKENS}
-            onSelectToken={actions.selectToken}
-            onClearSlot={actions.clearSlot}
-            onSubmit={actions.submit}
-            onNewGame={actions.newGame}
-            onReveal={actions.reveal}
-          />
-          <RulesCard />
+      <main className="flex-1 overflow-hidden px-3 py-3">
+        <div className="h-full grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-3 max-w-4xl mx-auto">
+          <div className="overflow-y-auto">
+            <GameBoard
+              state={state}
+              symbols={constants.SYMBOLS}
+              onSelectSymbol={actions.selectSymbol}
+              onClearSlot={actions.clearSlot}
+              onSubmit={actions.submit}
+              onNewGame={actions.newGame}
+            />
+          </div>
+          <div className="hidden lg:block overflow-y-auto">
+            <RulesCard />
+          </div>
         </div>
       </main>
     </div>
