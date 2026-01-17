@@ -5,7 +5,7 @@ import { GameBoard } from '@/components/game/GameBoard';
 import { RulesCard } from '@/components/game/RulesCard';
 
 const Index = () => {
-  const { state, actions, constants } = useGame();
+  const { state, actions, constants, secretCode } = useGame();
   
   // RNG Ambiental v1 - afeta apenas o visual, nunca a lógica
   const { config: environmentalConfig } = useEnvironmentalRng({
@@ -28,6 +28,7 @@ const Index = () => {
           <div className="overflow-y-auto">
             <GameBoard
               state={state}
+              secretCode={secretCode}
               symbols={constants.SYMBOLS}
               onSelectSymbol={actions.selectSymbol}
               onClearSlot={actions.clearSlot}
