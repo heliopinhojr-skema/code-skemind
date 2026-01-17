@@ -1,12 +1,34 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useGame } from '@/hooks/useGame';
+import { StatsBar } from '@/components/game/StatsBar';
+import { GameBoard } from '@/components/game/GameBoard';
+import { RulesCard } from '@/components/game/RulesCard';
 
 const Index = () => {
+  const { state, actions, constants } = useGame();
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen pb-10">
+      <StatsBar 
+        attempts={state.attempts}
+        maxAttempts={constants.MAX_ATTEMPTS}
+        elapsedSeconds={state.elapsedSeconds}
+        score={state.score}
+      />
+
+      <main className="max-w-4xl mx-auto px-4 pt-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-4">
+          <GameBoard
+            state={state}
+            tokens={constants.TOKENS}
+            onSelectToken={actions.selectToken}
+            onClearSlot={actions.clearSlot}
+            onSubmit={actions.submit}
+            onNewGame={actions.newGame}
+            onReveal={actions.reveal}
+          />
+          <RulesCard />
+        </div>
+      </main>
     </div>
   );
 };
