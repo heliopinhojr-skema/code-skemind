@@ -86,6 +86,9 @@ export function useGame() {
     const secret = generateSecret();
     secretRef.current = [...secret]; // Cópia para garantir imutabilidade
 
+    // DEBUG: confirma que o código secreto foi fixado no início da rodada
+    console.log('[SKEMIND] startGame secret=', secretRef.current);
+
     const cleared: GuessSlot[] = [null, null, null, null];
     currentGuessRef.current = cleared;
 
@@ -183,6 +186,14 @@ export function useGame() {
 
     // Calcula feedback usando snapshots
     const result = evaluateGuess(secretSnapshot, guessIds);
+
+    // DEBUG: confirma segredo fixo e cálculo do feedback
+    console.log('[SKEMIND] submit', {
+      secret: secretSnapshot,
+      guess: guessIds,
+      result,
+      historyLenBefore: history.length,
+    });
 
     // Cria entrada no histórico com ID único e dados imutáveis
     const entry: AttemptResult = {
