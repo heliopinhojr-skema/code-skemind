@@ -51,52 +51,55 @@ export function generateSecret(symbolIds: string[]): string[] {
 /**
  * Avalia palpite contra código secreto
  *
- * ALGORITMO MASTERMIND CLÁSSICO (2 passes):
- * 1) Conta EXACT (símbolo e posição corretos)
- * 2) Marca slots usados
- * 3) Conta PRESENT (símbolo correto em posição errada) apenas nos restantes
+ * ALGORITMO MASTERMIND CLÁSSICO (2 passos):
+ * PASSO 1 — BRANCOS (posição correta)
+ *   - Conta guess[i] === secret[i]
+ *   - Remove essas posições da comparação
+ * PASSO 2 — CINZAS (símbolo correto, posição errada)
+ *   - Compara apenas os restantes
+ *   - Cada símbolo pode ser contado apenas uma vez
  *
- * IMPORTANTE: não muta os inputs.
+ * IMPORTANTE: usa apenas cópias locais; não muta os inputs por referência.
  */
 export function evaluateGuess(
   secret: string[],
   guess: string[],
-): { exact: number; present: number } {
+): { whites: number; grays: number } {
+  // Cópias locais (imutabilidade dos inputs)
   const secretCopy = [...secret];
   const guessCopy = [...guess];
 
-  let exact = 0;
-  let present = 0;
+  let whites = 0;
 
-  const secretUsed = [false, false, false, false];
-  const guessUsed = [false, false, false, false];
+  // Resto após remover brancos
+  const secretRemainder: string[] = [];
+  const guessRemainder: string[] = [];
 
-  // PASSO 1: EXACT (posição exata)
+  // PASSO 1 — BRANCOS
   for (let i = 0; i < CODE_LENGTH; i++) {
     if (guessCopy[i] === secretCopy[i]) {
-      exact++;
-      secretUsed[i] = true;
-      guessUsed[i] = true;
+      whites++;
+    } else {
+      // remove da comparação: só entra nos 'restantes'
+      if (typeof secretCopy[i] === 'string') secretRemainder.push(secretCopy[i]);
+      if (typeof guessCopy[i] === 'string') guessRemainder.push(guessCopy[i]);
     }
   }
 
-  // PASSO 2: PRESENT (símbolo certo, posição errada)
-  for (let i = 0; i < CODE_LENGTH; i++) {
-    if (guessUsed[i]) continue;
-
-    for (let j = 0; j < CODE_LENGTH; j++) {
-      if (secretUsed[j]) continue;
-
-      if (guessCopy[i] === secretCopy[j]) {
-        present++;
-        secretUsed[j] = true;
-        guessUsed[i] = true;
-        break;
-      }
+  // PASSO 2 — CINZAS
+  // Para cada símbolo restante no guess, procura 1 ocorrência no secret restante
+  // e remove (splice) para garantir que nunca conta duas vezes.
+  let grays = 0;
+  const secretBag = [...secretRemainder];
+  for (const g of guessRemainder) {
+    const idx = secretBag.indexOf(g);
+    if (idx !== -1) {
+      grays++;
+      secretBag.splice(idx, 1);
     }
   }
 
-  return { exact, present };
+  return { whites, grays };
 }
 
 /**
