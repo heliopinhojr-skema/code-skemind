@@ -27,12 +27,12 @@ export function RulesCard() {
         
         <div className="space-y-1.5 pt-1">
           <div className="flex items-center gap-2">
-            <div className="peg peg-black" />
-            <span>Correct symbol, correct position</span>
+            <div className="w-4 h-4 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.6)]" />
+            <span>Símbolo correto, posição correta</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="peg peg-white" />
-            <span>Correct symbol, wrong position</span>
+            <div className="w-4 h-4 rounded-full bg-gray-500 shadow-[0_0_4px_rgba(0,0,0,0.3)]" />
+            <span>Símbolo correto, posição errada</span>
           </div>
         </div>
       </div>
