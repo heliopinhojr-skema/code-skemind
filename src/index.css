@@ -123,21 +123,24 @@
   }
 
   .peg {
-    @apply w-3 h-3 rounded-full;
+    @apply w-4 h-4 rounded-full;
   }
 
   /* MASTERMIND CLÁSSICO: Branco = Exato (posição certa), Cinza = Parcial (posição errada) */
   .peg-exact {
     background: hsl(0 0% 100%);
-    box-shadow: 0 0 8px hsl(0 0% 100% / 0.6), inset 0 -1px 2px hsl(0 0% 80%);
+    box-shadow: 0 0 10px hsl(0 0% 100% / 0.7), inset 0 -2px 3px hsl(0 0% 75%);
+    border: 1px solid hsl(0 0% 85%);
   }
 
   .peg-partial {
-    background: hsl(0 0% 50%);
-    box-shadow: 0 0 4px hsl(0 0% 30% / 0.5), inset 0 1px 2px hsl(0 0% 60%);
+    background: hsl(0 0% 55%);
+    box-shadow: 0 0 6px hsl(0 0% 40% / 0.5), inset 0 1px 3px hsl(0 0% 70%);
+    border: 1px solid hsl(0 0% 40%);
   }
 
   .peg-empty {
-    background: hsl(var(--muted) / 0.3);
+    background: hsl(var(--muted) / 0.4);
+    border: 1px dashed hsl(var(--border));
   }
 }
