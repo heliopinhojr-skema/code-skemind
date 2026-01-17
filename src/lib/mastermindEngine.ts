@@ -29,71 +29,74 @@ export const SYMBOLS: readonly Symbol[] = [
 
 /**
  * Gera código secreto com 4 símbolos ÚNICOS
- * Usa Fisher-Yates para embaralhar e pega os 4 primeiros
+ * - Recebe a lista de IDs disponíveis (ex.: os 6 símbolos da UI)
+ * - Embaralha e pega os 4 primeiros
  */
-export function generateSecret(): string[] {
-  const ids = SYMBOLS.map(s => s.id);
-  
-  // Fisher-Yates shuffle
+export function generateSecret(symbolIds: string[]): string[] {
+  const uniqueIds = Array.from(new Set(symbolIds));
+  if (uniqueIds.length < CODE_LENGTH) {
+    throw new Error(`generateSecret: precisa de pelo menos ${CODE_LENGTH} símbolos únicos`);
+  }
+
+  // Fisher-Yates shuffle (em cópia)
+  const ids = [...uniqueIds];
   for (let i = ids.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [ids[i], ids[j]] = [ids[j], ids[i]];
   }
-  
-  // Retorna cópia dos 4 primeiros (todos únicos)
+
   return ids.slice(0, CODE_LENGTH);
 }
 
 /**
  * Avalia palpite contra código secreto
- * 
- * ALGORITMO MASTERMIND CLÁSSICO:
- * 1. Primeiro conta TODOS os brancos (posição exata)
- * 2. Marca esses símbolos como usados
- * 3. Depois conta cinzas (símbolo certo, posição errada)
- * 4. Nunca conta o mesmo símbolo duas vezes
- * 
- * @param secret - Array de IDs do código secreto
- * @param guess - Array de IDs do palpite
- * @returns { whites, grays } - Contagem de pinos
+ *
+ * ALGORITMO MASTERMIND CLÁSSICO (2 passes):
+ * 1) Conta EXACT (símbolo e posição corretos)
+ * 2) Marca slots usados
+ * 3) Conta PRESENT (símbolo correto em posição errada) apenas nos restantes
+ *
+ * IMPORTANTE: não muta os inputs.
  */
-export function evaluateGuess(secret: string[], guess: string[]): { whites: number; grays: number } {
-  // Trabalha com cópias para não mutar os originais
+export function evaluateGuess(
+  secret: string[],
+  guess: string[],
+): { exact: number; present: number } {
   const secretCopy = [...secret];
   const guessCopy = [...guess];
-  
-  let whites = 0;
-  let grays = 0;
-  
+
+  let exact = 0;
+  let present = 0;
+
   const secretUsed = [false, false, false, false];
   const guessUsed = [false, false, false, false];
-  
-  // PASSO 1: Contar brancos (posição exata)
+
+  // PASSO 1: EXACT (posição exata)
   for (let i = 0; i < CODE_LENGTH; i++) {
     if (guessCopy[i] === secretCopy[i]) {
-      whites++;
+      exact++;
       secretUsed[i] = true;
       guessUsed[i] = true;
     }
   }
-  
-  // PASSO 2: Contar cinzas (símbolo certo, posição errada)
+
+  // PASSO 2: PRESENT (símbolo certo, posição errada)
   for (let i = 0; i < CODE_LENGTH; i++) {
-    if (guessUsed[i]) continue; // Já contou como branco
-    
+    if (guessUsed[i]) continue;
+
     for (let j = 0; j < CODE_LENGTH; j++) {
-      if (secretUsed[j]) continue; // Já usado
-      
+      if (secretUsed[j]) continue;
+
       if (guessCopy[i] === secretCopy[j]) {
-        grays++;
+        present++;
         secretUsed[j] = true;
         guessUsed[i] = true;
         break;
       }
     }
   }
-  
-  return { whites, grays };
+
+  return { exact, present };
 }
 
 /**
