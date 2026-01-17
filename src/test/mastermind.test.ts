@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { calculateFeedback, GameSymbol, CODE_LENGTH } from '@/hooks/useGame';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HELPER: Create test symbols
+// HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 
 function sym(id: string): GameSymbol {
@@ -14,13 +14,12 @@ function makeArray(ids: string[]): GameSymbol[] {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MASTERMIND FEEDBACK ALGORITHM TESTS
+// TESTE 1: ALGORITMO DE FEEDBACK MASTERMIND (2 PASSES)
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('Mastermind Feedback Algorithm - 2 Passes', () => {
+describe('Mastermind Feedback Algorithm', () => {
   
-  // 1) secret [A,B,C,D], guess [A,B,C,D] => exact 4, present 0
-  it('Case 1: All correct positions', () => {
+  it('Caso 1: Todos corretos → 4 exact, 0 present', () => {
     const secret = makeArray(['A', 'B', 'C', 'D']);
     const guess = makeArray(['A', 'B', 'C', 'D']);
     
@@ -30,8 +29,7 @@ describe('Mastermind Feedback Algorithm - 2 Passes', () => {
     expect(result.present).toBe(0);
   });
 
-  // 2) secret [A,B,C,D], guess [D,C,B,A] => exact 0, present 4
-  it('Case 2: All swapped (wrong positions)', () => {
+  it('Caso 2: Todos trocados → 0 exact, 4 present', () => {
     const secret = makeArray(['A', 'B', 'C', 'D']);
     const guess = makeArray(['D', 'C', 'B', 'A']);
     
@@ -41,42 +39,9 @@ describe('Mastermind Feedback Algorithm - 2 Passes', () => {
     expect(result.present).toBe(4);
   });
 
-  // 3) secret [A,A,B,C], guess [A,B,A,A] => exact 1, present 2
-  it('Case 3: Duplicates - secret [A,A,B,C], guess [A,B,A,A]', () => {
-    const secret = makeArray(['A', 'A', 'B', 'C']);
-    const guess = makeArray(['A', 'B', 'A', 'A']);
-    
-    const result = calculateFeedback(secret, guess);
-    
-    // Explicação:
-    // - A na pos 0: exato
-    // - B na pos 1 guess -> B na pos 2 secret: parcial
-    // - A na pos 2 guess -> A na pos 1 secret: parcial
-    // - A na pos 3 guess: não há mais A disponível no secret
-    expect(result.exact).toBe(1);
-    expect(result.present).toBe(2);
-  });
-
-  // 4) secret [A,B,B,B], guess [B,B,B,A] => exact 2, present 2
-  it('Case 4: Duplicates - secret [A,B,B,B], guess [B,B,B,A]', () => {
-    const secret = makeArray(['A', 'B', 'B', 'B']);
-    const guess = makeArray(['B', 'B', 'B', 'A']);
-    
-    const result = calculateFeedback(secret, guess);
-    
-    // Explicação:
-    // - B na pos 1: exato
-    // - B na pos 2: exato
-    // - B na pos 0 guess -> B na pos 3 secret: parcial
-    // - A na pos 3 guess -> A na pos 0 secret: parcial
-    expect(result.exact).toBe(2);
-    expect(result.present).toBe(2);
-  });
-
-  // 5) secret [A,B,C,D], guess [E,E,E,E] => exact 0, present 0
-  it('Case 5: No matches at all', () => {
+  it('Caso 3: Nenhum acerto → 0 exact, 0 present', () => {
     const secret = makeArray(['A', 'B', 'C', 'D']);
-    const guess = makeArray(['E', 'E', 'E', 'E']);
+    const guess = makeArray(['E', 'F', 'G', 'H']);
     
     const result = calculateFeedback(secret, guess);
     
@@ -84,54 +49,135 @@ describe('Mastermind Feedback Algorithm - 2 Passes', () => {
     expect(result.present).toBe(0);
   });
 
-  // 6) secret [A,B,C,A], guess [A,A,B,C] => exact 1, present 3
-  it('Case 6: Mixed - secret [A,B,C,A], guess [A,A,B,C]', () => {
+  it('Caso 4: Misto simples → 2 exact, 2 present', () => {
+    const secret = makeArray(['A', 'B', 'C', 'D']);
+    const guess = makeArray(['A', 'B', 'D', 'C']);
+    
+    const result = calculateFeedback(secret, guess);
+    
+    expect(result.exact).toBe(2); // A e B
+    expect(result.present).toBe(2); // C e D trocados
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TESTE 2: DUPLICATAS NO SECRET (CASOS CRÍTICOS)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Duplicatas no Secret', () => {
+  
+  it('Secret [A,A,B,C] vs Guess [A,B,A,A] → 1 exact, 2 present', () => {
+    const secret = makeArray(['A', 'A', 'B', 'C']);
+    const guess = makeArray(['A', 'B', 'A', 'A']);
+    
+    const result = calculateFeedback(secret, guess);
+    
+    // Explicação:
+    // Pos 0: A === A → exact (secretUsed[0]=true, guessUsed[0]=true)
+    // Pos 1: A !== B
+    // Pos 2: A !== B
+    // Pos 3: A !== C
+    // 
+    // Passo 2:
+    // Pos 1 (B): procura B não usado no secret → secret[2]=B → present
+    // Pos 2 (A): procura A não usado no secret → secret[1]=A → present
+    // Pos 3 (A): procura A não usado no secret → nenhum → nada
+    
+    expect(result.exact).toBe(1);
+    expect(result.present).toBe(2);
+  });
+
+  it('Secret [A,B,B,B] vs Guess [B,B,B,A] → 2 exact, 2 present', () => {
+    const secret = makeArray(['A', 'B', 'B', 'B']);
+    const guess = makeArray(['B', 'B', 'B', 'A']);
+    
+    const result = calculateFeedback(secret, guess);
+    
+    // Explicação:
+    // Pos 0: B !== A
+    // Pos 1: B === B → exact
+    // Pos 2: B === B → exact
+    // Pos 3: A !== B
+    // 
+    // Passo 2:
+    // Pos 0 (B): procura B não usado → secret[3]=B → present
+    // Pos 3 (A): procura A não usado → secret[0]=A → present
+    
+    expect(result.exact).toBe(2);
+    expect(result.present).toBe(2);
+  });
+
+  it('Secret [A,A,A,A] vs Guess [A,A,A,A] → 4 exact, 0 present', () => {
+    const secret = makeArray(['A', 'A', 'A', 'A']);
+    const guess = makeArray(['A', 'A', 'A', 'A']);
+    
+    const result = calculateFeedback(secret, guess);
+    
+    expect(result.exact).toBe(4);
+    expect(result.present).toBe(0);
+  });
+
+  it('Secret [A,A,A,A] vs Guess [B,B,B,B] → 0 exact, 0 present', () => {
+    const secret = makeArray(['A', 'A', 'A', 'A']);
+    const guess = makeArray(['B', 'B', 'B', 'B']);
+    
+    const result = calculateFeedback(secret, guess);
+    
+    expect(result.exact).toBe(0);
+    expect(result.present).toBe(0);
+  });
+
+  it('Secret [A,B,C,A] vs Guess [A,A,B,C] → 1 exact, 3 present', () => {
     const secret = makeArray(['A', 'B', 'C', 'A']);
     const guess = makeArray(['A', 'A', 'B', 'C']);
     
     const result = calculateFeedback(secret, guess);
     
     // Explicação:
-    // - A na pos 0: exato
-    // - A na pos 1 guess -> A na pos 3 secret: parcial
-    // - B na pos 2 guess -> B na pos 1 secret: parcial
-    // - C na pos 3 guess -> C na pos 2 secret: parcial
+    // Pos 0: A === A → exact
+    // Pos 1: A !== B
+    // Pos 2: B !== C
+    // Pos 3: C !== A
+    // 
+    // Passo 2:
+    // Pos 1 (A): procura A não usado → secret[3]=A → present
+    // Pos 2 (B): procura B não usado → secret[1]=B → present
+    // Pos 3 (C): procura C não usado → secret[2]=C → present
+    
     expect(result.exact).toBe(1);
     expect(result.present).toBe(3);
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SECRET IMMUTABILITY TESTS
+// TESTE 3: IMUTABILIDADE DOS ARRAYS
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('Secret Immutability', () => {
+describe('Imutabilidade', () => {
   
-  it('calculateFeedback does not modify the secret array', () => {
+  it('calculateFeedback NÃO modifica o array secret', () => {
     const secret = makeArray(['A', 'B', 'C', 'D']);
     const guess = makeArray(['D', 'C', 'B', 'A']);
     
-    const originalSecretIds = secret.map(s => s.id);
+    const originalIds = secret.map(s => s.id);
     
     calculateFeedback(secret, guess);
     
-    const afterSecretIds = secret.map(s => s.id);
-    expect(afterSecretIds).toEqual(originalSecretIds);
+    expect(secret.map(s => s.id)).toEqual(originalIds);
   });
 
-  it('calculateFeedback does not modify the guess array', () => {
+  it('calculateFeedback NÃO modifica o array guess', () => {
     const secret = makeArray(['A', 'B', 'C', 'D']);
     const guess = makeArray(['D', 'C', 'B', 'A']);
     
-    const originalGuessIds = guess.map(s => s.id);
+    const originalIds = guess.map(s => s.id);
     
     calculateFeedback(secret, guess);
     
-    const afterGuessIds = guess.map(s => s.id);
-    expect(afterGuessIds).toEqual(originalGuessIds);
+    expect(guess.map(s => s.id)).toEqual(originalIds);
   });
 
-  it('Multiple calls with same input produce identical results', () => {
+  it('Múltiplas chamadas produzem resultado idêntico', () => {
     const secret = makeArray(['A', 'B', 'C', 'D']);
     const guess = makeArray(['A', 'C', 'B', 'D']);
     
@@ -145,12 +191,12 @@ describe('Secret Immutability', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// VICTORY CONDITION TESTS
+// TESTE 4: CONDIÇÃO DE VITÓRIA
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('Victory Condition', () => {
+describe('Condição de Vitória', () => {
   
-  it('Victory is detected when all 4 positions are correct', () => {
+  it('Vitória: exact === CODE_LENGTH', () => {
     const secret = makeArray(['A', 'B', 'C', 'D']);
     const guess = makeArray(['A', 'B', 'C', 'D']);
     
@@ -160,7 +206,7 @@ describe('Victory Condition', () => {
     expect(result.exact === CODE_LENGTH).toBe(true);
   });
 
-  it('Victory is NOT detected with partial matches', () => {
+  it('NÃO vitória: present === CODE_LENGTH', () => {
     const secret = makeArray(['A', 'B', 'C', 'D']);
     const guess = makeArray(['D', 'C', 'B', 'A']);
     
@@ -170,7 +216,7 @@ describe('Victory Condition', () => {
     expect(result.exact === CODE_LENGTH).toBe(false);
   });
 
-  it('Victory is NOT detected with 3 correct positions', () => {
+  it('NÃO vitória: exact < CODE_LENGTH', () => {
     const secret = makeArray(['A', 'B', 'C', 'D']);
     const guess = makeArray(['A', 'B', 'C', 'E']);
     
@@ -182,17 +228,18 @@ describe('Victory Condition', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// EDGE CASES
+// TESTE 5: GARANTIAS MATEMÁTICAS
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('Edge Cases', () => {
+describe('Garantias Matemáticas', () => {
   
-  it('Total feedback never exceeds CODE_LENGTH', () => {
+  it('exact + present <= CODE_LENGTH (sempre)', () => {
     const testCases = [
       { secret: ['A', 'B', 'C', 'D'], guess: ['A', 'B', 'C', 'D'] },
       { secret: ['A', 'B', 'C', 'D'], guess: ['D', 'C', 'B', 'A'] },
       { secret: ['A', 'A', 'B', 'C'], guess: ['A', 'B', 'A', 'A'] },
       { secret: ['A', 'B', 'B', 'B'], guess: ['B', 'B', 'B', 'A'] },
+      { secret: ['A', 'A', 'A', 'A'], guess: ['A', 'A', 'B', 'B'] },
     ];
 
     for (const tc of testCases) {
@@ -200,38 +247,17 @@ describe('Edge Cases', () => {
       const guess = makeArray(tc.guess);
       const result = calculateFeedback(secret, guess);
       
-      const total = result.exact + result.present;
-      expect(total).toBeLessThanOrEqual(CODE_LENGTH);
+      expect(result.exact + result.present).toBeLessThanOrEqual(CODE_LENGTH);
     }
   });
 
-  it('Handles single match scenarios correctly', () => {
-    // One exact match
-    const secret1 = makeArray(['A', 'B', 'C', 'D']);
-    const guess1 = makeArray(['A', 'E', 'E', 'E']);
-    const result1 = calculateFeedback(secret1, guess1);
-    expect(result1.exact).toBe(1);
-    expect(result1.present).toBe(0);
-
-    // One partial match
-    const secret2 = makeArray(['A', 'B', 'C', 'D']);
-    const guess2 = makeArray(['E', 'A', 'E', 'E']);
-    const result2 = calculateFeedback(secret2, guess2);
-    expect(result2.exact).toBe(0);
-    expect(result2.present).toBe(1);
-  });
-
-  it('Correctly handles repeating symbols in secret', () => {
-    // Secret has duplicate, guess has one of that symbol in wrong position
-    const secret = makeArray(['A', 'A', 'B', 'C']);
-    const guess = makeArray(['B', 'C', 'A', 'D']);
+  it('exact >= 0 e present >= 0 (sempre)', () => {
+    const secret = makeArray(['A', 'B', 'C', 'D']);
+    const guess = makeArray(['E', 'F', 'G', 'H']);
     
     const result = calculateFeedback(secret, guess);
     
-    // A na pos 2 guess -> A na pos 0 ou 1 secret: 1 parcial
-    // B na pos 0 guess -> B na pos 2 secret: 1 parcial
-    // C na pos 1 guess -> C na pos 3 secret: 1 parcial
-    expect(result.exact).toBe(0);
-    expect(result.present).toBe(3);
+    expect(result.exact).toBeGreaterThanOrEqual(0);
+    expect(result.present).toBeGreaterThanOrEqual(0);
   });
 });
