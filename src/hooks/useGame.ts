@@ -235,17 +235,11 @@ function logRound(state: GameState, endTime: number): RoundLog {
 }
 
 export function useGame() {
-  // Secret code must be generated ONCE per round and never change during guesses/timer ticks.
-  // useRef guarantees it won't be recreated by setState updates.
+  // Secret code must be generated ONLY inside newGame() and remain immutable during the round.
+  // useRef guarantees it won't be recreated by renders/timers.
   const secretRef = useRef<GameSymbol[] | null>(null);
 
-  function createInitialState(): GameState {
-    const now = Date.now();
-    const roundId = generateRoundId();
-
-    // Generate secret EXACTLY once at round start
-    secretRef.current = generateSecret();
-
+  function createInitialState(roundId: string, startTime: number): GameState {
     return {
       roundId,
       guess: [null, null, null, null],
@@ -253,19 +247,42 @@ export function useGame() {
       history: [],
       score: 0,
       remainingSeconds: ROUND_DURATION_SECONDS,
-      startTime: now,
+      startTime,
       gameStatus: 'playing',
     };
   }
 
-  // Initialize state once; secret is stored in secretRef (not state)
-  const [state, setState] = useState<GameState>(() => createInitialState());
+  // Create initial round synchronously; secret is stored in secretRef (NOT React state).
+  const [state, setState] = useState<GameState>(() => {
+    const now = Date.now();
+    const roundId = generateRoundId();
+
+    // Generate secret EXACTLY once at round start (and ONLY when a round starts)
+    secretRef.current = generateSecret();
+
+    return createInitialState(roundId, now);
+  });
 
   const timerRef = useRef<number | null>(null);
   const hasLoggedRef = useRef(false);
 
   // Track current roundId to detect when timer should restart
   const currentRoundIdRef = useRef(state.roundId);
+
+  // New Round: ONLY moment when secret changes
+  const newGame = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    // Generate secret EXACTLY once per round, only when starting a new round.
+    secretRef.current = generateSecret();
+
+    const now = Date.now();
+    const roundId = generateRoundId();
+    setState(createInitialState(roundId, now));
+  }, []);
 
   // Countdown timer (must never touch secretRef)
   useEffect(() => {
@@ -308,14 +325,6 @@ export function useGame() {
     }
   }, [state.gameStatus, state]);
 
-  // New Round: ONLY moment when secret changes
-  const newGame = useCallback(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    setState(createInitialState());
-  }, []);
 
   const selectSymbol = useCallback((symbol: GameSymbol) => {
     setState(s => {
