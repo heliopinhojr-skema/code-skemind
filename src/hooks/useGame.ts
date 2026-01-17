@@ -218,11 +218,19 @@ export function useGame() {
 
   // ───────────────────────────────────────────────────────────────────────────
   // ACTION: Select Symbol
+  // 
+  // REGRA: Símbolos NÃO podem se repetir no palpite
   // ───────────────────────────────────────────────────────────────────────────
   const selectSymbol = useCallback((symbol: GameSymbol) => {
     if (status !== 'playing') return;
     
     setCurrentGuess(prev => {
+      // VALIDAÇÃO: Impede símbolo repetido no palpite
+      const alreadyUsed = prev.some(slot => slot !== null && slot.id === symbol.id);
+      if (alreadyUsed) {
+        return prev; // Não adiciona se já está no palpite
+      }
+      
       const newGuess = [...prev];
       const emptyIdx = newGuess.findIndex(slot => slot === null);
       if (emptyIdx !== -1) {
