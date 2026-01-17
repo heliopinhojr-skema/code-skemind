@@ -5,6 +5,8 @@ import { HistoryLog } from './HistoryLog';
 import { Symbol } from './Symbol';
 import { Button } from '@/components/ui/button';
 import type { GameState, GameSymbol } from '@/hooks/useGame';
+import type { EnvironmentalConfig } from '@/lib/seededRng';
+import { BACKGROUND_PATTERNS } from '@/lib/seededRng';
 
 interface GameBoardProps {
   state: GameState;
@@ -13,6 +15,7 @@ interface GameBoardProps {
   onClearSlot: (index: number) => void;
   onSubmit: () => void;
   onNewGame: () => void;
+  environmentalConfig?: EnvironmentalConfig;
 }
 
 export function GameBoard({
@@ -22,6 +25,7 @@ export function GameBoard({
   onClearSlot,
   onSubmit,
   onNewGame,
+  environmentalConfig,
 }: GameBoardProps) {
   const isPlaying = state.gameStatus === 'playing';
   const isLocked = !isPlaying;
@@ -30,12 +34,18 @@ export function GameBoard({
   // Get currently selected symbol IDs to prevent duplicate selection
   const selectedIds = state.guess.filter(Boolean).map(s => s!.id);
 
+  // Padrão de fundo ambiental
+  const backgroundStyle = environmentalConfig
+    ? { backgroundImage: BACKGROUND_PATTERNS[environmentalConfig.backgroundPattern] }
+    : undefined;
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.1 }}
-      className="glass-card rounded-2xl p-4 space-y-4 flex flex-col"
+      className="glass-card rounded-2xl p-4 space-y-4 flex flex-col relative overflow-hidden"
+      style={backgroundStyle}
     >
       {/* Game Status Messages */}
       {state.gameStatus === 'won' && (
@@ -107,6 +117,7 @@ export function GameBoard({
               onSelect={onSelectSymbol} 
               disabled={isLocked}
               selectedIds={selectedIds}
+              environmentalConfig={environmentalConfig}
             />
           </div>
 
