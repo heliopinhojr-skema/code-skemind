@@ -126,14 +126,15 @@
     @apply w-3 h-3 rounded-full;
   }
 
-  .peg-black {
-    background: hsl(0 0% 8%);
-    box-shadow: 0 0 6px hsl(0 0% 0% / 0.8), inset 0 1px 2px hsl(0 0% 30%);
+  /* MASTERMIND CLÁSSICO: Branco = Exato (posição certa), Cinza = Parcial (posição errada) */
+  .peg-exact {
+    background: hsl(0 0% 100%);
+    box-shadow: 0 0 8px hsl(0 0% 100% / 0.6), inset 0 -1px 2px hsl(0 0% 80%);
   }
 
-  .peg-white {
-    background: hsl(0 0% 95%);
-    box-shadow: 0 0 6px hsl(0 0% 100% / 0.5);
+  .peg-partial {
+    background: hsl(0 0% 50%);
+    box-shadow: 0 0 4px hsl(0 0% 30% / 0.5), inset 0 1px 2px hsl(0 0% 60%);
   }
 
   .peg-empty {
