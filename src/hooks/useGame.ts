@@ -9,14 +9,15 @@
  * - Debug panel: habilitado por ?debug=1 (SEM useMemo com deps vazias)
  */
 
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useCallback, useMemo, useRef, useState, useEffect } from "react";
+
+import {
   CODE_LENGTH,
   SYMBOLS as ENGINE_SYMBOLS,
   evaluateGuess,
   generateSecret,
   type Symbol as EngineSymbol,
-} from '@/lib/mastermindEngine';
+} from "@/lib/mastermindEngine";
 
 export type GameStatus = 'notStarted' | 'playing' | 'won' | 'lost';
 
@@ -86,9 +87,17 @@ function isDistinctCompleteGuess(guess: GuessSlot[]): guess is GameSymbol[] {
 }
 
 export function useGame() {
-  // Mantém um hook estável (evita crash de hooks em hot-reload) e lê debug do URL atual
-  const location = useLocation();
-  const debugMode = new URLSearchParams(location.search).get('debug') === '1';
+  // Debug mode — lê diretamente do URL sem dependência de router (evita problemas de hooks)
+  const [debugMode, setDebugMode] = useState(false);
+
+  useEffect(() => {
+    const checkDebug = () => {
+      setDebugMode(new URLSearchParams(window.location.search).get('debug') === '1');
+    };
+    checkDebug();
+    window.addEventListener('popstate', checkDebug);
+    return () => window.removeEventListener('popstate', checkDebug);
+  }, []);
 
   // Secret travado (NUNCA muda durante a partida)
   const secretRef = useRef<EngineSymbol[] | null>(null);
