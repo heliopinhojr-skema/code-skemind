@@ -34,6 +34,7 @@ export interface GameSymbol {
 export type GuessSlot = GameSymbol | null;
 
 export interface AttemptResult {
+  id: string;
   guess: string[];
   whites: number;
   grays: number;
@@ -159,8 +160,9 @@ export function useGame() {
     const secretCopy = [...secretRef.current];
     const result = evaluateGuess(secretCopy, guessIds);
 
-    // Cria entrada no histórico
+    // Cria entrada no histórico com ID único
     const entry: AttemptResult = {
+      id: crypto.randomUUID(),
       guess: [...guessIds],
       whites: result.whites,
       grays: result.grays,
