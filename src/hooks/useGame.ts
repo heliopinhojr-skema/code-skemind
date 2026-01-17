@@ -82,56 +82,121 @@ function generateSecret(): GameSymbol[] {
 }
 
 /**
- * Calculate Mastermind feedback using strict immutable logic.
+ * Classic Mastermind feedback algorithm.
  * 
- * Step 1: Count exact matches (correct position)
- * Step 2: Count partial matches (correct symbol, wrong position)
+ * PHASE 1 - Exact matches (Black pegs):
+ *   Same symbol AND same position.
+ *   Remove matched symbols from both arrays immediately.
+ * 
+ * PHASE 2 - Partial matches (White pegs):
+ *   Symbol exists in remaining secret but at different position.
+ *   Remove each matched symbol to prevent double counting.
  * 
  * Rules:
- * - Each symbol counted only once
- * - No double counting
- * - Original arrays never mutated
+ * - Each symbol can only generate ONE feedback point
+ * - Originals are NEVER mutated (copies used)
+ * - Different positions = different feedback
  */
 function calculateFeedback(
   secret: readonly GameSymbol[],
   guess: readonly GameSymbol[]
 ): { correctPosition: number; correctSymbol: number } {
-  // Create immutable copies of IDs for evaluation
-  const secretIds: string[] = secret.map(s => s.id);
-  const guessIds: string[] = guess.map(g => g.id);
+  // CRITICAL: Create mutable COPIES - never touch originals
+  const secretCopy: (string | null)[] = secret.map(s => s.id);
+  const guessCopy: (string | null)[] = guess.map(g => g.id);
   
-  // Track which positions have been matched
-  const secretMatched: boolean[] = new Array(CODE_LENGTH).fill(false);
-  const guessMatched: boolean[] = new Array(CODE_LENGTH).fill(false);
+  let exactMatches = 0;
+  let partialMatches = 0;
   
-  let correctPosition = 0;
-  let correctSymbol = 0;
-  
-  // Step 1: Find exact matches (correct position)
+  // ═══════════════════════════════════════════════════════════
+  // PHASE 1: Exact matches (correct symbol + correct position)
+  // ═══════════════════════════════════════════════════════════
   for (let i = 0; i < CODE_LENGTH; i++) {
-    if (guessIds[i] === secretIds[i]) {
-      correctPosition++;
-      secretMatched[i] = true;
-      guessMatched[i] = true;
+    if (guessCopy[i] !== null && guessCopy[i] === secretCopy[i]) {
+      exactMatches++;
+      // Remove from both arrays to prevent reuse
+      secretCopy[i] = null;
+      guessCopy[i] = null;
     }
   }
   
-  // Step 2: Find partial matches (correct symbol, wrong position)
+  // ═══════════════════════════════════════════════════════════
+  // PHASE 2: Partial matches (correct symbol + wrong position)
+  // ═══════════════════════════════════════════════════════════
   for (let i = 0; i < CODE_LENGTH; i++) {
-    if (guessMatched[i]) continue; // Skip already matched
+    if (guessCopy[i] === null) continue; // Already matched exactly
     
+    // Search for this guess symbol in remaining secret positions
     for (let j = 0; j < CODE_LENGTH; j++) {
-      if (secretMatched[j]) continue; // Skip already matched
+      if (secretCopy[j] === null) continue; // Already used
       
-      if (guessIds[i] === secretIds[j]) {
-        correctSymbol++;
-        secretMatched[j] = true; // Mark as used
-        break; // Each guess symbol counts once
+      if (guessCopy[i] === secretCopy[j]) {
+        partialMatches++;
+        // Remove from secret to prevent double counting
+        secretCopy[j] = null;
+        break; // This guess symbol is now accounted for
       }
     }
   }
   
-  return Object.freeze({ correctPosition, correctSymbol });
+  return { correctPosition: exactMatches, correctSymbol: partialMatches };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INTERNAL TEST SUITE - Run once on module load in development
+// ═══════════════════════════════════════════════════════════════════════════
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  const testSymbols = SYMBOLS.slice(0, 6);
+  const [A, B, C, D, E, F] = testSymbols;
+  
+  const runTest = (
+    name: string,
+    secret: GameSymbol[],
+    guess: GameSymbol[],
+    expectedExact: number,
+    expectedPartial: number
+  ) => {
+    const result = calculateFeedback(secret, guess);
+    const passed = result.correctPosition === expectedExact && result.correctSymbol === expectedPartial;
+    if (!passed) {
+      console.error(`❌ MASTERMIND TEST FAILED: ${name}`);
+      console.error(`   Secret: [${secret.map(s => s.id).join(', ')}]`);
+      console.error(`   Guess:  [${guess.map(s => s.id).join(', ')}]`);
+      console.error(`   Expected: ${expectedExact} exact, ${expectedPartial} partial`);
+      console.error(`   Got:      ${result.correctPosition} exact, ${result.correctSymbol} partial`);
+    } else {
+      console.log(`✓ ${name}`);
+    }
+    return passed;
+  };
+  
+  console.log('═══ MASTERMIND FEEDBACK TESTS ═══');
+  
+  // Test 1: All correct positions
+  runTest('All exact', [A, B, C, D], [A, B, C, D], 4, 0);
+  
+  // Test 2: All wrong positions but all symbols present
+  runTest('All partial (rotated)', [A, B, C, D], [B, C, D, A], 0, 4);
+  
+  // Test 3: Completely wrong
+  runTest('All wrong', [A, B, C, D], [E, F, E, F], 0, 0);
+  
+  // Test 4: One exact, rest partial
+  runTest('1 exact, 2 partial', [A, B, C, D], [A, C, D, E], 1, 2);
+  
+  // Test 5: Two exact, two wrong
+  runTest('2 exact, 0 partial', [A, B, C, D], [A, B, E, F], 2, 0);
+  
+  // Test 6: Same symbols swapped pairs
+  runTest('Swapped pairs', [A, B, C, D], [B, A, D, C], 0, 4);
+  
+  // Test 7: One exact, one partial, two wrong  
+  runTest('1 exact, 1 partial', [A, B, C, D], [A, E, B, F], 1, 1);
+  
+  // Test 8: Three partials
+  runTest('0 exact, 3 partial', [A, B, C, D], [B, C, D, E], 0, 3);
+  
+  console.log('═════════════════════════════════');
 }
 
 function calculateScore(attempts: number, elapsedMs: number, solved: boolean): number {
