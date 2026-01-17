@@ -9,7 +9,8 @@
  * - Debug panel: habilitado por ?debug=1 (SEM useMemo com deps vazias)
  */
 
-import { useCallback, useMemo, useRef, useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 
 import {
   CODE_LENGTH,
@@ -87,17 +88,50 @@ function isDistinctCompleteGuess(guess: GuessSlot[]): guess is GameSymbol[] {
 }
 
 export function useGame() {
-  // Debug mode — lê diretamente do URL sem dependência de router (evita problemas de hooks)
+  const location = useLocation();
+  
+  // Debug mode — estado reativo que re-verifica sempre
   const [debugMode, setDebugMode] = useState(false);
-
+  
   useEffect(() => {
     const checkDebug = () => {
-      setDebugMode(new URLSearchParams(window.location.search).get('debug') === '1');
+      // Prioridade 1: location.search do react-router
+      if (location.search) {
+        const found = new URLSearchParams(location.search).get('debug') === '1';
+        setDebugMode(found);
+        return;
+      }
+      // Prioridade 2: window.location.search
+      if (typeof window !== 'undefined' && window.location.search) {
+        const found = new URLSearchParams(window.location.search).get('debug') === '1';
+        setDebugMode(found);
+        return;
+      }
+      // Prioridade 3: query embutida no pathname (ex.: "/?debug=1" malformado)
+      if (typeof window !== 'undefined' && window.location.pathname.includes('?')) {
+        const embeddedQuery = window.location.pathname.split('?')[1] || '';
+        const found = new URLSearchParams(embeddedQuery).get('debug') === '1';
+        setDebugMode(found);
+        return;
+      }
+      // Prioridade 4: parse href completo
+      if (typeof window !== 'undefined') {
+        try {
+          const url = new URL(window.location.href);
+          setDebugMode(url.searchParams.get('debug') === '1');
+          return;
+        } catch {
+          // ignore
+        }
+      }
+      setDebugMode(false);
     };
+    
     checkDebug();
+    // Também escuta popstate para mudanças de URL
     window.addEventListener('popstate', checkDebug);
     return () => window.removeEventListener('popstate', checkDebug);
-  }, []);
+  }, [location.search, location.pathname]);
 
   // Secret travado (NUNCA muda durante a partida)
   const secretRef = useRef<EngineSymbol[] | null>(null);
