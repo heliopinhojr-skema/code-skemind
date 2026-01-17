@@ -4,10 +4,17 @@ import { GameBoard } from '@/components/game/GameBoard';
 import { RulesCard } from '@/components/game/RulesCard';
 
 const Index = () => {
-  const { state, actions, constants, secretCode } = useGame();
+  const { state, actions, constants, secretCode, debugMode } = useGame();
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
+      {/* Debug Mode Indicator */}
+      {debugMode && (
+        <div className="fixed top-2 right-2 z-50 bg-yellow-500 text-black text-xs px-2 py-1 rounded font-mono">
+          DEBUG: [{secretCode.map(s => s.id.split('-')[0]).join(', ')}]
+        </div>
+      )}
+      
       <StatsBar 
         attempts={state.attempts}
         maxAttempts={constants.MAX_ATTEMPTS}
