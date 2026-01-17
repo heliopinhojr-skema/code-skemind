@@ -1,18 +1,18 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { Symbol } from './Symbol';
 import { FeedbackPegs } from './FeedbackPegs';
-import { SYMBOLS, type AttemptResult } from '@/hooks/useGame';
+import { UI_SYMBOLS, type AttemptResult } from '@/hooks/useGame';
 
 interface HistoryLogProps {
   history: AttemptResult[];
 }
 
 /**
- * HistoryLog
- *
- * Blindagem:
- * - Nunca faz .map em algo potencialmente null/undefined
- * - Cada item do histórico segue { guess: string[], whites, blacks }
+ * HistoryLog - Histórico de tentativas
+ * 
+ * Cada entrada mostra:
+ * - Os 4 símbolos do palpite
+ * - Feedback (brancos = posição certa, cinzas = posição errada)
  */
 export function HistoryLog({ history }: HistoryLogProps) {
   const safeHistory = Array.isArray(history) ? history : [];
@@ -31,7 +31,7 @@ export function HistoryLog({ history }: HistoryLogProps) {
         {safeHistory.map((attempt, index) => {
           const guessIds = Array.isArray(attempt.guess) ? attempt.guess : [];
           const whites = Number.isFinite(attempt.whites) ? attempt.whites : 0;
-          const blacks = Number.isFinite(attempt.blacks) ? attempt.blacks : 0;
+          const grays = Number.isFinite(attempt.grays) ? attempt.grays : 0;
 
           return (
             <motion.div
@@ -44,7 +44,7 @@ export function HistoryLog({ history }: HistoryLogProps) {
             >
               <div className="flex gap-1.5">
                 {guessIds.map((id, i) => {
-                  const symbol = SYMBOLS.find(s => s.id === id);
+                  const symbol = UI_SYMBOLS.find(s => s.id === id);
 
                   return (
                     <div key={`${id}-${i}`} className="history-symbol">
@@ -54,7 +54,7 @@ export function HistoryLog({ history }: HistoryLogProps) {
                 })}
               </div>
 
-              <FeedbackPegs correctPosition={whites} correctSymbol={blacks} />
+              <FeedbackPegs correctPosition={whites} correctSymbol={grays} />
             </motion.div>
           );
         })}
@@ -62,4 +62,3 @@ export function HistoryLog({ history }: HistoryLogProps) {
     </div>
   );
 }
-

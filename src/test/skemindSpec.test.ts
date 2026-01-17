@@ -8,7 +8,7 @@ describe('SKEMIND spec — exemplo obrigatório', () => {
 
     const result = evaluateGuess(secret, guess);
 
-    expect(result.exact).toBe(2);
-    expect(result.present).toBe(1);
+    expect(result.whites).toBe(2);
+    expect(result.grays).toBe(1);
   });
 });

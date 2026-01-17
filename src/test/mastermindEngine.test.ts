@@ -28,72 +28,72 @@ describe('generateSecret', () => {
 });
 
 describe('evaluateGuess', () => {
-  it('4 exatos quando secret === guess (vitória)', () => {
+  it('4 brancos quando secret === guess (vitória)', () => {
     const secret = ['circle', 'square', 'triangle', 'diamond'];
     const guess = ['circle', 'square', 'triangle', 'diamond'];
     const result = evaluateGuess(secret, guess);
-    expect(result.exact).toBe(4);
-    expect(result.present).toBe(0);
+    expect(result.whites).toBe(4);
+    expect(result.grays).toBe(0);
   });
 
-  it('0 exatos, 0 presentes quando nenhum símbolo coincide', () => {
+  it('0 brancos, 0 cinzas quando nenhum símbolo coincide', () => {
     const secret = ['circle', 'square', 'triangle', 'diamond'];
     const guess = ['star', 'hexagon', 'star', 'hexagon'];
     const result = evaluateGuess(secret, guess);
-    expect(result.exact).toBe(0);
-    expect(result.present).toBe(0);
+    expect(result.whites).toBe(0);
+    expect(result.grays).toBe(0);
   });
 
-  it('1 exato na primeira posição', () => {
+  it('1 branco na primeira posição', () => {
     const secret = ['circle', 'square', 'triangle', 'diamond'];
     const guess = ['circle', 'star', 'hexagon', 'star'];
     const result = evaluateGuess(secret, guess);
-    expect(result.exact).toBe(1);
-    expect(result.present).toBe(0);
+    expect(result.whites).toBe(1);
+    expect(result.grays).toBe(0);
   });
 
-  it('2 presentes (símbolos trocados)', () => {
+  it('2 cinzas (símbolos trocados)', () => {
     const secret = ['circle', 'square', 'triangle', 'diamond'];
     const guess = ['square', 'circle', 'star', 'hexagon'];
     const result = evaluateGuess(secret, guess);
-    expect(result.exact).toBe(0);
-    expect(result.present).toBe(2);
+    expect(result.whites).toBe(0);
+    expect(result.grays).toBe(2);
   });
 
-  it('4 presentes (todos trocados)', () => {
+  it('4 cinzas (todos trocados)', () => {
     const secret = ['circle', 'square', 'triangle', 'diamond'];
     const guess = ['diamond', 'triangle', 'square', 'circle'];
     const result = evaluateGuess(secret, guess);
-    expect(result.exact).toBe(0);
-    expect(result.present).toBe(4);
+    expect(result.whites).toBe(0);
+    expect(result.grays).toBe(4);
   });
 
   it('exemplo obrigatório: secret=[circle,hexagon,square,star] guess=[circle,star,square,triangle]', () => {
     const secret = ['circle', 'hexagon', 'square', 'star'];
     const guess = ['circle', 'star', 'square', 'triangle'];
     const result = evaluateGuess(secret, guess);
-    // circle@0: EXATO
-    // star@1 existe em secret@3: PRESENTE
-    // square@2: EXATO
+    // circle@0: BRANCO
+    // star@1 existe em secret@3: CINZA
+    // square@2: BRANCO
     // triangle: não existe
-    expect(result.exact).toBe(2);
-    expect(result.present).toBe(1);
+    expect(result.whites).toBe(2);
+    expect(result.grays).toBe(1);
   });
 
   it('não conta o mesmo símbolo duas vezes', () => {
     const secret = ['circle', 'square', 'triangle', 'diamond'];
     const guess = ['circle', 'circle', 'circle', 'circle'];
     const result = evaluateGuess(secret, guess);
-    expect(result.exact).toBe(1);
-    expect(result.present).toBe(0);
+    expect(result.whites).toBe(1);
+    expect(result.grays).toBe(0);
   });
 
   it('símbolo presente conta só uma vez', () => {
     const secret = ['circle', 'square', 'triangle', 'diamond'];
     const guess = ['square', 'star', 'square', 'hexagon'];
     const result = evaluateGuess(secret, guess);
-    expect(result.exact).toBe(0);
-    expect(result.present).toBe(1);
+    expect(result.whites).toBe(0);
+    expect(result.grays).toBe(1);
   });
 
   it('múltiplas chamadas produzem mesmo resultado', () => {
@@ -102,9 +102,9 @@ describe('evaluateGuess', () => {
     const r1 = evaluateGuess(secret, guess);
     const r2 = evaluateGuess(secret, guess);
     const r3 = evaluateGuess(secret, guess);
-    expect(r1.exact).toBe(r2.exact);
-    expect(r1.present).toBe(r2.present);
-    expect(r2.exact).toBe(r3.exact);
-    expect(r2.present).toBe(r3.present);
+    expect(r1.whites).toBe(r2.whites);
+    expect(r1.grays).toBe(r2.grays);
+    expect(r2.whites).toBe(r3.whites);
+    expect(r2.grays).toBe(r3.grays);
   });
 });

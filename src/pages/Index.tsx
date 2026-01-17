@@ -4,28 +4,12 @@ import { GameBoard } from '@/components/game/GameBoard';
 import { RulesCard } from '@/components/game/RulesCard';
 
 const Index = () => {
-  const { state, actions, constants, secretCode, debugMode } = useGame();
+  const { state, actions, constants, secretCode } = useGame();
 
   const safeSecret = Array.isArray(secretCode) ? secretCode : [];
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-      {/* Debug Mode Panel — FIXO no canto superior direito */}
-      {debugMode && (
-        <div className="fixed top-2 right-2 z-50 glass-card rounded-xl px-3 py-2 text-xs font-mono space-y-1 max-w-xs">
-          <div className="font-bold text-foreground">DEBUG MODE</div>
-          <div className="text-muted-foreground">
-            Status: <span className="text-foreground">{state.status}</span>
-          </div>
-          <div className="text-muted-foreground">
-            Tentativas: <span className="text-foreground">{state.attempts} / {constants.MAX_ATTEMPTS}</span>
-          </div>
-          <div className="text-muted-foreground">
-            Secret: <span className="text-foreground">[{safeSecret.map(s => s.id).join(', ')}]</span>
-          </div>
-        </div>
-      )}
-
       <StatsBar attempts={state.attempts} maxAttempts={constants.MAX_ATTEMPTS} gameStatus={state.status} />
 
       <main className="flex-1 overflow-hidden px-3 py-3">
