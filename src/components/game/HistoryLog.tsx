@@ -35,7 +35,7 @@ export function HistoryLog({ history }: HistoryLogProps) {
 
           return (
             <motion.div
-              key={`${safeHistory.length - index}`}
+              key={attempt.id}
               initial={{ x: -20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: 20, opacity: 0 }}
