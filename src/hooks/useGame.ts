@@ -11,12 +11,10 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import {
   CODE_LENGTH,
   SYMBOLS as ENGINE_SYMBOLS,
   evaluateGuess,
   generateSecret,
-  type Feedback,
   type Symbol as EngineSymbol,
 } from '@/lib/mastermindEngine';
 
@@ -31,8 +29,11 @@ export interface GameSymbol {
 export type GuessSlot = GameSymbol | null;
 
 export interface AttemptResult {
-  guess: GameSymbol[];
-  feedback: Feedback;
+  // obrigatório: histórico armazena APENAS ids (string[])
+  guess: string[];
+  // obrigatório: feedback sempre existe
+  whites: number;
+  blacks: number;
 }
 
 export interface GameState {
@@ -85,6 +86,7 @@ function isDistinctCompleteGuess(guess: GuessSlot[]): guess is GameSymbol[] {
 }
 
 export function useGame() {
+  // Mantém um hook estável (evita crash de hooks em hot-reload) e lê debug do URL atual
   const location = useLocation();
   const debugMode = new URLSearchParams(location.search).get('debug') === '1';
 
@@ -169,9 +171,15 @@ export function useGame() {
     const engineGuess = guess.map(uiToEngineSymbol);
     const result = evaluateGuess(secret, engineGuess);
 
+    // obrigatório: histórico no formato { guess: string[], whites, blacks }
+    const guessIds = (Array.isArray(guess) ? guess : []).map(s => s.id);
+    const whites = Number.isFinite(result.feedback.exact) ? result.feedback.exact : 0;
+    const blacks = Number.isFinite(result.feedback.present) ? result.feedback.present : 0;
+
     const entry: AttemptResult = {
-      guess: [...guess],
-      feedback: { ...result.feedback },
+      guess: guessIds,
+      whites,
+      blacks,
     };
 
     const nextHistory = [entry, ...history];
@@ -193,10 +201,10 @@ export function useGame() {
     if (debugMode) {
       // eslint-disable-next-line no-console
       console.log('[DEBUG] submit', {
-        guess: guess.map(s => s.id),
-        secret: secret.map(s => s.id),
-        exact: result.feedback.exact,
-        present: result.feedback.present,
+        guess: guessIds,
+        secret: (Array.isArray(secret) ? secret : []).map(s => s.id),
+        whites,
+        blacks,
       });
     }
   }, [attempts, currentGuess, debugMode, history, status]);

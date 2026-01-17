@@ -9,9 +9,11 @@ interface GuessSlotsProps {
 }
 
 export function GuessSlots({ guess, onClear, disabled }: GuessSlotsProps) {
+  const safeGuess = Array.isArray(guess) ? guess : [];
+
   return (
     <div className="flex gap-2 sm:gap-3 justify-center">
-      {guess.map((symbol, index) => (
+      {safeGuess.map((symbol, index) => (
         <motion.button
           key={index}
           whileHover={!disabled && symbol ? { scale: 1.08 } : {}}

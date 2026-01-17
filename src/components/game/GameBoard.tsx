@@ -27,13 +27,17 @@ export function GameBoard({
   onNewGame,
   onStartGame,
 }: GameBoardProps) {
+  const safeGuess = Array.isArray(state.currentGuess) ? state.currentGuess : [];
+  const safeSecret = Array.isArray(secretCode) ? secretCode : [];
+  const safeSymbols = Array.isArray(symbols) ? symbols : [];
+
   const isPlaying = state.status === 'playing';
   const isNotStarted = state.status === 'notStarted';
   const isGameOver = state.status === 'won' || state.status === 'lost';
-  const canSubmit = isPlaying && !state.currentGuess.includes(null);
+  const canSubmit = isPlaying && !safeGuess.includes(null);
 
   // IDs selecionados (para highlight e bloqueio de duplicação no picker)
-  const selectedIds = state.currentGuess.filter(Boolean).map(s => s!.id);
+  const selectedIds = (Array.isArray(safeGuess) ? safeGuess : []).filter(Boolean).map(s => s!.id);
 
   return (
     <motion.div
@@ -79,7 +83,7 @@ export function GameBoard({
           <p className="text-xl font-bold text-destructive">Derrota!</p>
           <p className="text-xs text-muted-foreground mt-2">O código era:</p>
           <div className="flex justify-center gap-2 mt-2">
-            {secretCode.map((symbol, i) => (
+            {(Array.isArray(safeSecret) ? safeSecret : []).map((symbol, i) => (
               <div key={i} className="w-10 h-10 flex items-center justify-center bg-muted/30 rounded-lg">
                 <Symbol symbol={symbol} size="md" />
               </div>
@@ -93,12 +97,12 @@ export function GameBoard({
         <>
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground text-center">Seu palpite:</p>
-            <GuessSlots guess={state.currentGuess} onClear={onClearSlot} disabled={!isPlaying} />
+            <GuessSlots guess={safeGuess} onClear={onClearSlot} disabled={!isPlaying} />
           </div>
 
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground text-center">Escolha os símbolos:</p>
-            <TokenPicker symbols={symbols} onSelect={onSelectSymbol} disabled={!isPlaying} selectedIds={selectedIds} />
+            <TokenPicker symbols={safeSymbols} onSelect={onSelectSymbol} disabled={!isPlaying} selectedIds={selectedIds} />
           </div>
 
           <Button
@@ -121,10 +125,10 @@ export function GameBoard({
       )}
 
       {/* History */}
-      {state.history.length > 0 && (
+      {(Array.isArray(state.history) ? state.history : []).length > 0 && (
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground">Histórico:</p>
-          <HistoryLog history={state.history} />
+          <HistoryLog history={Array.isArray(state.history) ? state.history : []} />
         </div>
       )}
     </motion.div>
