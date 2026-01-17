@@ -14,6 +14,7 @@ interface GameBoardProps {
   onClearSlot: (index: number) => void;
   onSubmit: () => void;
   onNewGame: () => void;
+  onStartGame: () => void;
 }
 
 export function GameBoard({
@@ -24,13 +25,15 @@ export function GameBoard({
   onClearSlot,
   onSubmit,
   onNewGame,
+  onStartGame,
 }: GameBoardProps) {
-  const isPlaying = state.gameStatus === 'playing';
-  const isLocked = !isPlaying;
-  const canSubmit = isPlaying && !state.guess.includes(null);
+  const isPlaying = state.status === 'playing';
+  const isNotStarted = state.status === 'notStarted';
+  const isGameOver = state.status === 'won' || state.status === 'lost' || state.status === 'timeup';
+  const canSubmit = isPlaying && !state.currentGuess.includes(null);
   
-  // IDs selecionados para impedir duplicação
-  const selectedIds = state.guess.filter(Boolean).map(s => s!.id);
+  // IDs selecionados (para highlight, mas não impede duplicação no guess)
+  const selectedIds = state.currentGuess.filter(Boolean).map(s => s!.id);
 
   return (
     <motion.div 
@@ -39,8 +42,30 @@ export function GameBoard({
       transition={{ delay: 0.1 }}
       className="glass-card rounded-2xl p-4 space-y-4 flex flex-col"
     >
+      {/* Not Started - Show Start Button */}
+      {isNotStarted && (
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="p-6 text-center space-y-4"
+        >
+          <h2 className="text-2xl font-bold text-foreground">SKEMIND</h2>
+          <p className="text-muted-foreground">
+            Descubra o código secreto de 4 símbolos em até 8 tentativas!
+          </p>
+          <Button 
+            onClick={onStartGame} 
+            variant="primary" 
+            size="lg" 
+            className="w-full h-14 text-lg font-bold"
+          >
+            🎮 Iniciar Jogo
+          </Button>
+        </motion.div>
+      )}
+
       {/* Victory Message */}
-      {state.gameStatus === 'victory' && (
+      {state.status === 'won' && (
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -54,7 +79,7 @@ export function GameBoard({
       )}
 
       {/* Defeat Message */}
-      {state.gameStatus === 'defeat' && (
+      {state.status === 'lost' && (
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -72,15 +97,34 @@ export function GameBoard({
         </motion.div>
       )}
 
-      {/* Current Guess */}
+      {/* Time Up Message */}
+      {state.status === 'timeup' && (
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="p-4 rounded-xl bg-destructive/20 border border-destructive/50 text-center"
+        >
+          <p className="text-xl font-bold text-destructive">⏰ Tempo Esgotado!</p>
+          <p className="text-xs text-muted-foreground mt-2">O código era:</p>
+          <div className="flex justify-center gap-2 mt-2">
+            {secretCode.map((symbol, i) => (
+              <div key={i} className="w-10 h-10 flex items-center justify-center bg-muted/30 rounded-lg">
+                <Symbol symbol={symbol} size="md" />
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Current Guess - Only when playing */}
       {isPlaying && (
         <>
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground text-center">Seu palpite:</p>
             <GuessSlots 
-              guess={state.guess} 
+              guess={state.currentGuess} 
               onClear={onClearSlot} 
-              disabled={isLocked}
+              disabled={!isPlaying}
             />
           </div>
 
@@ -90,7 +134,7 @@ export function GameBoard({
             <TokenPicker 
               symbols={symbols} 
               onSelect={onSelectSymbol} 
-              disabled={isLocked}
+              disabled={!isPlaying}
               selectedIds={selectedIds}
             />
           </div>
@@ -108,8 +152,8 @@ export function GameBoard({
         </>
       )}
 
-      {/* New Game Button */}
-      {isLocked && (
+      {/* New Game Button - After game over */}
+      {isGameOver && (
         <Button 
           onClick={onNewGame} 
           variant="primary" 

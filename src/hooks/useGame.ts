@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SKEMIND - MASTERMIND CLÁSSICO
+// SKEMIND - MASTERMIND CLÁSSICO (REENGENHEIRADO)
 // ═══════════════════════════════════════════════════════════════════════════
 //
 // INVARIANTES ABSOLUTOS:
 // 1. O secret é gerado APENAS em startNewRound() via useRef
 // 2. O secretRef.current é IMUTÁVEL durante toda a rodada
 // 3. Nenhum render, timer, submit ou effect pode alterar o secret
-// 4. Apenas o botão "New Round" pode criar novo secret
+// 4. Apenas o botão "New Round" / "Start" pode criar novo secret
+// 5. DUPLICATAS SÃO PERMITIDAS no secret
 //
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -22,24 +23,24 @@ export interface GameSymbol {
   shape: 'circle' | 'square' | 'triangle' | 'diamond' | 'star' | 'hexagon';
 }
 
-export type GameStatus = 'playing' | 'victory' | 'defeat';
+export type GameStatus = 'notStarted' | 'playing' | 'won' | 'lost' | 'timeup';
 
 export type GuessSlot = GameSymbol | null;
 
 export interface AttemptResult {
   guess: GameSymbol[];
-  correctPosition: number; // Pino branco (exato)
-  correctSymbol: number;   // Pino cinza (parcial)
+  feedback: {
+    exact: number;   // Pinos brancos (posição correta)
+    present: number; // Pinos cinzas (posição errada)
+  };
 }
 
 export interface GameState {
-  roundId: string;
-  guess: GuessSlot[];
-  attempts: number;
+  currentGuess: GuessSlot[];
   history: AttemptResult[];
-  score: number;
-  remainingSeconds: number;
-  gameStatus: GameStatus;
+  status: GameStatus;
+  timeLeft: number;
+  attempts: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -73,55 +74,48 @@ function isDebugMode(): boolean {
 // PURE FUNCTIONS
 // ─────────────────────────────────────────────────────────────────────────────
 
-function generateRoundId(): string {
-  return `round_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}
-
 /**
- * Gera código secreto com 4 símbolos diferentes.
+ * Gera código secreto com 4 símbolos (COM DUPLICATAS PERMITIDAS).
  * CHAMADO APENAS POR startNewRound()
  */
 function generateSecret(): GameSymbol[] {
-  const pool = [...SYMBOLS];
-  
-  // Fisher-Yates shuffle
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
+  const secret: GameSymbol[] = [];
+  for (let i = 0; i < CODE_LENGTH; i++) {
+    const randomIndex = Math.floor(Math.random() * SYMBOLS.length);
+    secret.push(SYMBOLS[randomIndex]);
   }
-  
-  return pool.slice(0, CODE_LENGTH);
+  return secret;
 }
 
 /**
  * ALGORITMO MASTERMIND CLÁSSICO - 2 PASSES
  * 
- * PASSO 1 (exatos): Para cada posição i, se guess[i] === secret[i], 
- *   conta WHITE++ e marca ambos como usados.
+ * PASSO 1 (exatos): Para cada posição i, se guess[i].id === secret[i].id, 
+ *   conta exact++ e marca ambos como usados.
  * 
  * PASSO 2 (parciais): Para cada posição i do guess ainda não usada,
  *   procura um índice j ainda não usado do secret com o mesmo símbolo.
- *   Se achar, conta GRAY++ e marca secret[j] como usado.
+ *   Se achar, conta present++ e marca secret[j] como usado.
  * 
- * Retorna: { correctPosition: whites, correctSymbol: grays }
+ * Retorna: { exact, present }
  * 
  * NUNCA conta um símbolo duas vezes.
  */
 export function calculateFeedback(
   secret: GameSymbol[],
   guess: GameSymbol[]
-): { correctPosition: number; correctSymbol: number } {
-  // Cria cópias para marcar como "usado" sem mutar originais
-  const secretUsed: boolean[] = [false, false, false, false];
-  const guessUsed: boolean[] = [false, false, false, false];
+): { exact: number; present: number } {
+  // Arrays para marcar como "usado" sem mutar originais
+  const secretUsed: boolean[] = Array(CODE_LENGTH).fill(false);
+  const guessUsed: boolean[] = Array(CODE_LENGTH).fill(false);
   
-  let whites = 0; // Exatos (posição correta)
-  let grays = 0;  // Parciais (posição errada)
+  let exact = 0;   // Posição correta (branco)
+  let present = 0; // Posição errada (cinza)
   
   // PASSO 1: Acertos EXATOS (mesma posição)
   for (let i = 0; i < CODE_LENGTH; i++) {
     if (guess[i].id === secret[i].id) {
-      whites++;
+      exact++;
       secretUsed[i] = true;
       guessUsed[i] = true;
     }
@@ -135,14 +129,14 @@ export function calculateFeedback(
       if (secretUsed[j]) continue; // Já foi usado
       
       if (guess[i].id === secret[j].id) {
-        grays++;
+        present++;
         secretUsed[j] = true;
         break; // Importante: só conta uma vez por símbolo do guess
       }
     }
   }
   
-  return { correctPosition: whites, correctSymbol: grays };
+  return { exact, present };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -153,8 +147,8 @@ interface TestCase {
   name: string;
   secret: string[];
   guess: string[];
-  expectedWhites: number;
-  expectedGrays: number;
+  expectedExact: number;
+  expectedPresent: number;
 }
 
 function createSymbol(id: string): GameSymbol {
@@ -163,53 +157,47 @@ function createSymbol(id: string): GameSymbol {
 
 function runSelfTests(): void {
   const testCases: TestCase[] = [
-    // 1) Todos corretos
     {
       name: 'All correct',
       secret: ['A', 'B', 'C', 'D'],
       guess: ['A', 'B', 'C', 'D'],
-      expectedWhites: 4,
-      expectedGrays: 0,
+      expectedExact: 4,
+      expectedPresent: 0,
     },
-    // 2) Todos trocados
     {
       name: 'All swapped',
       secret: ['A', 'B', 'C', 'D'],
       guess: ['D', 'C', 'B', 'A'],
-      expectedWhites: 0,
-      expectedGrays: 4,
+      expectedExact: 0,
+      expectedPresent: 4,
     },
-    // 3) Duplicados: secret [A,A,B,C], guess [A,B,A,A] => whites 1, grays 2
     {
-      name: 'Duplicates case 1',
+      name: 'Duplicates: [A,A,B,C] vs [A,B,A,A]',
       secret: ['A', 'A', 'B', 'C'],
       guess: ['A', 'B', 'A', 'A'],
-      expectedWhites: 1, // A na pos 0
-      expectedGrays: 2,  // B (pos 1 guess -> pos 2 secret), A (pos 2 guess -> pos 1 secret)
+      expectedExact: 1,
+      expectedPresent: 2,
     },
-    // 4) Duplicados: secret [A,B,B,B], guess [B,B,B,A] => whites 2, grays 2
     {
-      name: 'Duplicates case 2',
+      name: 'Duplicates: [A,B,B,B] vs [B,B,B,A]',
       secret: ['A', 'B', 'B', 'B'],
       guess: ['B', 'B', 'B', 'A'],
-      expectedWhites: 2, // B na pos 1 e pos 2
-      expectedGrays: 2,  // B na pos 0 guess -> pos 3 secret, A na pos 3 guess -> pos 0 secret
+      expectedExact: 2,
+      expectedPresent: 2,
     },
-    // 5) Nenhum acerto
     {
       name: 'No matches',
       secret: ['A', 'B', 'C', 'D'],
       guess: ['E', 'E', 'E', 'E'],
-      expectedWhites: 0,
-      expectedGrays: 0,
+      expectedExact: 0,
+      expectedPresent: 0,
     },
-    // 6) Misto: secret [A,B,C,A], guess [A,A,B,C] => whites 1, grays 3
     {
-      name: 'Mixed case',
+      name: 'Mixed: [A,B,C,A] vs [A,A,B,C]',
       secret: ['A', 'B', 'C', 'A'],
       guess: ['A', 'A', 'B', 'C'],
-      expectedWhites: 1, // A na pos 0
-      expectedGrays: 3,  // A na pos 1 guess -> pos 3 secret, B na pos 2 guess -> pos 1 secret, C na pos 3 guess -> pos 2 secret
+      expectedExact: 1,
+      expectedPresent: 3,
     },
   ];
 
@@ -224,8 +212,8 @@ function runSelfTests(): void {
     const guess = tc.guess.map(createSymbol);
     const result = calculateFeedback(secret, guess);
     
-    const ok = result.correctPosition === tc.expectedWhites && 
-               result.correctSymbol === tc.expectedGrays;
+    const ok = result.exact === tc.expectedExact && 
+               result.present === tc.expectedPresent;
     
     if (ok) {
       console.log(`✅ PASS: ${tc.name}`);
@@ -233,8 +221,8 @@ function runSelfTests(): void {
     } else {
       console.log(`❌ FAIL: ${tc.name}`);
       console.log(`   Secret: [${tc.secret.join(',')}], Guess: [${tc.guess.join(',')}]`);
-      console.log(`   Expected: whites=${tc.expectedWhites}, grays=${tc.expectedGrays}`);
-      console.log(`   Got:      whites=${result.correctPosition}, grays=${result.correctSymbol}`);
+      console.log(`   Expected: exact=${tc.expectedExact}, present=${tc.expectedPresent}`);
+      console.log(`   Got:      exact=${result.exact}, present=${result.present}`);
       failed++;
     }
   }
@@ -257,28 +245,26 @@ export function useGame() {
   // ═══════════════════════════════════════════════════════════════════════════
   // SECRET TRAVADO COM useRef
   // O secret é armazenado em ref para NUNCA ser regenerado durante a rodada
+  // Inicializa como NULL - será gerado apenas em startNewRound()
   // ═══════════════════════════════════════════════════════════════════════════
-  const secretRef = useRef<GameSymbol[]>(generateSecret());
-  const roundIdRef = useRef<string>(generateRoundId());
+  const secretRef = useRef<GameSymbol[] | null>(null);
   
-  // Estado mutável (NÃO inclui o secret para evitar regeneração)
-  const [status, setStatus] = useState<GameStatus>('playing');
-  const [attempts, setAttempts] = useState(0);
+  // Estado do jogo
+  const [status, setStatus] = useState<GameStatus>('notStarted');
   const [history, setHistory] = useState<AttemptResult[]>([]);
   const [currentGuess, setCurrentGuess] = useState<GuessSlot[]>([null, null, null, null]);
-  const [remainingSeconds, setRemainingSeconds] = useState(ROUND_DURATION_SECONDS);
+  const [timeLeft, setTimeLeft] = useState(ROUND_DURATION_SECONDS);
   
   // Timer reference
   const timerRef = useRef<number | null>(null);
   
-  // Debug mode
+  // Debug mode (memoizado para não recalcular)
   const debugMode = useMemo(() => isDebugMode(), []);
 
   // Executa self-tests em modo debug (apenas uma vez)
   useEffect(() => {
     if (debugMode) {
       runSelfTests();
-      console.log('🔐 Current Secret:', secretRef.current.map(s => s.id));
     }
   }, [debugMode]);
 
@@ -296,13 +282,13 @@ export function useGame() {
     if (status !== 'playing') return;
 
     timerRef.current = window.setInterval(() => {
-      setRemainingSeconds(prev => {
+      setTimeLeft(prev => {
         if (prev <= 1) {
           if (timerRef.current) {
             clearInterval(timerRef.current);
             timerRef.current = null;
           }
-          setStatus('defeat');
+          setStatus('timeup');
           return 0;
         }
         return prev - 1;
@@ -315,7 +301,12 @@ export function useGame() {
         timerRef.current = null;
       }
     };
-  }, [status, roundIdRef.current]);
+  }, [status]);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // DERIVED: Attempts count
+  // ───────────────────────────────────────────────────────────────────────────
+  const attempts = history.length;
 
   // ───────────────────────────────────────────────────────────────────────────
   // ACTION: Start New Round
@@ -328,16 +319,14 @@ export function useGame() {
       timerRef.current = null;
     }
     
-    // Gera NOVO secret e round ID
+    // Gera NOVO secret (COM DUPLICATAS PERMITIDAS)
     secretRef.current = generateSecret();
-    roundIdRef.current = generateRoundId();
     
     // Reset de todo o estado
     setStatus('playing');
-    setAttempts(0);
     setHistory([]);
     setCurrentGuess([null, null, null, null]);
-    setRemainingSeconds(ROUND_DURATION_SECONDS);
+    setTimeLeft(ROUND_DURATION_SECONDS);
     
     // Log debug
     if (isDebugMode()) {
@@ -378,77 +367,81 @@ export function useGame() {
   // ───────────────────────────────────────────────────────────────────────────
   // ACTION: Submit Guess
   // Compara contra o secret IMUTÁVEL armazenado em secretRef
+  // O feedback é calculado UMA VEZ e armazenado no histórico (congelado)
   // ───────────────────────────────────────────────────────────────────────────
   const submitGuess = useCallback(() => {
+    // Validações
     if (status !== 'playing') return;
     if (currentGuess.includes(null)) return;
+    if (!secretRef.current) return;
+    if (history.length >= MAX_ATTEMPTS) return;
+    if (timeLeft <= 0) return;
     
     const guess = currentGuess as GameSymbol[];
     const secret = secretRef.current; // Usa o secret do ref (IMUTÁVEL)
     
+    // Calcula feedback UMA VEZ e congela
     const feedback = calculateFeedback(secret, guess);
     
     // Log debug
     if (isDebugMode()) {
       console.log('📝 Guess:', guess.map(s => s.id));
       console.log('🔐 Secret:', secret.map(s => s.id));
-      console.log('📊 Feedback:', `whites=${feedback.correctPosition}, grays=${feedback.correctSymbol}`);
+      console.log('📊 Feedback:', `exact=${feedback.exact}, present=${feedback.present}`);
     }
     
-    const newAttempts = attempts + 1;
+    // Cria entry do histórico com feedback CONGELADO
     const newHistoryEntry: AttemptResult = {
-      guess: [...guess],
-      correctPosition: feedback.correctPosition,
-      correctSymbol: feedback.correctSymbol,
+      guess: [...guess], // Clone para segurança
+      feedback: { ...feedback }, // Clone do feedback
     };
     
-    setHistory(prev => [newHistoryEntry, ...prev]);
-    setAttempts(newAttempts);
+    // Adiciona ao histórico (mais recente primeiro)
+    const newHistory = [newHistoryEntry, ...history];
+    setHistory(newHistory);
     setCurrentGuess([null, null, null, null]);
     
-    // Vitória: todos os 4 corretos
-    if (feedback.correctPosition === CODE_LENGTH) {
+    // Verifica vitória: todos os 4 corretos
+    if (feedback.exact === CODE_LENGTH) {
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
-      setStatus('victory');
+      setStatus('won');
       return;
     }
     
-    // Derrota: 8 tentativas esgotadas
-    if (newAttempts >= MAX_ATTEMPTS) {
+    // Verifica derrota: 8 tentativas esgotadas
+    if (newHistory.length >= MAX_ATTEMPTS) {
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
-      setStatus('defeat');
+      setStatus('lost');
       return;
     }
-  }, [status, currentGuess, attempts]);
+  }, [status, currentGuess, history, timeLeft]);
 
   // ───────────────────────────────────────────────────────────────────────────
   // PUBLIC API
   // ───────────────────────────────────────────────────────────────────────────
   return {
-    // Estado derivado para UI
     state: {
-      roundId: roundIdRef.current,
-      guess: currentGuess,
-      attempts,
+      currentGuess,
       history,
-      score: status === 'victory' ? 1000 : 0,
-      remainingSeconds,
-      gameStatus: status,
+      status,
+      timeLeft,
+      attempts,
     } as GameState,
     
-    // Secret para reveal no fim (ou debug)
-    secretCode: secretRef.current,
+    // Secret para reveal no fim (ou debug) - pode ser null se não iniciado
+    secretCode: secretRef.current ?? [],
     
     // Debug mode flag
     debugMode,
     
     actions: {
+      startGame: startNewRound,
       newGame: startNewRound,
       selectSymbol,
       clearSlot,

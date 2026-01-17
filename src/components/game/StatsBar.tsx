@@ -16,8 +16,9 @@ function formatTime(seconds: number): string {
 }
 
 export function StatsBar({ attempts, maxAttempts, remainingSeconds, score, gameStatus }: StatsBarProps) {
-  const isLowTime = remainingSeconds <= 30;
+  const isLowTime = remainingSeconds <= 30 && remainingSeconds > 0;
   const isPlaying = gameStatus === 'playing';
+  const isNotStarted = gameStatus === 'notStarted';
   
   return (
     <header className="w-full px-3 pt-3">
@@ -37,7 +38,7 @@ export function StatsBar({ attempts, maxAttempts, remainingSeconds, score, gameS
         </div>
 
         <div className="flex gap-2 flex-wrap justify-end">
-          <StatPill label="⏱" value={formatTime(remainingSeconds)} warning={isLowTime && isPlaying} />
+          <StatPill label="⏱" value={isNotStarted ? '--:--' : formatTime(remainingSeconds)} warning={isLowTime && isPlaying} />
           <StatPill label="🎯" value={`${attempts}/${maxAttempts}`} />
           <StatPill label="⭐" value={score.toString()} highlight={score > 0} />
         </div>

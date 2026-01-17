@@ -9,7 +9,7 @@ const Index = () => {
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       {/* Debug Mode Indicator */}
-      {debugMode && (
+      {debugMode && secretCode.length > 0 && (
         <div className="fixed top-2 right-2 z-50 bg-yellow-500 text-black text-xs px-2 py-1 rounded font-mono">
           DEBUG: [{secretCode.map(s => s.id.split('-')[0]).join(', ')}]
         </div>
@@ -18,9 +18,9 @@ const Index = () => {
       <StatsBar 
         attempts={state.attempts}
         maxAttempts={constants.MAX_ATTEMPTS}
-        remainingSeconds={state.remainingSeconds}
-        score={state.score}
-        gameStatus={state.gameStatus}
+        remainingSeconds={state.timeLeft}
+        score={state.status === 'won' ? 1000 : 0}
+        gameStatus={state.status}
       />
 
       <main className="flex-1 overflow-hidden px-3 py-3">
@@ -34,6 +34,7 @@ const Index = () => {
               onClearSlot={actions.clearSlot}
               onSubmit={actions.submit}
               onNewGame={actions.newGame}
+              onStartGame={actions.startGame}
             />
           </div>
           <div className="hidden lg:block overflow-y-auto">
