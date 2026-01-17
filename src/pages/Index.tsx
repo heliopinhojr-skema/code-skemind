@@ -1,17 +1,10 @@
 import { useGame } from '@/hooks/useGame';
-import { useEnvironmentalRng } from '@/hooks/useEnvironmentalRng';
 import { StatsBar } from '@/components/game/StatsBar';
 import { GameBoard } from '@/components/game/GameBoard';
 import { RulesCard } from '@/components/game/RulesCard';
 
 const Index = () => {
   const { state, actions, constants, secretCode } = useGame();
-  
-  // RNG Ambiental v1 - afeta apenas o visual, nunca a lógica
-  const { config: environmentalConfig } = useEnvironmentalRng({
-    roundId: state.roundId,
-    symbolCount: constants.SYMBOLS.length,
-  });
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
@@ -34,7 +27,6 @@ const Index = () => {
               onClearSlot={actions.clearSlot}
               onSubmit={actions.submit}
               onNewGame={actions.newGame}
-              environmentalConfig={environmentalConfig}
             />
           </div>
           <div className="hidden lg:block overflow-y-auto">

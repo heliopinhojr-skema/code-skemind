@@ -1,35 +1,23 @@
 import { motion } from 'framer-motion';
 import { Symbol } from './Symbol';
 import type { GameSymbol } from '@/hooks/useGame';
-import type { EnvironmentalConfig } from '@/lib/seededRng';
 
 interface TokenPickerProps {
   symbols: readonly GameSymbol[];
   onSelect: (symbol: GameSymbol) => void;
   disabled?: boolean;
   selectedIds?: string[];
-  environmentalConfig?: EnvironmentalConfig;
 }
 
-/**
- * TokenPicker com suporte a RNG Ambiental
- * 
- * A ordem visual dos símbolos pode variar por rodada (via environmentalConfig),
- * mas os símbolos em si e sua lógica permanecem inalterados.
- */
 export function TokenPicker({ 
   symbols, 
   onSelect, 
   disabled, 
   selectedIds = [],
-  environmentalConfig 
 }: TokenPickerProps) {
-  // Display all symbols
-  const displaySymbols: GameSymbol[] = [...symbols];
-
   return (
     <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 justify-center max-w-xs sm:max-w-sm mx-auto">
-      {displaySymbols.map((symbol, index) => {
+      {symbols.map((symbol, index) => {
         const isUsed = selectedIds.includes(symbol.id);
         
         return (
