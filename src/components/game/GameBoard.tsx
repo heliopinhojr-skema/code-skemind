@@ -10,6 +10,7 @@ import { BACKGROUND_PATTERNS } from '@/lib/seededRng';
 
 interface GameBoardProps {
   state: GameState;
+  secretCode: GameSymbol[];
   symbols: GameSymbol[];
   onSelectSymbol: (symbol: GameSymbol) => void;
   onClearSlot: (index: number) => void;
@@ -20,6 +21,7 @@ interface GameBoardProps {
 
 export function GameBoard({
   state,
+  secretCode,
   symbols,
   onSelectSymbol,
   onClearSlot,
@@ -70,7 +72,7 @@ export function GameBoard({
           <p className="text-xl font-bold text-destructive">💔 Game Over!</p>
           <p className="text-xs text-muted-foreground mt-2">The code was:</p>
           <div className="flex justify-center gap-2 mt-2">
-            {state.secret.map((symbol, i) => (
+            {secretCode.map((symbol, i) => (
               <div key={i} className="w-10 h-10 flex items-center justify-center bg-muted/30 rounded-lg">
                 <Symbol symbol={symbol} size="md" />
               </div>
@@ -88,7 +90,7 @@ export function GameBoard({
           <p className="text-xl font-bold text-destructive">⏰ Time's Up!</p>
           <p className="text-xs text-muted-foreground mt-2">The code was:</p>
           <div className="flex justify-center gap-2 mt-2">
-            {state.secret.map((symbol, i) => (
+            {secretCode.map((symbol, i) => (
               <div key={i} className="w-10 h-10 flex items-center justify-center bg-muted/30 rounded-lg">
                 <Symbol symbol={symbol} size="md" />
               </div>
