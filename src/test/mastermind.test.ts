@@ -1,244 +1,139 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
+import { calculateFeedback, GameSymbol, CODE_LENGTH } from '@/hooks/useGame';
 
-// ═══════════════════════════════════════════════════════════════════════════
-// SKEMIND - TESTES DE INTEGRIDADE DO JOGO
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// Estes testes garantem:
-// 1. O secret permanece IMUTÁVEL durante toda a rodada
-// 2. O feedback Mastermind é sempre correto
-// 3. Vitória é detectada quando todos os 4 acertam posição
-//
-// ═══════════════════════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPER: Create test symbols
+// ─────────────────────────────────────────────────────────────────────────────
 
-// Símbolos de teste
-const SYMBOLS = [
-  { id: 'red-circle', color: '#ef4444', shape: 'circle' as const },
-  { id: 'blue-square', color: '#3b82f6', shape: 'square' as const },
-  { id: 'green-triangle', color: '#22c55e', shape: 'triangle' as const },
-  { id: 'yellow-diamond', color: '#eab308', shape: 'diamond' as const },
-  { id: 'purple-star', color: '#a855f7', shape: 'star' as const },
-  { id: 'cyan-hexagon', color: '#06b6d4', shape: 'hexagon' as const },
-];
-
-const [A, B, C, D, E, F] = SYMBOLS;
-const CODE_LENGTH = 4;
-
-/**
- * Algoritmo Mastermind - CÓPIA EXATA do useGame.ts
- * Para garantir que testamos a mesma lógica
- */
-function calculateFeedback(
-  secret: typeof SYMBOLS,
-  guess: typeof SYMBOLS
-): { correctPosition: number; correctSymbol: number } {
-  const secretCopy: (string | null)[] = secret.map(s => s.id);
-  const guessCopy: (string | null)[] = guess.map(g => g.id);
-  
-  let exactMatches = 0;
-  let partialMatches = 0;
-  
-  // FASE 1: Acertos exatos (pino branco)
-  for (let i = 0; i < CODE_LENGTH; i++) {
-    if (guessCopy[i] !== null && guessCopy[i] === secretCopy[i]) {
-      exactMatches++;
-      secretCopy[i] = null;
-      guessCopy[i] = null;
-    }
-  }
-  
-  // FASE 2: Acertos parciais (pino cinza)
-  for (let i = 0; i < CODE_LENGTH; i++) {
-    if (guessCopy[i] === null) continue;
-    
-    for (let j = 0; j < CODE_LENGTH; j++) {
-      if (secretCopy[j] === null) continue;
-      
-      if (guessCopy[i] === secretCopy[j]) {
-        partialMatches++;
-        secretCopy[j] = null;
-        break;
-      }
-    }
-  }
-  
-  return { correctPosition: exactMatches, correctSymbol: partialMatches };
+function sym(id: string): GameSymbol {
+  return { id, color: '#000', shape: 'circle' };
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// TESTES DE FEEDBACK MASTERMIND
-// ═══════════════════════════════════════════════════════════════════════════
+function makeArray(ids: string[]): GameSymbol[] {
+  return ids.map(sym);
+}
 
-describe('Mastermind Feedback Algorithm', () => {
+// ─────────────────────────────────────────────────────────────────────────────
+// MASTERMIND FEEDBACK ALGORITHM TESTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Mastermind Feedback Algorithm - 2 Passes', () => {
   
-  describe('Acertos Exatos (Pino Branco)', () => {
-    it('deve retornar 4 exatos quando palpite = secret', () => {
-      const secret = [A, B, C, D];
-      const guess = [A, B, C, D];
-      
-      const result = calculateFeedback(secret, guess);
-      
-      expect(result.correctPosition).toBe(4);
-      expect(result.correctSymbol).toBe(0);
-    });
-
-    it('deve retornar 2 exatos quando 2 posições corretas', () => {
-      const secret = [A, B, C, D];
-      const guess = [A, B, E, F];
-      
-      const result = calculateFeedback(secret, guess);
-      
-      expect(result.correctPosition).toBe(2);
-      expect(result.correctSymbol).toBe(0);
-    });
-
-    it('deve retornar 1 exato quando apenas 1 posição correta', () => {
-      const secret = [A, B, C, D];
-      const guess = [A, E, F, E];
-      
-      const result = calculateFeedback(secret, guess);
-      
-      expect(result.correctPosition).toBe(1);
-      expect(result.correctSymbol).toBe(0);
-    });
+  // 1) secret [A,B,C,D], guess [A,B,C,D] => whites 4, grays 0
+  it('Case 1: All correct positions', () => {
+    const secret = makeArray(['A', 'B', 'C', 'D']);
+    const guess = makeArray(['A', 'B', 'C', 'D']);
+    
+    const result = calculateFeedback(secret, guess);
+    
+    expect(result.correctPosition).toBe(4);
+    expect(result.correctSymbol).toBe(0);
   });
 
-  describe('Acertos Parciais (Pino Cinza)', () => {
-    it('deve retornar 4 parciais quando todos trocados de posição', () => {
-      const secret = [A, B, C, D];
-      const guess = [B, C, D, A];
-      
-      const result = calculateFeedback(secret, guess);
-      
-      expect(result.correctPosition).toBe(0);
-      expect(result.correctSymbol).toBe(4);
-    });
-
-    it('deve retornar 2 parciais quando 2 cores em posições erradas', () => {
-      const secret = [A, B, C, D];
-      const guess = [B, A, E, F];
-      
-      const result = calculateFeedback(secret, guess);
-      
-      expect(result.correctPosition).toBe(0);
-      expect(result.correctSymbol).toBe(2);
-    });
-
-    it('deve retornar 1 parcial quando apenas 1 cor em posição errada', () => {
-      const secret = [A, B, C, D];
-      const guess = [E, A, E, F];
-      
-      const result = calculateFeedback(secret, guess);
-      
-      expect(result.correctPosition).toBe(0);
-      expect(result.correctSymbol).toBe(1);
-    });
+  // 2) secret [A,B,C,D], guess [D,C,B,A] => whites 0, grays 4
+  it('Case 2: All swapped (wrong positions)', () => {
+    const secret = makeArray(['A', 'B', 'C', 'D']);
+    const guess = makeArray(['D', 'C', 'B', 'A']);
+    
+    const result = calculateFeedback(secret, guess);
+    
+    expect(result.correctPosition).toBe(0);
+    expect(result.correctSymbol).toBe(4);
   });
 
-  describe('Combinações Mistas', () => {
-    it('deve retornar 1 exato e 2 parciais', () => {
-      const secret = [A, B, C, D];
-      const guess = [A, C, D, E];
-      
-      const result = calculateFeedback(secret, guess);
-      
-      expect(result.correctPosition).toBe(1);
-      expect(result.correctSymbol).toBe(2);
-    });
-
-    it('deve retornar 2 exatos e 2 parciais (pares trocados)', () => {
-      const secret = [A, B, C, D];
-      const guess = [A, B, D, C];
-      
-      const result = calculateFeedback(secret, guess);
-      
-      expect(result.correctPosition).toBe(2);
-      expect(result.correctSymbol).toBe(2);
-    });
-
-    it('deve retornar 1 exato e 1 parcial', () => {
-      const secret = [A, B, C, D];
-      const guess = [A, E, B, F];
-      
-      const result = calculateFeedback(secret, guess);
-      
-      expect(result.correctPosition).toBe(1);
-      expect(result.correctSymbol).toBe(1);
-    });
+  // 3) secret [A,A,B,C], guess [A,B,A,A] => whites 1, grays 2
+  it('Case 3: Duplicates - secret [A,A,B,C], guess [A,B,A,A]', () => {
+    const secret = makeArray(['A', 'A', 'B', 'C']);
+    const guess = makeArray(['A', 'B', 'A', 'A']);
+    
+    const result = calculateFeedback(secret, guess);
+    
+    // Explicação:
+    // - A na pos 0: exato (white)
+    // - B na pos 1 guess -> B na pos 2 secret: parcial (gray)
+    // - A na pos 2 guess -> A na pos 1 secret: parcial (gray)
+    // - A na pos 3 guess: não há mais A disponível no secret
+    expect(result.correctPosition).toBe(1);
+    expect(result.correctSymbol).toBe(2);
   });
 
-  describe('Nenhum Acerto', () => {
-    it('deve retornar 0 quando nenhum símbolo existe no secret', () => {
-      const secret = [A, B, C, D];
-      const guess = [E, F, E, F];
-      
-      const result = calculateFeedback(secret, guess);
-      
-      expect(result.correctPosition).toBe(0);
-      expect(result.correctSymbol).toBe(0);
-    });
+  // 4) secret [A,B,B,B], guess [B,B,B,A] => whites 2, grays 2
+  it('Case 4: Duplicates - secret [A,B,B,B], guess [B,B,B,A]', () => {
+    const secret = makeArray(['A', 'B', 'B', 'B']);
+    const guess = makeArray(['B', 'B', 'B', 'A']);
+    
+    const result = calculateFeedback(secret, guess);
+    
+    // Explicação:
+    // - B na pos 1: exato (white)
+    // - B na pos 2: exato (white)
+    // - B na pos 0 guess -> B na pos 3 secret: parcial (gray)
+    // - A na pos 3 guess -> A na pos 0 secret: parcial (gray)
+    expect(result.correctPosition).toBe(2);
+    expect(result.correctSymbol).toBe(2);
   });
 
-  describe('Prevenção de Dupla Contagem', () => {
-    it('não deve contar o mesmo símbolo duas vezes', () => {
-      const secret = [A, B, C, D];
-      const guess = [B, A, D, C];
-      
-      const result = calculateFeedback(secret, guess);
-      
-      // Todos são parciais, nenhum é exato
-      expect(result.correctPosition).toBe(0);
-      expect(result.correctSymbol).toBe(4);
-      // Total nunca pode exceder 4
-      expect(result.correctPosition + result.correctSymbol).toBeLessThanOrEqual(4);
-    });
+  // 5) secret [A,B,C,D], guess [E,E,E,E] => whites 0, grays 0
+  it('Case 5: No matches at all', () => {
+    const secret = makeArray(['A', 'B', 'C', 'D']);
+    const guess = makeArray(['E', 'E', 'E', 'E']);
+    
+    const result = calculateFeedback(secret, guess);
+    
+    expect(result.correctPosition).toBe(0);
+    expect(result.correctSymbol).toBe(0);
+  });
 
-    it('exato tem prioridade sobre parcial', () => {
-      const secret = [A, A, B, C]; // Se permitíssemos repetição
-      const guess = [A, B, A, C];
-      
-      // Neste caso com símbolos únicos:
-      const secretUnique = [A, B, C, D];
-      const guessUnique = [A, C, B, D];
-      
-      const result = calculateFeedback(secretUnique, guessUnique);
-      
-      expect(result.correctPosition).toBe(2); // A e D
-      expect(result.correctSymbol).toBe(2);   // B e C trocados
-    });
+  // 6) secret [A,B,C,A], guess [A,A,B,C] => whites 1, grays 3
+  it('Case 6: Mixed - secret [A,B,C,A], guess [A,A,B,C]', () => {
+    const secret = makeArray(['A', 'B', 'C', 'A']);
+    const guess = makeArray(['A', 'A', 'B', 'C']);
+    
+    const result = calculateFeedback(secret, guess);
+    
+    // Explicação:
+    // - A na pos 0: exato (white)
+    // - A na pos 1 guess -> A na pos 3 secret: parcial (gray)
+    // - B na pos 2 guess -> B na pos 1 secret: parcial (gray)
+    // - C na pos 3 guess -> C na pos 2 secret: parcial (gray)
+    expect(result.correctPosition).toBe(1);
+    expect(result.correctSymbol).toBe(3);
   });
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
-// TESTES DE IMUTABILIDADE DO SECRET
-// ═══════════════════════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────────────────
+// SECRET IMMUTABILITY TESTS
+// ─────────────────────────────────────────────────────────────────────────────
 
 describe('Secret Immutability', () => {
-  it('calculateFeedback não deve modificar o secret original', () => {
-    const secret = [A, B, C, D];
-    const secretCopy = JSON.stringify(secret);
-    const guess = [B, C, D, A];
+  
+  it('calculateFeedback does not modify the secret array', () => {
+    const secret = makeArray(['A', 'B', 'C', 'D']);
+    const guess = makeArray(['D', 'C', 'B', 'A']);
+    
+    const originalSecretIds = secret.map(s => s.id);
     
     calculateFeedback(secret, guess);
     
-    // Secret deve permanecer idêntico
-    expect(JSON.stringify(secret)).toBe(secretCopy);
+    const afterSecretIds = secret.map(s => s.id);
+    expect(afterSecretIds).toEqual(originalSecretIds);
   });
 
-  it('calculateFeedback não deve modificar o guess original', () => {
-    const secret = [A, B, C, D];
-    const guess = [B, C, D, A];
-    const guessCopy = JSON.stringify(guess);
+  it('calculateFeedback does not modify the guess array', () => {
+    const secret = makeArray(['A', 'B', 'C', 'D']);
+    const guess = makeArray(['D', 'C', 'B', 'A']);
+    
+    const originalGuessIds = guess.map(s => s.id);
     
     calculateFeedback(secret, guess);
     
-    // Guess deve permanecer idêntico
-    expect(JSON.stringify(guess)).toBe(guessCopy);
+    const afterGuessIds = guess.map(s => s.id);
+    expect(afterGuessIds).toEqual(originalGuessIds);
   });
 
-  it('múltiplas chamadas com mesmo secret devem dar mesmo resultado', () => {
-    const secret = [A, B, C, D];
-    const guess = [A, C, B, E];
+  it('Multiple calls with same input produce identical results', () => {
+    const secret = makeArray(['A', 'B', 'C', 'D']);
+    const guess = makeArray(['A', 'C', 'B', 'D']);
     
     const result1 = calculateFeedback(secret, guess);
     const result2 = calculateFeedback(secret, guess);
@@ -247,110 +142,96 @@ describe('Secret Immutability', () => {
     expect(result1).toEqual(result2);
     expect(result2).toEqual(result3);
   });
-
-  it('secret deve ser determinístico - mesma entrada = mesma saída', () => {
-    const secret = [A, B, C, D];
-    
-    // 10 palpites diferentes
-    const guesses = [
-      [A, B, C, D],
-      [D, C, B, A],
-      [E, F, E, F],
-      [A, E, F, E],
-      [B, A, D, C],
-    ];
-    
-    // Calcular feedback duas vezes para cada
-    guesses.forEach(guess => {
-      const r1 = calculateFeedback(secret, guess as typeof SYMBOLS);
-      const r2 = calculateFeedback(secret, guess as typeof SYMBOLS);
-      expect(r1).toEqual(r2);
-    });
-  });
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
-// TESTES DE CONDIÇÃO DE VITÓRIA
-// ═══════════════════════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────────────────
+// VICTORY CONDITION TESTS
+// ─────────────────────────────────────────────────────────────────────────────
 
 describe('Victory Condition', () => {
-  it('vitória ocorre quando correctPosition === 4', () => {
-    const secret = [A, B, C, D];
-    const winningGuess = [A, B, C, D];
+  
+  it('Victory is detected when all 4 positions are correct', () => {
+    const secret = makeArray(['A', 'B', 'C', 'D']);
+    const guess = makeArray(['A', 'B', 'C', 'D']);
     
-    const result = calculateFeedback(secret, winningGuess);
+    const result = calculateFeedback(secret, guess);
     
-    expect(result.correctPosition).toBe(4);
-    expect(result.correctPosition === 4).toBe(true); // Condição de vitória
+    expect(result.correctPosition).toBe(CODE_LENGTH);
+    expect(result.correctPosition === CODE_LENGTH).toBe(true);
   });
 
-  it('NÃO é vitória quando correctPosition < 4, mesmo com parciais', () => {
-    const secret = [A, B, C, D];
-    const almostGuess = [A, B, D, C]; // 2 exatos, 2 parciais
+  it('Victory is NOT detected with partial matches', () => {
+    const secret = makeArray(['A', 'B', 'C', 'D']);
+    const guess = makeArray(['D', 'C', 'B', 'A']);
     
-    const result = calculateFeedback(secret, almostGuess);
+    const result = calculateFeedback(secret, guess);
     
-    expect(result.correctPosition).toBe(2);
-    expect(result.correctPosition === 4).toBe(false); // NÃO é vitória
-  });
-
-  it('4 parciais NÃO é vitória', () => {
-    const secret = [A, B, C, D];
-    const allWrongPosition = [B, C, D, A];
-    
-    const result = calculateFeedback(secret, allWrongPosition);
-    
-    expect(result.correctSymbol).toBe(4);
     expect(result.correctPosition).toBe(0);
-    expect(result.correctPosition === 4).toBe(false); // NÃO é vitória
+    expect(result.correctPosition === CODE_LENGTH).toBe(false);
+  });
+
+  it('Victory is NOT detected with 3 correct positions', () => {
+    const secret = makeArray(['A', 'B', 'C', 'D']);
+    const guess = makeArray(['A', 'B', 'C', 'E']);
+    
+    const result = calculateFeedback(secret, guess);
+    
+    expect(result.correctPosition).toBe(3);
+    expect(result.correctPosition === CODE_LENGTH).toBe(false);
   });
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
-// TESTES DE EDGE CASES
-// ═══════════════════════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────────────────
+// EDGE CASES
+// ─────────────────────────────────────────────────────────────────────────────
 
 describe('Edge Cases', () => {
-  it('deve funcionar com qualquer combinação de 4 símbolos', () => {
-    // Testar todas as 15 combinações possíveis de 4 símbolos de 6
-    const combinations = [
-      [A, B, C, D],
-      [A, B, C, E],
-      [A, B, C, F],
-      [A, B, D, E],
-      [A, B, D, F],
-      [A, B, E, F],
-      [A, C, D, E],
-      [A, C, D, F],
-      [A, C, E, F],
-      [A, D, E, F],
-      [B, C, D, E],
-      [B, C, D, F],
-      [B, C, E, F],
-      [B, D, E, F],
-      [C, D, E, F],
-    ];
-
-    combinations.forEach(combo => {
-      const secret = combo;
-      const guess = combo;
-      const result = calculateFeedback(secret as typeof SYMBOLS, guess as typeof SYMBOLS);
-      expect(result.correctPosition).toBe(4);
-    });
-  });
-
-  it('feedback total nunca excede CODE_LENGTH', () => {
+  
+  it('Total feedback never exceeds CODE_LENGTH', () => {
     const testCases = [
-      { secret: [A, B, C, D], guess: [A, B, C, D] },
-      { secret: [A, B, C, D], guess: [D, C, B, A] },
-      { secret: [A, B, C, D], guess: [E, F, E, F] },
-      { secret: [A, B, C, D], guess: [A, C, B, D] },
+      { secret: ['A', 'B', 'C', 'D'], guess: ['A', 'B', 'C', 'D'] },
+      { secret: ['A', 'B', 'C', 'D'], guess: ['D', 'C', 'B', 'A'] },
+      { secret: ['A', 'A', 'B', 'C'], guess: ['A', 'B', 'A', 'A'] },
+      { secret: ['A', 'B', 'B', 'B'], guess: ['B', 'B', 'B', 'A'] },
     ];
 
-    testCases.forEach(({ secret, guess }) => {
-      const result = calculateFeedback(secret as typeof SYMBOLS, guess as typeof SYMBOLS);
+    for (const tc of testCases) {
+      const secret = makeArray(tc.secret);
+      const guess = makeArray(tc.guess);
+      const result = calculateFeedback(secret, guess);
+      
       const total = result.correctPosition + result.correctSymbol;
       expect(total).toBeLessThanOrEqual(CODE_LENGTH);
-    });
+    }
+  });
+
+  it('Handles single match scenarios correctly', () => {
+    // One exact match
+    const secret1 = makeArray(['A', 'B', 'C', 'D']);
+    const guess1 = makeArray(['A', 'E', 'E', 'E']);
+    const result1 = calculateFeedback(secret1, guess1);
+    expect(result1.correctPosition).toBe(1);
+    expect(result1.correctSymbol).toBe(0);
+
+    // One partial match
+    const secret2 = makeArray(['A', 'B', 'C', 'D']);
+    const guess2 = makeArray(['E', 'A', 'E', 'E']);
+    const result2 = calculateFeedback(secret2, guess2);
+    expect(result2.correctPosition).toBe(0);
+    expect(result2.correctSymbol).toBe(1);
+  });
+
+  it('Correctly handles repeating symbols in secret', () => {
+    // Secret has duplicate, guess has one of that symbol in wrong position
+    const secret = makeArray(['A', 'A', 'B', 'C']);
+    const guess = makeArray(['B', 'C', 'A', 'D']);
+    
+    const result = calculateFeedback(secret, guess);
+    
+    // A na pos 2 guess -> A na pos 0 ou 1 secret: 1 parcial
+    // B na pos 0 guess -> B na pos 2 secret: 1 parcial
+    // C na pos 1 guess -> C na pos 3 secret: 1 parcial
+    expect(result.correctPosition).toBe(0);
+    expect(result.correctSymbol).toBe(3);
   });
 });
