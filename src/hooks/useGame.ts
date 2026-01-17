@@ -145,22 +145,27 @@ export function useGame() {
     // Validações de estado
     if (status !== 'playing') return;
     if (!secretRef.current) return;
-    if (attempts >= MAX_ATTEMPTS) return;
 
-    // Extrai IDs do palpite
-    const filledGuess = currentGuess.filter((s): s is GameSymbol => s !== null);
+    // SNAPSHOT IMEDIATO - captura estado no momento do clique
+    const guessSnapshot: GuessSlot[] = currentGuess.map(s => s ? { ...s } : null);
+    const secretSnapshot: string[] = [...secretRef.current];
+
+    // Extrai IDs do palpite a partir do snapshot
+    const filledGuess = guessSnapshot.filter((s): s is GameSymbol => s !== null);
     if (filledGuess.length !== CODE_LENGTH) return;
 
-    const guessIds = filledGuess.map(s => s.id);
+    const guessIds: string[] = filledGuess.map(s => s.id);
 
     // Valida palpite (4 símbolos únicos)
     if (!isValidGuess(guessIds)) return;
 
-    // Calcula feedback usando cópia do segredo
-    const secretCopy = [...secretRef.current];
-    const result = evaluateGuess(secretCopy, guessIds);
+    // Verifica limite de tentativas usando histórico atual
+    if (history.length >= MAX_ATTEMPTS) return;
 
-    // Cria entrada no histórico com ID único
+    // Calcula feedback usando snapshots (nunca state direto)
+    const result = evaluateGuess(secretSnapshot, guessIds);
+
+    // Cria entrada no histórico com ID único e dados imutáveis
     const entry: AttemptResult = {
       id: crypto.randomUUID(),
       guess: [...guessIds],
@@ -186,7 +191,7 @@ export function useGame() {
 
     // Limpa palpite para próxima tentativa
     setCurrentGuess([null, null, null, null]);
-  }, [status, attempts, currentGuess, history]);
+  }, [status, currentGuess, history]);
 
   // ==================== DADOS DERIVADOS ====================
 
