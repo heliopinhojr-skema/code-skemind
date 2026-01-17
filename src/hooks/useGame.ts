@@ -1,16 +1,9 @@
 /**
- * useGame — SKEMIND (Mastermind) hook simplificado
+ * useGame — SKEMIND hook
  */
 
 import { useCallback, useRef, useState } from "react";
-
-import {
-  CODE_LENGTH,
-  SYMBOLS as ENGINE_SYMBOLS,
-  evaluateGuess,
-  generateSecret,
-  type Symbol as EngineSymbol,
-} from "@/lib/mastermindEngine";
+import { CODE_LENGTH, SYMBOLS, evaluateGuess, generateSecret, getSymbolById } from "@/lib/mastermindEngine";
 
 export type GameStatus = 'notStarted' | 'playing' | 'won' | 'lost';
 
@@ -24,8 +17,8 @@ export type GuessSlot = GameSymbol | null;
 
 export interface AttemptResult {
   guess: string[];
-  whites: number;  // exact matches
-  blacks: number;  // present but wrong position
+  whites: number;
+  blacks: number;
 }
 
 export interface GameState {
@@ -38,7 +31,7 @@ export interface GameState {
 export { CODE_LENGTH };
 export const MAX_ATTEMPTS = 8;
 
-export const SYMBOLS: readonly GameSymbol[] = [
+export const UI_SYMBOLS: readonly GameSymbol[] = [
   { id: 'circle', color: '#E53935', shape: 'circle' },
   { id: 'square', color: '#1E88E5', shape: 'square' },
   { id: 'triangle', color: '#43A047', shape: 'triangle' },
@@ -47,23 +40,10 @@ export const SYMBOLS: readonly GameSymbol[] = [
   { id: 'hexagon', color: '#00BCD4', shape: 'hexagon' },
 ] as const;
 
-function engineToUiSymbol(sym: EngineSymbol): GameSymbol {
-  const found = SYMBOLS.find(s => s.id === sym.id);
-  return found ?? { id: sym.id, color: sym.color, shape: 'circle' };
-}
-
-function uiToEngineSymbol(sym: GameSymbol): EngineSymbol {
-  const found = ENGINE_SYMBOLS.find(s => s.id === sym.id);
-  return found ?? { id: sym.id, label: sym.id.charAt(0).toUpperCase(), color: sym.color };
-}
+export { UI_SYMBOLS as SYMBOLS };
 
 export function useGame() {
-  // Debug mode simples
-  const debugMode = typeof window !== 'undefined' && 
-    new URLSearchParams(window.location.search).get('debug') === '1';
-
-  // Secret fixo durante a partida
-  const secretRef = useRef<EngineSymbol[] | null>(null);
+  const secretRef = useRef<string[] | null>(null);
 
   const [status, setStatus] = useState<GameStatus>('notStarted');
   const [history, setHistory] = useState<AttemptResult[]>([]);
@@ -77,9 +57,8 @@ export function useGame() {
     setStatus('playing');
     setHistory([]);
     setCurrentGuess([null, null, null, null]);
-    
     // eslint-disable-next-line no-console
-    console.log('[GAME] Secret gerado:', secret.map(s => s.id));
+    console.log('[GAME] Secret:', secret);
   }, []);
 
   const newGame = useCallback(() => {
@@ -93,9 +72,7 @@ export function useGame() {
     if (status !== 'playing') return;
 
     setCurrentGuess(prev => {
-      // Não permitir duplicação
       if (prev.some(s => s?.id === symbol.id)) return prev;
-
       const next = [...prev];
       const emptyIndex = next.findIndex(s => s === null);
       if (emptyIndex === -1) return prev;
@@ -118,36 +95,32 @@ export function useGame() {
     if (!secretRef.current) return;
     if (attempts >= MAX_ATTEMPTS) return;
 
-    // Verificar se palpite está completo (4 símbolos distintos)
     const filledGuess = currentGuess.filter((s): s is GameSymbol => s !== null);
     if (filledGuess.length !== CODE_LENGTH) return;
-    
-    const ids = filledGuess.map(s => s.id);
-    if (new Set(ids).size !== CODE_LENGTH) return;
 
-    // Converter para engine symbols e avaliar
-    const engineGuess = filledGuess.map(uiToEngineSymbol);
-    const result = evaluateGuess(secretRef.current, engineGuess);
+    const guessIds = filledGuess.map(s => s.id);
+    if (new Set(guessIds).size !== CODE_LENGTH) return;
+
+    const result = evaluateGuess(secretRef.current, guessIds);
 
     // eslint-disable-next-line no-console
     console.log('[GAME] Avaliação:', {
-      secret: secretRef.current.map(s => s.id),
-      guess: ids,
-      whites: result.feedback.exact,
-      blacks: result.feedback.present,
+      secret: secretRef.current,
+      guess: guessIds,
+      whites: result.exact,
+      blacks: result.present,
     });
 
-    // Adicionar ao histórico
     const entry: AttemptResult = {
-      guess: ids,
-      whites: result.feedback.exact,
-      blacks: result.feedback.present,
+      guess: guessIds,
+      whites: result.exact,
+      blacks: result.present,
     };
 
     const nextHistory = [entry, ...history];
     setHistory(nextHistory);
 
-    if (result.isVictory) {
+    if (result.exact === CODE_LENGTH) {
       setStatus('won');
       return;
     }
@@ -157,27 +130,23 @@ export function useGame() {
       return;
     }
 
-    // Limpar para próximo palpite
     setCurrentGuess([null, null, null, null]);
   }, [attempts, currentGuess, history, status]);
 
-  // Secret para exibição (UI)
-  const secretCode: GameSymbol[] = secretRef.current 
-    ? secretRef.current.map(engineToUiSymbol) 
+  const secretCode: GameSymbol[] = secretRef.current
+    ? secretRef.current.map(id => {
+        const sym = getSymbolById(id);
+        return sym 
+          ? { id: sym.id, color: sym.color, shape: sym.id as GameSymbol['shape'] }
+          : { id, color: '#888', shape: 'circle' as const };
+      })
     : [];
 
-  const state: GameState = {
-    status,
-    attempts,
-    currentGuess,
-    history,
-  };
-
   return {
-    state,
+    state: { status, attempts, currentGuess, history },
     actions: { startGame, newGame, selectSymbol, clearSlot, submit },
-    constants: { CODE_LENGTH, MAX_ATTEMPTS, SYMBOLS },
+    constants: { CODE_LENGTH, MAX_ATTEMPTS, SYMBOLS: UI_SYMBOLS },
     secretCode,
-    debugMode,
+    debugMode: false,
   };
 }
