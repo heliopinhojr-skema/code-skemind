@@ -5,7 +5,7 @@ interface StatsBarProps {
   maxAttempts: number;
   remainingSeconds: number;
   score: number;
-  gameStatus: 'playing' | 'won' | 'lost' | 'timeout';
+  gameStatus: 'playing' | 'victory' | 'defeat' | 'timeout';
 }
 
 function formatTime(seconds: number): string {
