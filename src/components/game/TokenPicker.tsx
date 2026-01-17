@@ -1,29 +1,38 @@
 import { motion } from 'framer-motion';
+import { Symbol } from './Symbol';
+import type { GameSymbol } from '@/hooks/useGame';
 
 interface TokenPickerProps {
-  tokens: string[];
-  onSelect: (token: string) => void;
+  symbols: GameSymbol[];
+  onSelect: (symbol: GameSymbol) => void;
   disabled?: boolean;
+  selectedIds?: string[];
 }
 
-export function TokenPicker({ tokens, onSelect, disabled }: TokenPickerProps) {
+export function TokenPicker({ symbols, onSelect, disabled, selectedIds = [] }: TokenPickerProps) {
   return (
-    <div className="flex flex-wrap gap-3 justify-center">
-      {tokens.map((token, index) => (
-        <motion.button
-          key={token}
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: index * 0.05, type: 'spring', stiffness: 300 }}
-          whileHover={disabled ? {} : { scale: 1.1 }}
-          whileTap={disabled ? {} : { scale: 0.95 }}
-          onClick={() => !disabled && onSelect(token)}
-          disabled={disabled}
-          className={`token-picker ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
-        >
-          {token}
-        </motion.button>
-      ))}
+    <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 justify-center max-w-xs sm:max-w-sm mx-auto">
+      {symbols.map((symbol, index) => {
+        const isUsed = selectedIds.includes(symbol.id);
+        return (
+          <motion.button
+            key={symbol.id}
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: index * 0.03, type: 'spring', stiffness: 300 }}
+            whileHover={disabled || isUsed ? {} : { scale: 1.15 }}
+            whileTap={disabled || isUsed ? {} : { scale: 0.9 }}
+            onClick={() => !disabled && !isUsed && onSelect(symbol)}
+            disabled={disabled || isUsed}
+            className={`
+              symbol-picker
+              ${disabled || isUsed ? 'opacity-30 cursor-not-allowed' : 'active:scale-95'}
+            `}
+          >
+            <Symbol symbol={symbol} size="lg" />
+          </motion.button>
+        );
+      })}
     </div>
   );
 }

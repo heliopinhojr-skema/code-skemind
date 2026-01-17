@@ -1,110 +1,196 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-export const TOKENS = ["🔥", "💎", "⚡", "🌙", "🧠", "🛡️", "👁️", "🌀"];
-const MAX_ATTEMPTS = 10;
-const CODE_LENGTH = 4;
+// Colored shapes as symbols
+export interface GameSymbol {
+  id: string;
+  color: string;
+  shape: 'circle' | 'square' | 'triangle' | 'diamond' | 'star' | 'hexagon';
+}
 
-export type GuessSlot = string | null;
+export const SYMBOLS: GameSymbol[] = [
+  { id: 'red-circle', color: '#ef4444', shape: 'circle' },
+  { id: 'blue-square', color: '#3b82f6', shape: 'square' },
+  { id: 'green-triangle', color: '#22c55e', shape: 'triangle' },
+  { id: 'yellow-diamond', color: '#eab308', shape: 'diamond' },
+  { id: 'purple-star', color: '#a855f7', shape: 'star' },
+  { id: 'cyan-hexagon', color: '#06b6d4', shape: 'hexagon' },
+];
+
+const MAX_ATTEMPTS = 8;
+const CODE_LENGTH = 4;
+const ROUND_DURATION_SECONDS = 180; // 3 minutes
+
+export type GuessSlot = GameSymbol | null;
 
 export interface AttemptResult {
-  guess: string[];
-  black: number;
-  white: number;
+  guess: GameSymbol[];
+  correctPosition: number;
+  correctSymbol: number;
+}
+
+export interface RoundLog {
+  round_id: string;
+  start_time: string;
+  end_time: string;
+  attempts_used: number;
+  solved: boolean;
+  total_time_ms: number;
+  final_score: number;
 }
 
 export interface GameState {
-  secret: string[];
+  roundId: string;
+  secret: GameSymbol[];
   guess: GuessSlot[];
   attempts: number;
   history: AttemptResult[];
   score: number;
-  elapsedSeconds: number;
-  gameStatus: 'playing' | 'won' | 'lost' | 'revealed';
+  remainingSeconds: number;
+  startTime: number;
+  gameStatus: 'playing' | 'won' | 'lost' | 'timeout';
 }
 
-function generateSecret(): string[] {
-  return Array.from({ length: CODE_LENGTH }, () => 
-    TOKENS[Math.floor(Math.random() * TOKENS.length)]
-  );
+function generateRoundId(): string {
+  return `round_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
-function calculateFeedback(code: string[], guess: string[]): { black: number; white: number } {
-  let black = 0;
-  let white = 0;
-  const codeRemaining: string[] = [];
-  const guessRemaining: string[] = [];
+// Generate secret with NO REPETITION
+function generateSecret(): GameSymbol[] {
+  const shuffled = [...SYMBOLS].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, CODE_LENGTH);
+}
+
+function calculateFeedback(code: GameSymbol[], guess: GameSymbol[]): { correctPosition: number; correctSymbol: number } {
+  let correctPosition = 0;
+  let correctSymbol = 0;
+  const codeRemaining: GameSymbol[] = [];
+  const guessRemaining: GameSymbol[] = [];
 
   for (let i = 0; i < CODE_LENGTH; i++) {
-    if (code[i] === guess[i]) {
-      black++;
+    if (code[i].id === guess[i].id) {
+      correctPosition++;
     } else {
       codeRemaining.push(code[i]);
       guessRemaining.push(guess[i]);
     }
   }
 
-  guessRemaining.forEach(token => {
-    const idx = codeRemaining.indexOf(token);
+  guessRemaining.forEach(symbol => {
+    const idx = codeRemaining.findIndex(s => s.id === symbol.id);
     if (idx > -1) {
-      white++;
+      correctSymbol++;
       codeRemaining.splice(idx, 1);
     }
   });
 
-  return { black, white };
+  return { correctPosition, correctSymbol };
 }
 
-function calculateScore(attempts: number, elapsedSeconds: number): number {
+function calculateScore(attempts: number, elapsedMs: number, solved: boolean): number {
+  if (!solved) return 0;
+  
+  // Base score for solving
+  const baseScore = 1000;
+  
+  // Fewer attempts = higher bonus (max 700 for 1 attempt)
   const attemptBonus = Math.max(0, (MAX_ATTEMPTS - attempts) * 100);
-  const timeBonus = Math.max(0, 500 - elapsedSeconds);
-  return attemptBonus + timeBonus;
+  
+  // Faster = higher bonus (max 180 bonus for instant solve, decreases linearly)
+  const elapsedSeconds = elapsedMs / 1000;
+  const timeBonus = Math.max(0, Math.floor(ROUND_DURATION_SECONDS - elapsedSeconds));
+  
+  return baseScore + attemptBonus + timeBonus;
+}
+
+function logRound(state: GameState, endTime: number): RoundLog {
+  const log: RoundLog = {
+    round_id: state.roundId,
+    start_time: new Date(state.startTime).toISOString(),
+    end_time: new Date(endTime).toISOString(),
+    attempts_used: state.attempts,
+    solved: state.gameStatus === 'won',
+    total_time_ms: endTime - state.startTime,
+    final_score: state.score,
+  };
+  
+  console.log('=== SKEMIND ROUND LOG ===');
+  console.log(JSON.stringify(log, null, 2));
+  console.log('=========================');
+  
+  return log;
 }
 
 export function useGame() {
-  const [state, setState] = useState<GameState>(() => ({
-    secret: generateSecret(),
-    guess: [null, null, null, null],
-    attempts: 0,
-    history: [],
-    score: 0,
-    elapsedSeconds: 0,
-    gameStatus: 'playing',
-  }));
+  const [state, setState] = useState<GameState>(() => {
+    const now = Date.now();
+    return {
+      roundId: generateRoundId(),
+      secret: generateSecret(),
+      guess: [null, null, null, null],
+      attempts: 0,
+      history: [],
+      score: 0,
+      remainingSeconds: ROUND_DURATION_SECONDS,
+      startTime: now,
+      gameStatus: 'playing',
+    };
+  });
 
   const timerRef = useRef<number | null>(null);
+  const hasLoggedRef = useRef(false);
 
+  // Countdown timer
   useEffect(() => {
     if (state.gameStatus === 'playing') {
+      hasLoggedRef.current = false;
       timerRef.current = window.setInterval(() => {
-        setState(s => ({ ...s, elapsedSeconds: s.elapsedSeconds + 1 }));
+        setState(s => {
+          if (s.remainingSeconds <= 1) {
+            // Time's up!
+            if (timerRef.current) clearInterval(timerRef.current);
+            return { ...s, remainingSeconds: 0, gameStatus: 'timeout', score: 0 };
+          }
+          return { ...s, remainingSeconds: s.remainingSeconds - 1 };
+        });
       }, 1000);
     }
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [state.gameStatus]);
+  }, [state.gameStatus, state.roundId]);
+
+  // Log when game ends
+  useEffect(() => {
+    if (state.gameStatus !== 'playing' && !hasLoggedRef.current) {
+      hasLoggedRef.current = true;
+      logRound(state, Date.now());
+    }
+  }, [state.gameStatus, state]);
 
   const newGame = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
+    const now = Date.now();
     setState({
+      roundId: generateRoundId(),
       secret: generateSecret(),
       guess: [null, null, null, null],
       attempts: 0,
       history: [],
       score: 0,
-      elapsedSeconds: 0,
+      remainingSeconds: ROUND_DURATION_SECONDS,
+      startTime: now,
       gameStatus: 'playing',
     });
   }, []);
 
-  const selectToken = useCallback((token: string) => {
+  const selectSymbol = useCallback((symbol: GameSymbol) => {
     setState(s => {
       if (s.gameStatus !== 'playing') return s;
       const newGuess = [...s.guess];
       const emptyIdx = newGuess.findIndex(slot => slot === null);
       if (emptyIdx !== -1) {
-        newGuess[emptyIdx] = token;
+        newGuess[emptyIdx] = symbol;
       }
       return { ...s, guess: newGuess };
     });
@@ -124,19 +210,21 @@ export function useGame() {
       if (s.gameStatus !== 'playing') return s;
       if (s.guess.includes(null)) return s;
 
-      const validGuess = s.guess as string[];
+      const validGuess = s.guess as GameSymbol[];
       const feedback = calculateFeedback(s.secret, validGuess);
       const newAttempts = s.attempts + 1;
       const newHistory = [{ guess: validGuess, ...feedback }, ...s.history];
+      const elapsedMs = Date.now() - s.startTime;
 
-      if (feedback.black === CODE_LENGTH) {
+      if (feedback.correctPosition === CODE_LENGTH) {
         if (timerRef.current) clearInterval(timerRef.current);
+        const finalScore = calculateScore(newAttempts, elapsedMs, true);
         return {
           ...s,
           attempts: newAttempts,
           history: newHistory,
           guess: [null, null, null, null],
-          score: calculateScore(newAttempts, s.elapsedSeconds),
+          score: finalScore,
           gameStatus: 'won',
         };
       }
@@ -148,6 +236,7 @@ export function useGame() {
           attempts: newAttempts,
           history: newHistory,
           guess: [null, null, null, null],
+          score: 0,
           gameStatus: 'lost',
         };
       }
@@ -161,24 +250,19 @@ export function useGame() {
     });
   }, []);
 
-  const reveal = useCallback(() => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    setState(s => ({ ...s, gameStatus: 'revealed' }));
-  }, []);
-
   return {
     state,
     actions: {
       newGame,
-      selectToken,
+      selectSymbol,
       clearSlot,
       submit,
-      reveal,
     },
     constants: {
-      TOKENS,
+      SYMBOLS,
       MAX_ATTEMPTS,
       CODE_LENGTH,
+      ROUND_DURATION_SECONDS,
     },
   };
 }

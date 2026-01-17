@@ -1,31 +1,31 @@
 import { motion } from 'framer-motion';
 
 interface FeedbackPegsProps {
-  black: number;
-  white: number;
+  correctPosition: number;
+  correctSymbol: number;
   total?: number;
 }
 
-export function FeedbackPegs({ black, white, total = 4 }: FeedbackPegsProps) {
-  const empty = total - black - white;
+export function FeedbackPegs({ correctPosition, correctSymbol, total = 4 }: FeedbackPegsProps) {
+  const empty = total - correctPosition - correctSymbol;
   
   return (
     <div className="flex gap-1.5 items-center">
-      {Array.from({ length: black }).map((_, i) => (
+      {Array.from({ length: correctPosition }).map((_, i) => (
         <motion.div
           key={`black-${i}`}
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
-          transition={{ delay: i * 0.1 }}
+          transition={{ delay: i * 0.08, type: 'spring', stiffness: 400 }}
           className="peg peg-black"
         />
       ))}
-      {Array.from({ length: white }).map((_, i) => (
+      {Array.from({ length: correctSymbol }).map((_, i) => (
         <motion.div
           key={`white-${i}`}
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
-          transition={{ delay: (black + i) * 0.1 }}
+          transition={{ delay: (correctPosition + i) * 0.08, type: 'spring', stiffness: 400 }}
           className="peg peg-white"
         />
       ))}
@@ -34,7 +34,7 @@ export function FeedbackPegs({ black, white, total = 4 }: FeedbackPegsProps) {
           key={`empty-${i}`}
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
-          transition={{ delay: (black + white + i) * 0.1 }}
+          transition={{ delay: (correctPosition + correctSymbol + i) * 0.08 }}
           className="peg peg-empty"
         />
       ))}

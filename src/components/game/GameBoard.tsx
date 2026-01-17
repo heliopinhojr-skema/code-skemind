@@ -2,48 +2,41 @@ import { motion } from 'framer-motion';
 import { TokenPicker } from './TokenPicker';
 import { GuessSlots } from './GuessSlots';
 import { HistoryLog } from './HistoryLog';
+import { Symbol } from './Symbol';
 import { Button } from '@/components/ui/button';
-import type { GameState } from '@/hooks/useGame';
+import type { GameState, GameSymbol } from '@/hooks/useGame';
 
 interface GameBoardProps {
   state: GameState;
-  tokens: string[];
-  onSelectToken: (token: string) => void;
+  symbols: GameSymbol[];
+  onSelectSymbol: (symbol: GameSymbol) => void;
   onClearSlot: (index: number) => void;
   onSubmit: () => void;
   onNewGame: () => void;
-  onReveal: () => void;
 }
 
 export function GameBoard({
   state,
-  tokens,
-  onSelectToken,
+  symbols,
+  onSelectSymbol,
   onClearSlot,
   onSubmit,
   onNewGame,
-  onReveal,
 }: GameBoardProps) {
   const isPlaying = state.gameStatus === 'playing';
+  const isLocked = !isPlaying;
   const canSubmit = isPlaying && !state.guess.includes(null);
+  
+  // Get currently selected symbol IDs to prevent duplicate selection
+  const selectedIds = state.guess.filter(Boolean).map(s => s!.id);
 
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.1 }}
-      className="glass-card rounded-2xl p-6 space-y-6"
+      className="glass-card rounded-2xl p-4 space-y-4 flex flex-col"
     >
-      {/* Controls */}
-      <div className="flex gap-3 flex-wrap">
-        <Button onClick={onNewGame} variant="primary" size="lg">
-          Novo código
-        </Button>
-        <Button onClick={onReveal} variant="danger" size="lg" disabled={!isPlaying}>
-          Revelar
-        </Button>
-      </div>
-
       {/* Game Status Messages */}
       {state.gameStatus === 'won' && (
         <motion.div
@@ -51,9 +44,9 @@ export function GameBoard({
           animate={{ scale: 1, opacity: 1 }}
           className="p-4 rounded-xl bg-success/20 border border-success/50 text-center"
         >
-          <p className="text-xl font-bold text-success">🎉 Você venceu!</p>
+          <p className="text-xl font-bold text-success">🎉 Victory!</p>
           <p className="text-sm text-muted-foreground mt-1">
-            Score final: {state.score} pontos
+            Score: <span className="text-success font-bold">{state.score}</span> points
           </p>
         </motion.div>
       )}
@@ -64,60 +57,91 @@ export function GameBoard({
           animate={{ scale: 1, opacity: 1 }}
           className="p-4 rounded-xl bg-destructive/20 border border-destructive/50 text-center"
         >
-          <p className="text-xl font-bold text-destructive">😔 Fim de jogo!</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            O código era: {state.secret.join(' ')}
-          </p>
+          <p className="text-xl font-bold text-destructive">💔 Game Over!</p>
+          <p className="text-xs text-muted-foreground mt-2">The code was:</p>
+          <div className="flex justify-center gap-2 mt-2">
+            {state.secret.map((symbol, i) => (
+              <div key={i} className="w-10 h-10 flex items-center justify-center bg-muted/30 rounded-lg">
+                <Symbol symbol={symbol} size="md" />
+              </div>
+            ))}
+          </div>
         </motion.div>
       )}
 
-      {state.gameStatus === 'revealed' && (
+      {state.gameStatus === 'timeout' && (
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="p-4 rounded-xl bg-secondary/20 border border-secondary/50 text-center"
+          className="p-4 rounded-xl bg-destructive/20 border border-destructive/50 text-center"
         >
-          <p className="text-xl font-bold text-secondary">👁️ Código revelado</p>
-          <p className="text-2xl mt-2">{state.secret.join(' ')}</p>
+          <p className="text-xl font-bold text-destructive">⏰ Time's Up!</p>
+          <p className="text-xs text-muted-foreground mt-2">The code was:</p>
+          <div className="flex justify-center gap-2 mt-2">
+            {state.secret.map((symbol, i) => (
+              <div key={i} className="w-10 h-10 flex items-center justify-center bg-muted/30 rounded-lg">
+                <Symbol symbol={symbol} size="md" />
+              </div>
+            ))}
+          </div>
         </motion.div>
       )}
 
-      {/* Guess Slots */}
-      <div className="space-y-2">
-        <p className="text-sm text-muted-foreground text-center">Sua tentativa:</p>
-        <GuessSlots 
-          guess={state.guess} 
-          onClear={onClearSlot} 
-          disabled={!isPlaying}
-        />
-      </div>
+      {/* Current Guess */}
+      {isPlaying && (
+        <>
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground text-center">Your guess:</p>
+            <GuessSlots 
+              guess={state.guess} 
+              onClear={onClearSlot} 
+              disabled={isLocked}
+            />
+          </div>
 
-      {/* Token Picker */}
-      <div className="space-y-2">
-        <p className="text-sm text-muted-foreground text-center">Escolha as imagens:</p>
-        <TokenPicker 
-          tokens={tokens} 
-          onSelect={onSelectToken} 
-          disabled={!isPlaying}
-        />
-      </div>
+          {/* Symbol Picker */}
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground text-center">Pick symbols:</p>
+            <TokenPicker 
+              symbols={symbols} 
+              onSelect={onSelectSymbol} 
+              disabled={isLocked}
+              selectedIds={selectedIds}
+            />
+          </div>
 
-      {/* Submit Button */}
-      <Button 
-        onClick={onSubmit} 
-        variant="primary" 
-        size="lg" 
-        className="w-full"
-        disabled={!canSubmit}
-      >
-        Enviar tentativa
-      </Button>
+          {/* Submit Button */}
+          <Button 
+            onClick={onSubmit} 
+            variant="primary" 
+            size="lg" 
+            className="w-full h-14 text-lg font-bold"
+            disabled={!canSubmit}
+          >
+            Submit Guess
+          </Button>
+        </>
+      )}
+
+      {/* New Game Button */}
+      {isLocked && (
+        <Button 
+          onClick={onNewGame} 
+          variant="primary" 
+          size="lg" 
+          className="w-full h-14 text-lg font-bold"
+        >
+          🔄 New Round
+        </Button>
+      )}
 
       {/* History */}
-      <div className="space-y-2">
-        <p className="text-sm text-muted-foreground">Histórico:</p>
-        <HistoryLog history={state.history} />
-      </div>
+      {state.history.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">History:</p>
+          <HistoryLog history={state.history} />
+        </div>
+      )}
     </motion.div>
   );
 }
