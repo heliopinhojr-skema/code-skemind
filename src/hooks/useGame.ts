@@ -233,33 +233,67 @@ function logRound(state: GameState, endTime: number): RoundLog {
   return log;
 }
 
+/**
+ * Creates initial game state with a FIXED secret code.
+ * The secret is generated ONCE and stored - never regenerated during a round.
+ */
+function createInitialState(): GameState {
+  const now = Date.now();
+  const roundId = generateRoundId();
+  const secret = generateSecret();
+  
+  // Debug log - verify secret is generated only at round start
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🎯 NEW ROUND STARTED');
+    console.log(`   Round ID: ${roundId}`);
+    console.log(`   Secret Code: [${secret.map(s => s.id).join(', ')}]`);
+    console.log('   ⚠️ This secret must remain FIXED until round ends');
+  }
+  
+  return {
+    roundId,
+    secret, // FIXED for entire round - never regenerate
+    guess: [null, null, null, null],
+    attempts: 0,
+    history: [],
+    score: 0,
+    remainingSeconds: ROUND_DURATION_SECONDS,
+    startTime: now,
+    gameStatus: 'playing',
+  };
+}
+
 export function useGame() {
-  const [state, setState] = useState<GameState>(() => {
-    const now = Date.now();
-    return {
-      roundId: generateRoundId(),
-      secret: generateSecret(),
-      guess: [null, null, null, null],
-      attempts: 0,
-      history: [],
-      score: 0,
-      remainingSeconds: ROUND_DURATION_SECONDS,
-      startTime: now,
-      gameStatus: 'playing',
-    };
-  });
+  // State initialized ONCE per mount with fixed secret
+  const [state, setState] = useState<GameState>(createInitialState);
 
   const timerRef = useRef<number | null>(null);
   const hasLoggedRef = useRef(false);
+  
+  // Track current roundId to detect when timer should restart
+  const currentRoundIdRef = useRef(state.roundId);
 
-  // Countdown timer
+  // Countdown timer - only depends on gameStatus, NOT roundId in dependencies
+  // We use ref to track roundId changes instead
   useEffect(() => {
+    // Clear any existing timer first
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    
     if (state.gameStatus === 'playing') {
       hasLoggedRef.current = false;
+      currentRoundIdRef.current = state.roundId;
+      
       timerRef.current = window.setInterval(() => {
         setState(s => {
+          // Safety check - don't update if round changed
+          if (s.roundId !== currentRoundIdRef.current) {
+            return s;
+          }
+          
           if (s.remainingSeconds <= 1) {
-            // Time's up!
             if (timerRef.current) clearInterval(timerRef.current);
             return { ...s, remainingSeconds: 0, gameStatus: 'timeout', score: 0 };
           }
@@ -269,7 +303,10 @@ export function useGame() {
     }
 
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
     };
   }, [state.gameStatus, state.roundId]);
 
@@ -281,20 +318,14 @@ export function useGame() {
     }
   }, [state.gameStatus, state]);
 
+  // newGame creates a completely fresh state with NEW secret
   const newGame = useCallback(() => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    const now = Date.now();
-    setState({
-      roundId: generateRoundId(),
-      secret: generateSecret(),
-      guess: [null, null, null, null],
-      attempts: 0,
-      history: [],
-      score: 0,
-      remainingSeconds: ROUND_DURATION_SECONDS,
-      startTime: now,
-      gameStatus: 'playing',
-    });
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    // Create new state with fresh secret - only place secret changes
+    setState(createInitialState());
   }, []);
 
   const selectSymbol = useCallback((symbol: GameSymbol) => {
@@ -323,11 +354,26 @@ export function useGame() {
       if (s.gameStatus !== 'playing') return s;
       if (s.guess.includes(null)) return s;
 
+      // CRITICAL: Use the SAME secret from state - never regenerate
+      // s.secret is the fixed code for this round
+      const currentSecret = s.secret;
+      
       // Create deep immutable copy of guess for evaluation
       const validGuess: GameSymbol[] = s.guess.map(g => ({ ...g! }));
       
-      // Calculate feedback once - this result is final and immutable
-      const feedback = calculateFeedback(s.secret, validGuess);
+      // Debug log to verify same secret is used
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`📝 GUESS #${s.attempts + 1}`);
+        console.log(`   Guess:  [${validGuess.map(g => g.id).join(', ')}]`);
+        console.log(`   Secret: [${currentSecret.map(s => s.id).join(', ')}]`);
+      }
+      
+      // Calculate feedback using the FIXED secret
+      const feedback = calculateFeedback(currentSecret, validGuess);
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`   Result: ${feedback.correctPosition} exact, ${feedback.correctSymbol} partial`);
+      }
       
       // Create immutable history entry with frozen data
       const historyEntry: AttemptResult = Object.freeze({
@@ -340,11 +386,14 @@ export function useGame() {
       const newHistory = [historyEntry, ...s.history];
       const elapsedMs = Date.now() - s.startTime;
 
+      // Win condition: all 4 positions correct
       if (feedback.correctPosition === CODE_LENGTH) {
         if (timerRef.current) clearInterval(timerRef.current);
         const finalScore = calculateScore(newAttempts, elapsedMs, true);
+        console.log('🏆 ROUND WON!');
         return {
           ...s,
+          // Keep the SAME secret - it doesn't change
           attempts: newAttempts,
           history: newHistory,
           guess: [null, null, null, null],
@@ -353,10 +402,13 @@ export function useGame() {
         };
       }
 
+      // Lose condition: max attempts reached
       if (newAttempts >= MAX_ATTEMPTS) {
         if (timerRef.current) clearInterval(timerRef.current);
+        console.log('💀 ROUND LOST - Max attempts reached');
         return {
           ...s,
+          // Keep the SAME secret - it doesn't change
           attempts: newAttempts,
           history: newHistory,
           guess: [null, null, null, null],
@@ -365,8 +417,10 @@ export function useGame() {
         };
       }
 
+      // Continue playing with SAME secret
       return {
         ...s,
+        // IMPORTANT: secret remains unchanged
         attempts: newAttempts,
         history: newHistory,
         guess: [null, null, null, null],
