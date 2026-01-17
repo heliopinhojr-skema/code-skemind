@@ -139,8 +139,10 @@ export function useGame() {
   // Timer reference
   const timerRef = useRef<number | null>(null);
   
-  // Debug mode (memoizado para não recalcular)
-  const debugMode = useMemo(() => isDebugMode(), []);
+  // Debug mode - lê SEMPRE do URL atual
+  const debugMode = typeof window !== 'undefined' 
+    ? new URLSearchParams(window.location.search).get('debug') === '1'
+    : false;
 
   // ───────────────────────────────────────────────────────────────────────────
   // TIMER EFFECT
