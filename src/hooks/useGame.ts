@@ -1,20 +1,33 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * SKEMIND - HOOK DO JOGO MASTERMIND
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 
+ * Este hook gerencia o estado do jogo e usa a engine pura de src/lib/mastermindEngine.ts
+ * 
+ * REGRAS OBRIGATÓRIAS:
+ * 1. Jogo SÓ começa ao clicar "Iniciar Jogo"
+ * 2. Secret é gerado UMA VEZ e travado com useRef
+ * 3. Secret NÃO muda até vitória/derrota/nova rodada
+ * 4. Secret tem 4 símbolos SEM REPETIÇÃO
+ * 5. Palpite deve ter 4 símbolos para ser enviado
+ * 6. Feedback segue algoritmo Mastermind clássico (2 passes)
+ * 
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 
-// ═══════════════════════════════════════════════════════════════════════════
-// SKEMIND - MASTERMIND CLÁSSICO (REENGENHEIRADO DO ZERO)
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// INVARIANTES MATEMÁTICOS:
-// 1. O secret é gerado UMA ÚNICA VEZ em startNewRound()
-// 2. O secret é armazenado em useRef e NUNCA muda durante a rodada
-// 3. O secret NÃO pode ter símbolos repetidos (sem duplicatas)
-// 4. O feedback segue o algoritmo clássico do Mastermind (2 passes)
-// 5. Nenhum símbolo é contado duas vezes no feedback
-//
-// ═══════════════════════════════════════════════════════════════════════════
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import {
+  generateSecret,
+  evaluateGuess,
+  Symbol,
+  Feedback,
+  SYMBOLS as ENGINE_SYMBOLS,
+  CODE_LENGTH,
+} from '@/lib/mastermindEngine';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TYPES
+// TIPOS EXPORTADOS (compatível com UI existente)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface GameSymbol {
@@ -27,10 +40,7 @@ export type GameStatus = 'notStarted' | 'playing' | 'won' | 'lost';
 
 export type GuessSlot = GameSymbol | null;
 
-export interface Feedback {
-  exact: number;   // Pinos brancos (posição correta)
-  present: number; // Pinos cinzas (posição errada)
-}
+export type { Feedback };
 
 export interface AttemptResult {
   guess: GameSymbol[];
@@ -46,152 +56,79 @@ export interface GameState {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CONSTANTS
+// CONSTANTES
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Símbolos do jogo (mesma ordem da engine, com shapes para UI)
 export const SYMBOLS: GameSymbol[] = [
-  { id: 'red-circle', color: '#ef4444', shape: 'circle' },
-  { id: 'blue-square', color: '#3b82f6', shape: 'square' },
-  { id: 'green-triangle', color: '#22c55e', shape: 'triangle' },
-  { id: 'yellow-diamond', color: '#eab308', shape: 'diamond' },
-  { id: 'purple-star', color: '#a855f7', shape: 'star' },
-  { id: 'cyan-hexagon', color: '#06b6d4', shape: 'hexagon' },
+  { id: 'triangle', color: '#E53935', shape: 'triangle' },
+  { id: 'square', color: '#1E88E5', shape: 'square' },
+  { id: 'circle', color: '#FDD835', shape: 'circle' },
+  { id: 'diamond', color: '#43A047', shape: 'diamond' },
+  { id: 'star', color: '#8E24AA', shape: 'star' },
+  { id: 'hexagon', color: '#FF7043', shape: 'hexagon' },
 ];
 
 export const MAX_ATTEMPTS = 8;
-export const CODE_LENGTH = 4;
+export { CODE_LENGTH };
 export const ROUND_DURATION_SECONDS = 180;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DEBUG MODE
+// FUNÇÕES AUXILIARES
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Detecta modo debug via query param
+ */
 function isDebugMode(): boolean {
   if (typeof window === 'undefined') return false;
   const params = new URLSearchParams(window.location.search);
   return params.get('debug') === '1';
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PURE FUNCTIONS
-// ─────────────────────────────────────────────────────────────────────────────
-
 /**
- * Retorna um símbolo aleatório do pool.
+ * Converte Symbol da engine para GameSymbol da UI
  */
-function randomSymbol(): GameSymbol {
-  const index = Math.floor(Math.random() * SYMBOLS.length);
-  return SYMBOLS[index];
-}
-
-/**
- * Gera código secreto com 4 símbolos SEM REPETIÇÃO.
- * 
- * Regras atendidas:
- * - NÃO usa Fisher-Yates
- * - Usa sorteios aleatórios e re-sorteia se repetir
- * - CHAMADO APENAS POR startNewRound()
- */
-function generateSecret(): GameSymbol[] {
-  const used = new Set<string>();
-  const secret: GameSymbol[] = [];
-
-  while (secret.length < CODE_LENGTH) {
-    const candidate = randomSymbol();
-    if (used.has(candidate.id)) continue;
-    used.add(candidate.id);
-    secret.push(candidate);
-  }
-
-  return secret;
-}
-
-// Export apenas para testes unitários (não usado pela UI)
-export function generateSecretForTest(): GameSymbol[] {
-  return generateSecret();
+function engineSymbolToGameSymbol(sym: Symbol): GameSymbol {
+  const uiSymbol = SYMBOLS.find(s => s.id === sym.id);
+  if (uiSymbol) return uiSymbol;
+  
+  // Fallback (não deve acontecer)
+  return {
+    id: sym.id,
+    color: sym.color,
+    shape: 'circle',
+  };
 }
 
 /**
- * ALGORITMO MASTERMIND CLÁSSICO - 2 PASSES
- * 
- * Implementação matematicamente idêntica ao Mastermind original.
- * 
- * PASSO 1 (EXATOS - Pinos Brancos):
- *   Para cada posição i, se guess[i] === secret[i]:
- *   - Incrementa exact
- *   - Marca posição como usada em ambos os arrays
- * 
- * PASSO 2 (PARCIAIS - Pinos Cinzas):
- *   Para cada posição i do guess ainda não usada:
- *   - Procura um símbolo igual em posição j do secret ainda não usada
- *   - Se encontrar, incrementa present e marca j como usada
- * 
- * GARANTIAS:
- * - Nenhum símbolo é contado duas vezes
- * - exact + present <= CODE_LENGTH
- * - Feedback não revela posições específicas
+ * Converte GameSymbol para Symbol da engine
  */
-export function calculateFeedback(
-  secret: GameSymbol[],
-  guess: GameSymbol[]
-): Feedback {
-  // Arrays para marcar posições já usadas (não mutam os originais)
-  const secretUsed: boolean[] = [false, false, false, false];
-  const guessUsed: boolean[] = [false, false, false, false];
+function gameSymbolToEngineSymbol(sym: GameSymbol): Symbol {
+  const engineSym = ENGINE_SYMBOLS.find(s => s.id === sym.id);
+  if (engineSym) return engineSym;
   
-  let exact = 0;   // Pinos brancos
-  let present = 0; // Pinos cinzas
-  
-  // ═══════════════════════════════════════════════════════════════════════════
-  // PASSO 1: Contar acertos EXATOS (mesma posição)
-  // ═══════════════════════════════════════════════════════════════════════════
-  for (let i = 0; i < CODE_LENGTH; i++) {
-    if (guess[i].id === secret[i].id) {
-      exact++;
-      secretUsed[i] = true;
-      guessUsed[i] = true;
-    }
-  }
-  
-  // ═══════════════════════════════════════════════════════════════════════════
-  // PASSO 2: Contar acertos PARCIAIS (posição diferente)
-  // ═══════════════════════════════════════════════════════════════════════════
-  for (let i = 0; i < CODE_LENGTH; i++) {
-    // Pular posições já contadas como exatas
-    if (guessUsed[i]) continue;
-    
-    // Procurar símbolo igual em posição não usada do secret
-    for (let j = 0; j < CODE_LENGTH; j++) {
-      if (secretUsed[j]) continue;
-      
-      if (guess[i].id === secret[j].id) {
-        present++;
-        secretUsed[j] = true;
-        break; // Importante: só conta uma vez por símbolo do guess
-      }
-    }
-  }
-  
-  return { exact, present };
+  // Fallback
+  return {
+    id: sym.id,
+    label: sym.id.charAt(0).toUpperCase(),
+    color: sym.color,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GAME HOOK
+// HOOK PRINCIPAL
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function useGame() {
   // ═══════════════════════════════════════════════════════════════════════════
   // SECRET TRAVADO COM useRef
   // 
-  // O secret é armazenado em useRef para garantir que:
-  // 1. Não é regenerado em re-renders
-  // 2. Não é regenerado em effects
-  // 3. Não é regenerado em submits
-  // 4. Só muda em startNewRound()
-  // 
-  // Inicializa como NULL - será gerado apenas em startNewRound()
+  // - Inicializa como NULL (jogo não começou)
+  // - Gerado APENAS em startNewRound()
+  // - NUNCA muda durante a rodada
   // ═══════════════════════════════════════════════════════════════════════════
-  const secretRef = useRef<GameSymbol[] | null>(null);
+  const secretRef = useRef<Symbol[] | null>(null);
   
   // Estado do jogo
   const [status, setStatus] = useState<GameStatus>('notStarted');
@@ -202,7 +139,7 @@ export function useGame() {
   // Timer reference
   const timerRef = useRef<number | null>(null);
   
-  // Debug mode (memoizado)
+  // Debug mode (memoizado para não recalcular)
   const debugMode = useMemo(() => isDebugMode(), []);
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -258,8 +195,8 @@ export function useGame() {
     }
     
     // ═══════════════════════════════════════════════════════════════════════
-    // GERA NOVO SECRET (SEM REPETIÇÃO)
-    // Este é o ÚNICO lugar onde o secret é criado/modificado
+    // GERA NOVO SECRET usando a engine pura
+    // Este é o ÚNICO lugar onde o secret é criado
     // ═══════════════════════════════════════════════════════════════════════
     const newSecret = generateSecret();
     secretRef.current = newSecret;
@@ -270,14 +207,14 @@ export function useGame() {
     setCurrentGuess([null, null, null, null]);
     setTimeLeft(ROUND_DURATION_SECONDS);
     
-    // Log debug
-    if (isDebugMode()) {
+    // Debug log
+    if (debugMode) {
       console.log('═══════════════════════════════════════════════════════');
       console.log('🔄 NOVA RODADA INICIADA');
       console.log('🔐 SECRET GERADO:', newSecret.map(s => s.id));
       console.log('═══════════════════════════════════════════════════════');
     }
-  }, []);
+  }, [debugMode]);
 
   // ───────────────────────────────────────────────────────────────────────────
   // ACTION: Select Symbol
@@ -311,40 +248,43 @@ export function useGame() {
   // ───────────────────────────────────────────────────────────────────────────
   // ACTION: Submit Guess
   // 
-  // Compara contra o secret IMUTÁVEL armazenado em secretRef.
-  // O feedback é calculado UMA VEZ e armazenado no histórico (congelado).
+  // Usa a engine pura para avaliar o palpite
   // ───────────────────────────────────────────────────────────────────────────
   const submitGuess = useCallback(() => {
     // ═══════════════════════════════════════════════════════════════════════
     // VALIDAÇÕES
     // ═══════════════════════════════════════════════════════════════════════
     if (status !== 'playing') return;
-    if (currentGuess.includes(null)) return;
-    if (!secretRef.current) return;
+    if (currentGuess.includes(null)) return; // Palpite deve estar completo
+    if (!secretRef.current) return; // Secret deve existir
     if (history.length >= MAX_ATTEMPTS) return;
     if (timeLeft <= 0) return;
     
     const guess = currentGuess as GameSymbol[];
     const secret = secretRef.current; // Referência IMUTÁVEL
     
-    // ═══════════════════════════════════════════════════════════════════════
-    // CALCULA FEEDBACK (UMA VEZ, CONGELADO)
-    // ═══════════════════════════════════════════════════════════════════════
-    const feedback = calculateFeedback(secret, guess);
+    // Converte para formato da engine
+    const engineGuess = guess.map(gameSymbolToEngineSymbol);
     
-    // Log debug
-    if (isDebugMode()) {
+    // ═══════════════════════════════════════════════════════════════════════
+    // AVALIA O PALPITE usando a engine pura
+    // ═══════════════════════════════════════════════════════════════════════
+    const result = evaluateGuess(secret, engineGuess);
+    
+    // Debug log
+    if (debugMode) {
       console.log('───────────────────────────────────────────────────────');
       console.log('📝 PALPITE:', guess.map(s => s.id));
       console.log('🔐 SECRET:', secret.map(s => s.id));
-      console.log('📊 FEEDBACK:', `exact=${feedback.exact}, present=${feedback.present}`);
+      console.log('📊 FEEDBACK:', `exact=${result.feedback.exact}, present=${result.feedback.present}`);
+      console.log('🏆 VITÓRIA?:', result.isVictory);
       console.log('───────────────────────────────────────────────────────');
     }
     
     // Cria entry do histórico com feedback CONGELADO
     const newHistoryEntry: AttemptResult = {
       guess: [...guess], // Clone para segurança
-      feedback: { ...feedback }, // Clone do feedback
+      feedback: { ...result.feedback }, // Clone do feedback
     };
     
     // Adiciona ao histórico (mais recente primeiro)
@@ -353,23 +293,23 @@ export function useGame() {
     setCurrentGuess([null, null, null, null]);
     
     // ═══════════════════════════════════════════════════════════════════════
-    // VERIFICA VITÓRIA: todos os 4 na posição correta
+    // VERIFICA VITÓRIA
     // ═══════════════════════════════════════════════════════════════════════
-    if (feedback.exact === CODE_LENGTH) {
+    if (result.isVictory) {
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
       setStatus('won');
       
-      if (isDebugMode()) {
+      if (debugMode) {
         console.log('🎉 VITÓRIA! Código descoberto.');
       }
       return;
     }
     
     // ═══════════════════════════════════════════════════════════════════════
-    // VERIFICA DERROTA: 8 tentativas esgotadas
+    // VERIFICA DERROTA: tentativas esgotadas
     // ═══════════════════════════════════════════════════════════════════════
     if (newHistory.length >= MAX_ATTEMPTS) {
       if (timerRef.current) {
@@ -378,13 +318,22 @@ export function useGame() {
       }
       setStatus('lost');
       
-      if (isDebugMode()) {
+      if (debugMode) {
         console.log('💔 DERROTA! Tentativas esgotadas.');
         console.log('🔐 O código era:', secret.map(s => s.id));
       }
       return;
     }
-  }, [status, currentGuess, history, timeLeft]);
+  }, [status, currentGuess, history, timeLeft, debugMode]);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // SECRET CODE para UI (convertido para GameSymbol)
+  // ───────────────────────────────────────────────────────────────────────────
+  const secretCode = useMemo(() => {
+    if (!secretRef.current) return [];
+    return secretRef.current.map(engineSymbolToGameSymbol);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]); // Recalcula quando status muda (secret só muda em startNewRound)
 
   // ───────────────────────────────────────────────────────────────────────────
   // PUBLIC API
@@ -399,8 +348,7 @@ export function useGame() {
     } as GameState,
     
     // Secret para reveal no final (ou debug)
-    // Retorna array vazio se não iniciado (proteção)
-    secretCode: secretRef.current ?? [],
+    secretCode,
     
     // Debug mode flag
     debugMode,
@@ -421,3 +369,8 @@ export function useGame() {
     },
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RE-EXPORT para testes (funções da engine)
+// ─────────────────────────────────────────────────────────────────────────────
+export { evaluateGuess as calculateFeedback, generateSecret as generateSecretForTest } from '@/lib/mastermindEngine';
