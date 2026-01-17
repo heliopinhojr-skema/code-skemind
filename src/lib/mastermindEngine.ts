@@ -1,28 +1,13 @@
 /**
- * ═══════════════════════════════════════════════════════════════════════════
- * MASTERMIND ENGINE - IMPLEMENTAÇÃO PURA E DETERMINÍSTICA
- * ═══════════════════════════════════════════════════════════════════════════
- * 
- * REGRAS MATEMÁTICAS:
- * 1. Secret tem exatamente 4 símbolos SEM REPETIÇÃO
- * 2. Secret é gerado UMA VEZ e NUNCA muda durante a rodada
- * 3. Feedback segue algoritmo clássico de 2 passes
- * 4. Nenhum símbolo é contado mais de uma vez
- * 
- * ALGORITMO DE FEEDBACK:
- * - Pass 1: Contar EXATOS (mesmo símbolo, mesma posição)
- * - Pass 2: Contar PRESENTES (símbolo existe, posição errada)
- * 
- * Esta engine é:
- * - Pura (sem side effects)
- * - Determinística (mesma entrada = mesma saída)
- * - Testável (funções isoladas)
- * - Sem acesso a estado global
+ * SKEMIND (Mastermind) Engine — REGRAS OFICIAIS
+ *
+ * Regras:
+ * - CODE_LENGTH = 4
+ * - Sem repetição no secret
+ * - Feedback em 2 passos (obrigatório):
+ *   PASSO 1: brancos (símbolo certo, posição certa) e marcar como null
+ *   PASSO 2: cinzas (símbolo certo, posição errada) removendo só 1 ocorrência
  */
-
-// ═══════════════════════════════════════════════════════════════════════════
-// TIPOS
-// ═══════════════════════════════════════════════════════════════════════════
 
 export interface Symbol {
   readonly id: string;
@@ -31,9 +16,9 @@ export interface Symbol {
 }
 
 export interface Feedback {
-  /** Símbolos na posição CORRETA (pino branco) */
+  /** Pino branco: símbolo correto na posição correta */
   readonly exact: number;
-  /** Símbolos PRESENTES mas na posição ERRADA (pino cinza) */
+  /** Pino cinza: símbolo correto na posição errada */
   readonly present: number;
 }
 
@@ -42,151 +27,100 @@ export interface EvaluationResult {
   readonly isVictory: boolean;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// CONSTANTES
-// ═══════════════════════════════════════════════════════════════════════════
-
 export const CODE_LENGTH = 4;
 
 export const SYMBOLS: readonly Symbol[] = [
-  { id: 'circle', label: '●', color: '#E53935' },     // círculo vermelho
-  { id: 'square', label: '■', color: '#1E88E5' },     // quadrado azul
-  { id: 'triangle', label: '▲', color: '#43A047' },   // triângulo verde
-  { id: 'diamond', label: '◆', color: '#FDD835' },    // losango amarelo
-  { id: 'star', label: '★', color: '#8E24AA' },       // estrela roxa
-  { id: 'hexagon', label: '⬡', color: '#00BCD4' },    // hexágono ciano
+  { id: 'circle', label: '●', color: '#E53935' },
+  { id: 'square', label: '■', color: '#1E88E5' },
+  { id: 'triangle', label: '▲', color: '#43A047' },
+  { id: 'diamond', label: '◆', color: '#FDD835' },
+  { id: 'star', label: '★', color: '#8E24AA' },
+  { id: 'hexagon', label: '⬡', color: '#00BCD4' },
 ] as const;
 
-// ═══════════════════════════════════════════════════════════════════════════
-// GERAÇÃO DO SECRET
-// ═══════════════════════════════════════════════════════════════════════════
-
 /**
- * Gera um código secreto com exatamente CODE_LENGTH símbolos únicos.
- * 
- * REGRAS:
- * - NÃO usa shuffle/Fisher-Yates
- * - Sorteia aleatoriamente e re-sorteia se repetir
- * - Cada símbolo aparece NO MÁXIMO uma vez
- * 
- * @returns Array imutável de símbolos únicos
+ * Gera o secret SOMENTE quando chamado (ex.: ao clicar "Iniciar Jogo").
+ * - Exatamente 4 símbolos
+ * - Sem repetição
  */
 export function generateSecret(): Symbol[] {
-  const usedIds = new Set<string>();
-  const secret: Symbol[] = [];
+  const used = new Set<string>();
+  const out: Symbol[] = [];
 
-  while (secret.length < CODE_LENGTH) {
-    const randomIndex = Math.floor(Math.random() * SYMBOLS.length);
-    const candidate = SYMBOLS[randomIndex];
-    
-    // Se já usou, sorteia de novo
-    if (usedIds.has(candidate.id)) {
-      continue;
-    }
-    
-    usedIds.add(candidate.id);
-    secret.push(candidate);
+  while (out.length < CODE_LENGTH) {
+    const idx = Math.floor(Math.random() * SYMBOLS.length);
+    const candidate = SYMBOLS[idx];
+    if (used.has(candidate.id)) continue;
+    used.add(candidate.id);
+    out.push(candidate);
   }
 
-  return secret;
+  return out;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// AVALIAÇÃO DO PALPITE - ALGORITMO MASTERMIND CLÁSSICO
-// ═══════════════════════════════════════════════════════════════════════════
-
 /**
- * Avalia um palpite contra o código secreto.
- * 
- * ALGORITMO DE 2 PASSES:
- * 
- * PASS 1 - EXATOS (pino branco):
- * - Percorre cada posição
- * - Se secret[i].id === guess[i].id → marca como EXATO
- * - Marca posição como USADA em ambos os arrays
- * 
- * PASS 2 - PRESENTES (pino cinza):
- * - Para cada posição NÃO USADA no guess
- * - Procura o símbolo em posições NÃO USADAS do secret
- * - Se encontrar → marca como PRESENTE, marca ambas posições como USADAS
- * 
- * GARANTIAS:
- * - exact + present <= CODE_LENGTH
- * - Nenhum símbolo contado mais de uma vez
- * - Função é PURA (não modifica inputs)
- * 
- * @param secret - Código secreto (4 símbolos únicos)
- * @param guess - Palpite do jogador (4 símbolos)
- * @returns Feedback com contagem de exatos e presentes
+ * Avalia guess contra secret seguindo ESTRITAMENTE o algoritmo exigido:
+ *
+ * PASSO 1:
+ * - comparar secret[i] === guess[i]
+ * - contar branco
+ * - marcar secret[i] = null e guess[i] = null
+ *
+ * PASSO 2:
+ * - para cada símbolo restante em guess
+ *   - se existir em secret
+ *     - contar cinza
+ *     - remover UMA ocorrência do símbolo no secret (marcar como null)
  */
 export function evaluateGuess(secret: Symbol[], guess: Symbol[]): EvaluationResult {
-  // Validação
   if (secret.length !== CODE_LENGTH || guess.length !== CODE_LENGTH) {
     throw new Error(`Secret e guess devem ter exatamente ${CODE_LENGTH} símbolos`);
   }
 
-  // Arrays para marcar posições já usadas
-  const secretUsed: boolean[] = [false, false, false, false];
-  const guessUsed: boolean[] = [false, false, false, false];
+  // cópias mutáveis para marcar com null (sem modificar inputs)
+  const secretWork: Array<Symbol | null> = secret.map(s => ({ ...s }));
+  const guessWork: Array<Symbol | null> = guess.map(s => ({ ...s }));
 
   let exact = 0;
   let present = 0;
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // PASS 1: EXATOS (mesmo símbolo, mesma posição)
-  // ─────────────────────────────────────────────────────────────────────────
+  // PASSO 1 — BRANCOS (exatos)
   for (let i = 0; i < CODE_LENGTH; i++) {
-    if (secret[i].id === guess[i].id) {
+    const s = secretWork[i];
+    const g = guessWork[i];
+    if (s && g && s.id === g.id) {
       exact++;
-      secretUsed[i] = true;
-      guessUsed[i] = true;
+      secretWork[i] = null;
+      guessWork[i] = null;
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // PASS 2: PRESENTES (símbolo existe, posição errada)
-  // ─────────────────────────────────────────────────────────────────────────
+  // PASSO 2 — CINZAS (presentes)
   for (let i = 0; i < CODE_LENGTH; i++) {
-    // Pula posições já usadas (exatos)
-    if (guessUsed[i]) continue;
+    const g = guessWork[i];
+    if (!g) continue;
 
-    // Procura esse símbolo em posições não usadas do secret
-    for (let j = 0; j < CODE_LENGTH; j++) {
-      if (secretUsed[j]) continue;
-      
-      if (guess[i].id === secret[j].id) {
-        present++;
-        secretUsed[j] = true;
-        guessUsed[i] = true;
-        break; // Cada símbolo conta só UMA vez
-      }
+    const j = secretWork.findIndex(s => s !== null && s.id === g.id);
+    if (j !== -1) {
+      present++;
+      secretWork[j] = null; // remove UMA ocorrência
+      guessWork[i] = null;
     }
   }
 
   const feedback: Feedback = { exact, present };
   const isVictory = exact === CODE_LENGTH;
-
   return { feedback, isVictory };
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// UTILITÁRIOS
-// ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * Cria um símbolo a partir do ID (para testes).
- */
+/** Utilitário (testes) */
 export function createSymbol(id: string): Symbol {
   const found = SYMBOLS.find(s => s.id === id);
   if (found) return found;
-  
-  // Símbolo de teste customizado
   return { id, label: id.charAt(0).toUpperCase(), color: '#888888' };
 }
 
-/**
- * Cria um array de símbolos a partir de IDs (para testes).
- */
+/** Utilitário (testes) */
 export function createSymbolArray(ids: string[]): Symbol[] {
   return ids.map(createSymbol);
 }

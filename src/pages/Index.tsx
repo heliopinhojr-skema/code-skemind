@@ -8,29 +8,21 @@ const Index = () => {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-      {/* Debug Mode Panel - Mostra secret e estado do jogo */}
+      {/* Debug Mode Panel — FIXO no canto superior direito */}
       {debugMode && (
-        <div className="fixed top-2 right-2 z-50 bg-yellow-500 text-black text-xs px-3 py-2 rounded font-mono space-y-1 max-w-xs">
-          <div className="font-bold">🔧 DEBUG MODE</div>
-          <div>Status: {state.status}</div>
-          <div>Tentativas: {state.attempts}/{constants.MAX_ATTEMPTS}</div>
-          {secretCode.length > 0 ? (
-            <div>
-              Secret: [{secretCode.map(s => s.id).join(', ')}]
-            </div>
-          ) : (
-            <div>Secret: (não gerado)</div>
-          )}
+        <div className="fixed top-2 right-2 z-50 glass-card rounded-xl px-3 py-2 text-xs font-mono space-y-1 max-w-xs">
+          <div className="font-bold text-foreground">DEBUG MODE</div>
+          <div className="text-muted-foreground">Status: <span className="text-foreground">{state.status}</span></div>
+          <div className="text-muted-foreground">
+            Tentativas: <span className="text-foreground">{state.attempts} / {constants.MAX_ATTEMPTS}</span>
+          </div>
+          <div className="text-muted-foreground">
+            Secret: <span className="text-foreground">[{secretCode.map(s => s.id).join(', ')}]</span>
+          </div>
         </div>
       )}
-      
-      <StatsBar 
-        attempts={state.attempts}
-        maxAttempts={constants.MAX_ATTEMPTS}
-        remainingSeconds={state.timeLeft}
-        score={state.status === 'won' ? 1000 : 0}
-        gameStatus={state.status}
-      />
+
+      <StatsBar attempts={state.attempts} maxAttempts={constants.MAX_ATTEMPTS} gameStatus={state.status} />
 
       <main className="flex-1 overflow-hidden px-3 py-3">
         <div className="h-full grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-3 max-w-4xl mx-auto">
