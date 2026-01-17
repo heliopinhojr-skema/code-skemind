@@ -54,44 +54,84 @@ function generateRoundId(): string {
   return `round_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
-// Generate secret with NO REPETITION
+/**
+ * Generate secret code with exactly 4 DIFFERENT symbols.
+ * Uses Fisher-Yates shuffle for unbiased randomization.
+ * Returns immutable array - never mutate.
+ */
 function generateSecret(): GameSymbol[] {
-  const shuffled = [...SYMBOLS].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, CODE_LENGTH);
+  // Create a fresh copy to avoid mutating SYMBOLS
+  const pool = [...SYMBOLS];
+  
+  // Fisher-Yates shuffle for unbiased randomization
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  
+  // Take first CODE_LENGTH symbols (all different guaranteed)
+  const secret = pool.slice(0, CODE_LENGTH);
+  
+  // Verify no duplicates (defensive check)
+  const ids = new Set(secret.map(s => s.id));
+  if (ids.size !== CODE_LENGTH) {
+    throw new Error('Secret generation failed: duplicates detected');
+  }
+  
+  return Object.freeze(secret) as GameSymbol[];
 }
 
-function calculateFeedback(secret: GameSymbol[], guess: GameSymbol[]): { correctPosition: number; correctSymbol: number } {
-  // Step 1: Find exact matches (correct position)
+/**
+ * Calculate Mastermind feedback using strict immutable logic.
+ * 
+ * Step 1: Count exact matches (correct position)
+ * Step 2: Count partial matches (correct symbol, wrong position)
+ * 
+ * Rules:
+ * - Each symbol counted only once
+ * - No double counting
+ * - Original arrays never mutated
+ */
+function calculateFeedback(
+  secret: readonly GameSymbol[],
+  guess: readonly GameSymbol[]
+): { correctPosition: number; correctSymbol: number } {
+  // Create immutable copies of IDs for evaluation
+  const secretIds: string[] = secret.map(s => s.id);
+  const guessIds: string[] = guess.map(g => g.id);
+  
+  // Track which positions have been matched
+  const secretMatched: boolean[] = new Array(CODE_LENGTH).fill(false);
+  const guessMatched: boolean[] = new Array(CODE_LENGTH).fill(false);
+  
   let correctPosition = 0;
-  const secretRemaining: string[] = [];
-  const guessRemaining: string[] = [];
-
-  for (let i = 0; i < CODE_LENGTH; i++) {
-    if (secret[i].id === guess[i].id) {
-      correctPosition++;
-    } else {
-      // Only add non-matched symbols to remaining pools
-      secretRemaining.push(secret[i].id);
-      guessRemaining.push(guess[i].id);
-    }
-  }
-
-  // Step 2: Find partial matches (correct symbol, wrong position)
-  // Each symbol can only generate one feedback point
   let correctSymbol = 0;
-  const usedSecretIndices: Set<number> = new Set();
-
-  for (const guessId of guessRemaining) {
-    const secretIdx = secretRemaining.findIndex(
-      (secretId, idx) => secretId === guessId && !usedSecretIndices.has(idx)
-    );
-    if (secretIdx !== -1) {
-      correctSymbol++;
-      usedSecretIndices.add(secretIdx);
+  
+  // Step 1: Find exact matches (correct position)
+  for (let i = 0; i < CODE_LENGTH; i++) {
+    if (guessIds[i] === secretIds[i]) {
+      correctPosition++;
+      secretMatched[i] = true;
+      guessMatched[i] = true;
     }
   }
-
-  return { correctPosition, correctSymbol };
+  
+  // Step 2: Find partial matches (correct symbol, wrong position)
+  for (let i = 0; i < CODE_LENGTH; i++) {
+    if (guessMatched[i]) continue; // Skip already matched
+    
+    for (let j = 0; j < CODE_LENGTH; j++) {
+      if (secretMatched[j]) continue; // Skip already matched
+      
+      if (guessIds[i] === secretIds[j]) {
+        correctSymbol++;
+        secretMatched[j] = true; // Mark as used
+        break; // Each guess symbol counts once
+      }
+    }
+  }
+  
+  return Object.freeze({ correctPosition, correctSymbol });
 }
 
 function calculateScore(attempts: number, elapsedMs: number, solved: boolean): number {
@@ -218,10 +258,21 @@ export function useGame() {
       if (s.gameStatus !== 'playing') return s;
       if (s.guess.includes(null)) return s;
 
-      const validGuess = s.guess as GameSymbol[];
+      // Create deep immutable copy of guess for evaluation
+      const validGuess: GameSymbol[] = s.guess.map(g => ({ ...g! }));
+      
+      // Calculate feedback once - this result is final and immutable
       const feedback = calculateFeedback(s.secret, validGuess);
+      
+      // Create immutable history entry with frozen data
+      const historyEntry: AttemptResult = Object.freeze({
+        guess: Object.freeze(validGuess.map(g => ({ ...g }))),
+        correctPosition: feedback.correctPosition,
+        correctSymbol: feedback.correctSymbol,
+      }) as AttemptResult;
+      
       const newAttempts = s.attempts + 1;
-      const newHistory = [{ guess: validGuess, ...feedback }, ...s.history];
+      const newHistory = [historyEntry, ...s.history];
       const elapsedMs = Date.now() - s.startTime;
 
       if (feedback.correctPosition === CODE_LENGTH) {
@@ -233,7 +284,7 @@ export function useGame() {
           history: newHistory,
           guess: [null, null, null, null],
           score: finalScore,
-          gameStatus: 'won',
+          gameStatus: 'won' as const,
         };
       }
 
@@ -245,7 +296,7 @@ export function useGame() {
           history: newHistory,
           guess: [null, null, null, null],
           score: 0,
-          gameStatus: 'lost',
+          gameStatus: 'lost' as const,
         };
       }
 
