@@ -4,14 +4,14 @@ import { GuessSlots } from './GuessSlots';
 import { HistoryLog } from './HistoryLog';
 import { Symbol } from './Symbol';
 import { Button } from '@/components/ui/button';
-import type { GameState, GameSymbol } from '@/hooks/useGame';
+import type { GameState, GameSymbol, GameStatus } from '@/hooks/useGame';
 import type { EnvironmentalConfig } from '@/lib/seededRng';
 import { BACKGROUND_PATTERNS } from '@/lib/seededRng';
 
 interface GameBoardProps {
   state: GameState;
-  secretCode: GameSymbol[];
-  symbols: GameSymbol[];
+  secretCode: readonly GameSymbol[];
+  symbols: readonly GameSymbol[];
   onSelectSymbol: (symbol: GameSymbol) => void;
   onClearSlot: (index: number) => void;
   onSubmit: () => void;
@@ -63,7 +63,7 @@ export function GameBoard({
         </motion.div>
       )}
 
-      {state.gameStatus === 'defeat' && (
+      {state.gameStatus === 'timeout' && state.attempts >= 8 && (
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}

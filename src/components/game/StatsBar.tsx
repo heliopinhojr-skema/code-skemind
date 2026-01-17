@@ -1,11 +1,12 @@
 import { motion } from 'framer-motion';
+import type { GameStatus } from '@/hooks/useGame';
 
 interface StatsBarProps {
   attempts: number;
   maxAttempts: number;
   remainingSeconds: number;
   score: number;
-  gameStatus: 'playing' | 'victory' | 'defeat' | 'timeout';
+  gameStatus: GameStatus;
 }
 
 function formatTime(seconds: number): string {
