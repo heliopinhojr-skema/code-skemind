@@ -14,7 +14,6 @@ import { useCallback, useRef, useState } from 'react';
 import {
   CODE_LENGTH,
   MAX_ATTEMPTS,
-  SYMBOLS,
   generateSecret,
   evaluateGuess,
   getSymbolById,
@@ -75,6 +74,10 @@ export function useGame() {
 
   const attempts = history.length;
 
+  // Mantém histórico mais recente disponível de forma síncrona
+  // (evita depender de timing de render/batching)
+  const historyRef = useRef<AttemptResult[]>([]);
+
   // ==================== AÇÕES ====================
 
   /**
@@ -83,14 +86,12 @@ export function useGame() {
    * - Reseta estado
    */
   const startGame = useCallback(() => {
-    const secret = generateSecret();
-    secretRef.current = [...secret]; // Cópia para garantir imutabilidade
-
-    // DEBUG: confirma que o código secreto foi fixado no início da rodada
-    console.log('[SKEMIND] startGame secret=', secretRef.current);
+    const secret = generateSecret(UI_SYMBOLS.map(s => s.id));
+    secretRef.current = [...secret]; // imutável
 
     const cleared: GuessSlot[] = [null, null, null, null];
     currentGuessRef.current = cleared;
+    historyRef.current = [];
 
     setStatus('playing');
     setHistory([]);
@@ -105,6 +106,7 @@ export function useGame() {
 
     const cleared: GuessSlot[] = [null, null, null, null];
     currentGuessRef.current = cleared;
+    historyRef.current = [];
 
     setStatus('notStarted');
     setHistory([]);
@@ -164,66 +166,52 @@ export function useGame() {
    * - Verifica vitória/derrota
    */
   const submit = useCallback(() => {
-    // Validações de estado
     if (status !== 'playing') return;
     if (!secretRef.current) return;
 
-    // SNAPSHOT IMEDIATO - captura o palpite mais recente no momento do clique
+    // snapshots IMEDIATOS (nunca usar state direto para avaliar)
     const guessSnapshot: GuessSlot[] = currentGuessRef.current.map(s => (s ? { ...s } : null));
     const secretSnapshot: string[] = [...secretRef.current];
 
-    // Extrai IDs do palpite a partir do snapshot
-    const filledGuess = guessSnapshot.filter((s): s is GameSymbol => s !== null);
-    if (filledGuess.length !== CODE_LENGTH) return;
-
-    const guessIds: string[] = filledGuess.map(s => s.id);
-
-    // Valida palpite (4 símbolos únicos)
+    // precisa estar completo (4 slots) e sem repetição
+    if (guessSnapshot.some(s => s === null)) return;
+    const guessIds = guessSnapshot.map(s => (s as GameSymbol).id);
     if (!isValidGuess(guessIds)) return;
 
-    // Verifica limite de tentativas usando histórico atual
-    if (history.length >= MAX_ATTEMPTS) return;
+    // limite de tentativas (sincrono via ref)
+    const attemptsBefore = historyRef.current.length;
+    if (attemptsBefore >= MAX_ATTEMPTS) return;
 
-    // Calcula feedback usando snapshots
-    const result = evaluateGuess(secretSnapshot, guessIds);
+    // feedback 100% puro: apenas secret fixo + palpite daquele clique
+    const result = evaluateGuess(secretSnapshot, [...guessIds]);
 
-    // DEBUG: confirma segredo fixo e cálculo do feedback
-    console.log('[SKEMIND] submit', {
-      secret: secretSnapshot,
-      guess: guessIds,
-      result,
-      historyLenBefore: history.length,
-    });
-
-    // Cria entrada no histórico com ID único e dados imutáveis
     const entry: AttemptResult = {
       id: crypto.randomUUID(),
       guess: [...guessIds],
-      whites: result.whites,
-      grays: result.grays,
+      whites: result.exact,
+      grays: result.present,
     };
 
-    // Atualiza histórico (mais recente primeiro)
-    const nextHistory = [entry, ...history];
+    const nextHistory = [entry, ...historyRef.current];
+    historyRef.current = nextHistory;
     setHistory(nextHistory);
 
-    // Verifica vitória (4 brancos)
-    if (result.whites === CODE_LENGTH) {
+    // vitória/derrota
+    if (result.exact === CODE_LENGTH) {
       setStatus('won');
       return;
     }
 
-    // Verifica derrota (8 tentativas)
-    if (nextHistory.length >= MAX_ATTEMPTS) {
+    if (attemptsBefore + 1 >= MAX_ATTEMPTS) {
       setStatus('lost');
       return;
     }
 
-    // Limpa palpite para próxima tentativa
+    // próxima tentativa
     const cleared: GuessSlot[] = [null, null, null, null];
     currentGuessRef.current = cleared;
     setCurrentGuess(cleared);
-  }, [status, history]);
+  }, [status]);
 
   // ==================== DADOS DERIVADOS ====================
 
