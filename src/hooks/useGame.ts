@@ -10,7 +10,7 @@
  * - Derrota: 8 tentativas
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   CODE_LENGTH,
   MAX_ATTEMPTS,
@@ -80,6 +80,29 @@ export function useGame() {
   // Mantém histórico mais recente disponível de forma síncrona
   // (evita depender de timing de render/batching)
   const historyRef = useRef<AttemptResult[]>([]);
+
+  // Detecta qualquer mudança inesperada do secret durante a rodada
+  const secretInvariantRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    // mantém historyRef alinhado com o estado (blindagem)
+    historyRef.current = Array.isArray(history) ? history : [];
+  }, [history]);
+
+  useEffect(() => {
+    const key = Array.isArray(secretRef.current) ? secretRef.current.join('|') : null;
+
+    if (secretInvariantRef.current && key && secretInvariantRef.current !== key) {
+      console.error('[SKEMIND] SECRET_CHANGED_UNEXPECTEDLY', {
+        prev: secretInvariantRef.current,
+        next: key,
+        status,
+      });
+    }
+
+    secretInvariantRef.current = key;
+  }, [status, history.length]);
+
   // ==================== AÇÕES ====================
 
   /**
