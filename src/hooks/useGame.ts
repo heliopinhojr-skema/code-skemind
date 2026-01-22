@@ -141,13 +141,33 @@ export function useGame() {
   // ==================== AÇÕES ====================
 
   /**
-   * Inicia novo jogo
+   * Inicia novo jogo (gera código secreto automaticamente)
    */
   const startGame = useCallback(() => {
     if (secretRef.current) return;
 
     const secret = generateSecret(UI_SYMBOLS.map(s => s.id));
     // Congela para impedir qualquer mutação acidental durante a rodada
+    secretRef.current = Object.freeze([...secret]);
+
+    const cleared: GuessSlot[] = [null, null, null, null];
+    currentGuessRef.current = cleared;
+    historyRef.current = [];
+
+    setStatus('playing');
+    setHistory([]);
+    setCurrentGuess(cleared);
+    setScore(0);
+    setTimeRemaining(GAME_DURATION);
+  }, []);
+
+  /**
+   * Inicia jogo com código secreto específico (usado no torneio)
+   */
+  const startGameWithSecret = useCallback((secret: string[]) => {
+    if (secretRef.current) return;
+    if (!secret || secret.length !== CODE_LENGTH) return;
+
     secretRef.current = Object.freeze([...secret]);
 
     const cleared: GuessSlot[] = [null, null, null, null];
@@ -321,6 +341,7 @@ export function useGame() {
     },
     actions: {
       startGame,
+      startGameWithSecret,
       newGame,
       selectSymbol,
       clearSlot,
