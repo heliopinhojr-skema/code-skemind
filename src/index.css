@@ -126,21 +126,21 @@
     @apply w-4 h-4 rounded-full;
   }
 
-  /* MASTERMIND CLÁSSICO: Branco = Exato (posição certa), Cinza = Parcial (posição errada) */
+  /* MASTERMIND CLÁSSICO: Branco = Exato (posição certa), Preto = Parcial (posição errada) */
   .peg-exact {
-    background: hsl(0 0% 100%);
-    box-shadow: 0 0 10px hsl(0 0% 100% / 0.7), inset 0 -2px 3px hsl(0 0% 75%);
-    border: 1px solid hsl(0 0% 85%);
+    background: #FFFFFF;
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.9), inset 0 -2px 4px rgba(200, 200, 200, 0.8);
+    border: 2px solid #E0E0E0;
   }
 
   .peg-partial {
-    background: hsl(0 0% 55%);
-    box-shadow: 0 0 6px hsl(0 0% 40% / 0.5), inset 0 1px 3px hsl(0 0% 70%);
-    border: 1px solid hsl(0 0% 40%);
+    background: #1A1A1A;
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.6), inset 0 2px 4px rgba(60, 60, 60, 0.8);
+    border: 2px solid #333333;
   }
 
   .peg-empty {
-    background: hsl(var(--muted) / 0.4);
-    border: 1px dashed hsl(var(--border));
+    background: hsl(var(--muted) / 0.3);
+    border: 1px dashed hsl(var(--border) / 0.5);
   }
 }
