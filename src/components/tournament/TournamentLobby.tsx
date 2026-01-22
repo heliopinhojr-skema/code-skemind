@@ -66,8 +66,8 @@ const GAME_MODES: GameModeConfig[] = [
   },
   {
     id: 'arena',
-    name: 'Arena',
-    description: 'Compita contra 9 bots',
+    name: '9 Bots',
+    description: 'Enfrente 9 adversários IA',
     icon: Swords,
     entryFee: 100,
     prizeMultiplier: 10,
@@ -79,8 +79,15 @@ const GAME_MODES: GameModeConfig[] = [
 
 // Corridas simuladas em andamento
 const ONGOING_RACES = [
-  { id: 1, name: 'Arena #42', players: 8, status: 'Em andamento', timeLeft: '2:34' },
-  { id: 2, name: 'Arena #43', players: 10, status: 'Iniciando', timeLeft: '0:10' },
+  { id: 1, name: '9 Bots #42', players: 8, status: 'Em andamento', timeLeft: '2:34' },
+  { id: 2, name: '9 Bots #43', players: 10, status: 'Iniciando', timeLeft: '0:10' },
+];
+
+// Inscrições abertas
+const OPEN_REGISTRATIONS = [
+  { id: 1, name: '9 Bots #44', entryFee: 100, prize: 1000, spotsLeft: 7, startsIn: '5:00' },
+  { id: 2, name: '9 Bots #45', entryFee: 100, prize: 1000, spotsLeft: 10, startsIn: '8:30' },
+  { id: 3, name: 'Torneio VIP', entryFee: 500, prize: 5000, spotsLeft: 4, startsIn: '15:00' },
 ];
 
 // Nomes dos bots para Arena
@@ -326,6 +333,46 @@ export function TournamentLobby({
                 <div className="flex items-center justify-between mt-2 text-xs text-white/50">
                   <span><Users className="w-3 h-3 inline mr-1" />{race.players}</span>
                   <span className="text-primary">{race.timeLeft}</span>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </motion.section>
+        
+        {/* Inscrições Abertas */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="mx-4 mt-4"
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <Trophy className="w-4 h-4 text-yellow-400" />
+            <span className="text-sm font-medium text-white/80">Inscrições Abertas</span>
+          </div>
+          
+          <div className="space-y-2">
+            {OPEN_REGISTRATIONS.map((reg) => (
+              <motion.div
+                key={reg.id}
+                whileHover={{ scale: 1.01 }}
+                className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium text-white">{reg.name}</div>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-white/50">
+                      <span><Users className="w-3 h-3 inline mr-1" />{reg.spotsLeft} vagas</span>
+                      <span><Timer className="w-3 h-3 inline mr-1" />Inicia em {reg.startsIn}</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="flex items-center gap-1 text-yellow-400">
+                      <Coins className="w-4 h-4" />
+                      <span className="font-bold">{reg.entryFee} K$</span>
+                    </div>
+                    <div className="text-xs text-green-400 mt-1">Prêmio: {reg.prize} K$</div>
+                  </div>
                 </div>
               </motion.div>
             ))}
