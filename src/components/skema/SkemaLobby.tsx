@@ -35,7 +35,7 @@ interface SkemaLobbyProps {
 type GameMode = 'training' | 'bots' | 'official';
 
 const COUNTDOWN_SECONDS = 10;
-// URL pública (publicada) do app para convites — evita link de preview que pode pedir login.
+// URL pública (publicada) do app para convites — evita link de preview/sandbox que pode pedir login.
 const PUBLISHED_APP_ORIGIN = 'https://skemind-code-guess.lovable.app';
 
 export function SkemaLobby({
@@ -77,8 +77,14 @@ export function SkemaLobby({
   const inviteLink = useMemo(() => {
     const origin = window.location.origin;
 
-    // Se estiver em preview, força a URL publicada (pública) para que convidados não precisem logar.
-    const baseUrl = origin.includes('id-preview--') ? PUBLISHED_APP_ORIGIN : origin;
+    // Qualquer domínio de preview/sandbox do Lovable pode exigir login. Para convites, sempre use o publicado.
+    const isLovablePreview =
+      origin.includes('lovableproject.com') ||
+      origin.includes('id-preview--') ||
+      origin.includes('lovable.app');
+
+    // Se você tiver um domínio próprio no futuro, pode trocar esta regra.
+    const baseUrl = isLovablePreview ? PUBLISHED_APP_ORIGIN : origin;
 
     const code = encodeURIComponent(player.inviteCode);
     return `${baseUrl}/?convite=${code}`;
