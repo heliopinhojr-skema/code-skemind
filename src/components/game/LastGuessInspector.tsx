@@ -86,14 +86,24 @@ export function LastGuessInspector({
               className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background/30 px-3 py-2"
             >
               <div className="flex items-center gap-2">
-                <span className="text-xs font-mono text-muted-foreground w-12">Pos {i + 1}</span>
+                <span className="text-xs font-mono text-muted-foreground w-8">Pos {i + 1}</span>
+                <div className="w-6 h-6 flex items-center justify-center">
+                  {status === 'exact' ? (
+                    <span className="text-lg">⚪</span>
+                  ) : status === 'present' ? (
+                    <span className="text-lg">⚫</span>
+                  ) : (
+                    <span className="text-muted-foreground">✗</span>
+                  )}
+                </div>
                 <div className="w-8 h-8 rounded-lg bg-background/60 flex items-center justify-center">
                   {symbol ? <Symbol symbol={symbol} size="sm" /> : null}
                 </div>
-                <span className="text-xs font-mono text-foreground">{id}</span>
               </div>
 
-              <span className={`text-xs font-medium ${statusClass(status)}`}>{statusLabel(status)}</span>
+              <span className={`text-xs font-medium ${statusClass(status)}`}>
+                {status === 'exact' ? 'posição certa!' : status === 'present' ? 'posição errada' : 'não está'}
+              </span>
             </div>
           );
         })}
