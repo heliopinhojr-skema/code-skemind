@@ -72,14 +72,16 @@ export function SkemaLobby({
   const canAffordBots = player.energy >= 0; // Treinar x Bots é grátis
   const canAffordOfficial = (buyIn: BuyInOption) => player.energy >= buyIn.total;
 
-  // Gera link de convite (formato /convite/CODIGO - mais confiável)
+  // Gera link de convite (usa a HOME com query param para evitar 404/login em links profundos)
+  // Ex.: https://.../?convite=SEUCODIGO
   const inviteLink = useMemo(() => {
     const origin = window.location.origin;
 
     // Se estiver em preview, força a URL publicada (pública) para que convidados não precisem logar.
     const baseUrl = origin.includes('id-preview--') ? PUBLISHED_APP_ORIGIN : origin;
 
-    return `${baseUrl}/convite/${player.inviteCode}`;
+    const code = encodeURIComponent(player.inviteCode);
+    return `${baseUrl}/?convite=${code}`;
   }, [player.inviteCode]);
 
   const handleCopyInviteCode = useCallback(async () => {
