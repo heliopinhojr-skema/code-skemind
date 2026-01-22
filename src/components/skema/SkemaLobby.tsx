@@ -343,16 +343,18 @@ export function SkemaLobby({
                 <Button
                   variant="secondary"
                   size="icon"
-                  onClick={() => {
+                  onClick={async () => {
                     const text = `🎮 Entre no SKEMA comigo!\n${inviteLink}`;
-                    if (navigator.share) {
-                      navigator.share({ text, url: inviteLink });
-                    } else {
-                      navigator.clipboard.writeText(text);
+                    try {
+                      await navigator.clipboard.writeText(text);
+                      setCopiedCode(true);
+                      setTimeout(() => setCopiedCode(false), 2000);
+                    } catch (e) {
+                      console.error('Erro ao copiar:', e);
                     }
                   }}
                   className="shrink-0"
-                  title="Compartilhar"
+                  title="Copiar mensagem com link"
                 >
                   <Share2 className="w-4 h-4" />
                 </Button>
