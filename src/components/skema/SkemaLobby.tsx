@@ -35,6 +35,8 @@ interface SkemaLobbyProps {
 type GameMode = 'training' | 'bots' | 'official';
 
 const COUNTDOWN_SECONDS = 10;
+// URL pública (publicada) do app para convites — evita link de preview que pode pedir login.
+const PUBLISHED_APP_ORIGIN = 'https://skemind-code-guess.lovable.app';
 
 export function SkemaLobby({
   player,
@@ -72,7 +74,11 @@ export function SkemaLobby({
 
   // Gera link de convite (formato /convite/CODIGO - mais confiável)
   const inviteLink = useMemo(() => {
-    const baseUrl = window.location.origin;
+    const origin = window.location.origin;
+
+    // Se estiver em preview, força a URL publicada (pública) para que convidados não precisem logar.
+    const baseUrl = origin.includes('id-preview--') ? PUBLISHED_APP_ORIGIN : origin;
+
     return `${baseUrl}/convite/${player.inviteCode}`;
   }, [player.inviteCode]);
 
