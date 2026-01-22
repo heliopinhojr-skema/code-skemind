@@ -113,15 +113,28 @@ export function useSkemaPlayer() {
           parsed.lastRefillDate = today;
         }
         
-        // Carrega referrals do registro global (para sincronizar convites feitos em outras sessões)
-        const REFERRALS_BY_PLAYER_KEY = 'skema_referrals_by_player';
-        const storedReferrals = localStorage.getItem(REFERRALS_BY_PLAYER_KEY);
+        // Carrega referrals do registro global (usa inviteCode como chave para persistir entre sessões)
+        const REFERRALS_BY_INVITE_KEY = 'skema_referrals_by_invite_code';
+        const storedReferrals = localStorage.getItem(REFERRALS_BY_INVITE_KEY);
         if (storedReferrals) {
-          const referralsByPlayer = JSON.parse(storedReferrals);
-          if (referralsByPlayer[parsed.id]) {
-            const globalReferrals = referralsByPlayer[parsed.id] as string[];
+          const referralsByInvite = JSON.parse(storedReferrals);
+          // Usa o inviteCode do jogador como chave (persiste entre sessões)
+          if (referralsByInvite[parsed.inviteCode]) {
+            const globalReferrals = referralsByInvite[parsed.inviteCode] as string[];
             // Merge com referrals locais (evita duplicatas)
             const mergedReferrals = [...new Set([...(parsed.referrals || []), ...globalReferrals])];
+            parsed.referrals = mergedReferrals;
+          }
+        }
+        
+        // Migração: verifica também o registro antigo por ID para não perder dados
+        const OLD_REFERRALS_KEY = 'skema_referrals_by_player';
+        const oldReferrals = localStorage.getItem(OLD_REFERRALS_KEY);
+        if (oldReferrals) {
+          const oldByPlayer = JSON.parse(oldReferrals);
+          if (oldByPlayer[parsed.id]) {
+            const oldGlobalReferrals = oldByPlayer[parsed.id] as string[];
+            const mergedReferrals = [...new Set([...(parsed.referrals || []), ...oldGlobalReferrals])];
             parsed.referrals = mergedReferrals;
           }
         }
@@ -247,15 +260,34 @@ export function useSkemaPlayer() {
           }
         }
         
-        // Também salva em registro global de referrals por jogador
-        const REFERRALS_BY_PLAYER_KEY = 'skema_referrals_by_player';
-        const storedReferrals = localStorage.getItem(REFERRALS_BY_PLAYER_KEY);
-        const referralsByPlayer = storedReferrals ? JSON.parse(storedReferrals) : {};
-        if (!referralsByPlayer[validation.inviterId]) {
-          referralsByPlayer[validation.inviterId] = [];
+        // Salva em registro global usando o INVITE CODE do inviter (persiste entre sessões/dispositivos)
+        // Busca o inviteCode do inviter no CODE_REGISTRY
+        const storedRegistry = localStorage.getItem(CODE_REGISTRY_KEY);
+        let inviterInviteCode: string | null = null;
+        
+        if (storedRegistry) {
+          const registry = JSON.parse(storedRegistry) as Record<string, CodeRegistryEntry>;
+          // Procura o inviteCode cujo ID corresponde ao inviterId
+          for (const [code, entry] of Object.entries(registry)) {
+            if (entry.id === validation.inviterId) {
+              inviterInviteCode = code;
+              break;
+            }
+          }
         }
-        referralsByPlayer[validation.inviterId].push(newPlayer.id);
-        localStorage.setItem(REFERRALS_BY_PLAYER_KEY, JSON.stringify(referralsByPlayer));
+        
+        if (inviterInviteCode) {
+          const REFERRALS_BY_INVITE_KEY = 'skema_referrals_by_invite_code';
+          const storedReferrals = localStorage.getItem(REFERRALS_BY_INVITE_KEY);
+          const referralsByInvite = storedReferrals ? JSON.parse(storedReferrals) : {};
+          if (!referralsByInvite[inviterInviteCode]) {
+            referralsByInvite[inviterInviteCode] = [];
+          }
+          if (!referralsByInvite[inviterInviteCode].includes(newPlayer.id)) {
+            referralsByInvite[inviterInviteCode].push(newPlayer.id);
+          }
+          localStorage.setItem(REFERRALS_BY_INVITE_KEY, JSON.stringify(referralsByInvite));
+        }
       } catch (e) {
         console.error('Erro ao atualizar referrals do inviter:', e);
       }

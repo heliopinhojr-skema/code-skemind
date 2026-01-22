@@ -67,7 +67,12 @@ export function getBotThinkTime(iq: number): number {
 
 /**
  * Gera palpite do bot baseado no histórico
- * IQ80 = comete erros ocasionais, nem sempre usa feedback corretamente
+ * IQ80 = usa estratégia básica de eliminação, mas comete erros ocasionais
+ * 
+ * Estratégia melhorada:
+ * - Mantém símbolos que tiveram whites (posição certa)
+ * - Usa eliminação para símbolos que não tiveram match
+ * - 15% de chance de erro (menor que antes)
  */
 export function generateBotGuess(
   state: BotGameState,
@@ -80,35 +85,87 @@ export function generateBotGuess(
     return getRandomGuess(symbolIds);
   }
   
-  const lastGuess = state.guessHistory[state.guessHistory.length - 1];
-  const lastFeedback = state.feedbackHistory[state.feedbackHistory.length - 1];
-  
-  // IQ80: 30% de chance de ignorar feedback e fazer palpite aleatório
-  if (Math.random() < 0.3) {
+  // IQ80: 15% de chance de ignorar feedback e fazer palpite aleatório
+  if (Math.random() < 0.15) {
     return getRandomGuess(symbolIds);
   }
   
-  // Tenta usar feedback de forma simplificada
-  // Mantém símbolos que tiveram match (whites ou grays)
-  const totalMatches = lastFeedback.whites + lastFeedback.grays;
+  // Analisa histórico para deduzir
+  const eliminatedSymbols = new Set<string>();
+  const confirmedPositions: (string | null)[] = [null, null, null, null];
+  const symbolsInCode = new Set<string>();
   
-  if (totalMatches === 0) {
-    // Nenhum match - usa símbolos diferentes
-    const unusedSymbols = symbolIds.filter(id => !lastGuess.includes(id));
-    if (unusedSymbols.length >= CODE_LENGTH) {
-      return shuffleArray(unusedSymbols).slice(0, CODE_LENGTH);
+  // Analisa cada tentativa anterior
+  for (let i = 0; i < state.guessHistory.length; i++) {
+    const guess = state.guessHistory[i];
+    const feedback = state.feedbackHistory[i];
+    
+    // Se nenhum match, todos os símbolos podem ser eliminados
+    if (feedback.whites === 0 && feedback.grays === 0) {
+      guess.forEach(s => eliminatedSymbols.add(s));
+    } else {
+      // Algum match - símbolos podem estar no código
+      guess.forEach(s => symbolsInCode.add(s));
+    }
+    
+    // Se todos brancos, confirmamos as posições
+    if (feedback.whites === CODE_LENGTH) {
+      return guess;
     }
   }
   
-  // IQ80: estratégia simples - troca posições aleatoriamente mantendo alguns símbolos
-  const keptSymbols = lastGuess.slice(0, Math.min(totalMatches, CODE_LENGTH - 1));
-  const otherSymbols = symbolIds.filter(id => !keptSymbols.includes(id));
-  const neededCount = CODE_LENGTH - keptSymbols.length;
+  const lastGuess = state.guessHistory[state.guessHistory.length - 1];
+  const lastFeedback = state.feedbackHistory[state.feedbackHistory.length - 1];
   
-  const newSymbols = shuffleArray(otherSymbols).slice(0, neededCount);
-  const guess = shuffleArray([...keptSymbols, ...newSymbols]);
+  // Gera novo palpite
+  const newGuess: string[] = [];
+  const usedSymbols = new Set<string>();
   
-  return guess.slice(0, CODE_LENGTH);
+  // Símbolos disponíveis (não eliminados)
+  const available = symbolIds.filter(s => !eliminatedSymbols.has(s));
+  
+  // Se tivemos whites, mantemos alguns símbolos mas trocamos posições
+  if (lastFeedback.whites > 0) {
+    // IQ80: mantém os primeiros símbolos que tiveram match (estratégia simples)
+    const toKeep = lastGuess.slice(0, Math.min(lastFeedback.whites, CODE_LENGTH - 1));
+    toKeep.forEach(s => {
+      if (!usedSymbols.has(s)) {
+        newGuess.push(s);
+        usedSymbols.add(s);
+      }
+    });
+  }
+  
+  // Se tivemos grays, incluímos esses símbolos em novas posições
+  if (lastFeedback.grays > 0 && newGuess.length < CODE_LENGTH) {
+    const graySymbols = lastGuess.filter(s => !usedSymbols.has(s));
+    const toAdd = graySymbols.slice(0, Math.min(lastFeedback.grays, CODE_LENGTH - newGuess.length));
+    toAdd.forEach(s => {
+      if (!usedSymbols.has(s)) {
+        newGuess.push(s);
+        usedSymbols.add(s);
+      }
+    });
+  }
+  
+  // Completa com símbolos disponíveis não usados
+  const remaining = shuffleArray(available.filter(s => !usedSymbols.has(s)));
+  while (newGuess.length < CODE_LENGTH && remaining.length > 0) {
+    const next = remaining.pop()!;
+    newGuess.push(next);
+    usedSymbols.add(next);
+  }
+  
+  // Se ainda faltam, usa qualquer símbolo
+  if (newGuess.length < CODE_LENGTH) {
+    const fallback = shuffleArray(symbolIds.filter(s => !usedSymbols.has(s)));
+    while (newGuess.length < CODE_LENGTH && fallback.length > 0) {
+      newGuess.push(fallback.pop()!);
+    }
+  }
+  
+  // Embaralha para variar posições (IQ80 não otimiza posições perfeitamente)
+  return shuffleArray(newGuess).slice(0, CODE_LENGTH);
 }
 
 /**
