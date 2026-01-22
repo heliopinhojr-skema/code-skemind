@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trophy, Coins, Eye } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Symbol } from '@/components/game/Symbol';
+import { CosmicBackground } from '@/components/CosmicBackground';
 
 export default function Tournament() {
   const tournament = useTournament();
@@ -74,29 +75,34 @@ export default function Tournament() {
   const symbolsById = new Map(UI_SYMBOLS.map(s => [s.id, s]));
   
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Header com saldo */}
-      <div className="bg-card border-b px-4 py-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Trophy className="w-5 h-5 text-yellow-500" />
-          <span className="font-bold">Torneio</span>
-        </div>
-        <div className="flex items-center gap-2 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 px-3 py-1 rounded-full border border-yellow-500/30">
-          <Coins className="w-4 h-4 text-yellow-500" />
-          <span className="font-bold">{tournament.state.credits.toLocaleString()} K$</span>
-        </div>
-      </div>
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Persistent cosmic background */}
+      <CosmicBackground />
       
-      <StatsBar 
-        attempts={game.state.attempts} 
-        maxAttempts={game.constants.MAX_ATTEMPTS} 
-        gameStatus={game.state.status}
-        score={game.state.score}
-        timeRemaining={game.state.timeRemaining}
-      />
-      
-      <main className="flex-1 overflow-hidden p-3">
-        <div className="h-full grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-3 max-w-6xl mx-auto">
+      {/* Main content */}
+      <div className="relative z-10 min-h-screen flex flex-col">
+        {/* Header com saldo */}
+        <div className="bg-black/30 backdrop-blur-sm border-b border-white/10 px-4 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Trophy className="w-5 h-5 text-yellow-500" />
+            <span className="font-bold text-white">Torneio</span>
+          </div>
+          <div className="flex items-center gap-2 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 px-3 py-1 rounded-full border border-yellow-500/30">
+            <Coins className="w-4 h-4 text-yellow-500" />
+            <span className="font-bold text-yellow-400">{tournament.state.credits.toLocaleString()} K$</span>
+          </div>
+        </div>
+        
+        <StatsBar 
+          attempts={game.state.attempts} 
+          maxAttempts={game.constants.MAX_ATTEMPTS} 
+          gameStatus={game.state.status}
+          score={game.state.score}
+          timeRemaining={game.state.timeRemaining}
+        />
+        
+        <main className="flex-1 overflow-hidden p-3">
+          <div className="h-full grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-3 max-w-6xl mx-auto">
           {/* Área do jogo */}
           <div className="overflow-y-auto">
             {isFinished ? (
@@ -191,15 +197,16 @@ export default function Tournament() {
         </div>
       </main>
       
-      {/* Leaderboard mobile */}
-      <div className="lg:hidden border-t bg-card p-3">
-        <TournamentLeaderboard
-          players={tournament.state.players}
-          results={tournament.state.results}
-          humanPlayerId={tournament.state.humanPlayerId}
-          isFinished={isFinished}
-          symbolsById={symbolsById}
-        />
+        {/* Leaderboard mobile */}
+        <div className="lg:hidden border-t border-white/10 bg-black/30 backdrop-blur-sm p-3">
+          <TournamentLeaderboard
+            players={tournament.state.players}
+            results={tournament.state.results}
+            humanPlayerId={tournament.state.humanPlayerId}
+            isFinished={isFinished}
+            symbolsById={symbolsById}
+          />
+        </div>
       </div>
     </div>
   );
