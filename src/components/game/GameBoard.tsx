@@ -147,6 +147,21 @@ export function GameBoard({
       {/* Playing */}
       {isPlaying && (
         <>
+          {/* DEBUG: Mostrar código secreto para teste */}
+          <div className="p-3 rounded-xl bg-yellow-500/20 border border-yellow-500/50 text-center">
+            <p className="text-xs text-yellow-400 font-bold mb-2">🔓 MODO DEBUG - CÓDIGO VISÍVEL</p>
+            <div className="flex justify-center gap-2">
+              {safeSecret.map((symbol, i) => (
+                <div key={i} className="w-10 h-10 flex items-center justify-center bg-muted/30 rounded-lg border-2 border-yellow-500/50">
+                  <Symbol symbol={symbol} size="md" />
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              ⚪ Branco = posição certa | ⚫ Preto = posição errada
+            </p>
+          </div>
+
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground text-center">Seu palpite:</p>
             <GuessSlots guess={safeGuess} onClear={onClearSlot} disabled={!isPlaying} />
