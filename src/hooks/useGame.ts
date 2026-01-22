@@ -87,7 +87,7 @@ function calculateTimeBonus(timeRemaining: number): number {
 
 export function useGame() {
   // Código secreto armazenado em ref (não muda durante a rodada)
-  const secretRef = useRef<string[] | null>(null);
+  const secretRef = useRef<readonly string[] | null>(null);
 
   // Estados do jogo
   const [status, setStatus] = useState<GameStatus>('notStarted');
@@ -147,7 +147,8 @@ export function useGame() {
     if (secretRef.current) return;
 
     const secret = generateSecret(UI_SYMBOLS.map(s => s.id));
-    secretRef.current = [...secret];
+    // Congela para impedir qualquer mutação acidental durante a rodada
+    secretRef.current = Object.freeze([...secret]);
 
     const cleared: GuessSlot[] = [null, null, null, null];
     currentGuessRef.current = cleared;
