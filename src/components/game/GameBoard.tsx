@@ -1,11 +1,12 @@
 import { motion } from 'framer-motion';
+import { Copy, Check } from 'lucide-react';
+import { useState } from 'react';
 import { TokenPicker } from './TokenPicker';
 import { GuessSlots } from './GuessSlots';
 import { HistoryLog } from './HistoryLog';
 import { Symbol } from './Symbol';
 import { Button } from '@/components/ui/button';
-import type { GameState, GameSymbol } from '@/hooks/useGame';
-
+import type { GameState, GameSymbol, AttemptResult } from '@/hooks/useGame';
 interface GameBoardProps {
   state: GameState;
   secretCode: GameSymbol[];
@@ -27,9 +28,12 @@ export function GameBoard({
   onNewGame,
   onStartGame,
 }: GameBoardProps) {
+  const [copied, setCopied] = useState(false);
+
   const safeGuess = Array.isArray(state.currentGuess) ? state.currentGuess : [];
   const safeSecret = Array.isArray(secretCode) ? secretCode : [];
   const safeSymbols = Array.isArray(symbols) ? symbols : [];
+  const safeHistory = Array.isArray(state.history) ? state.history : [];
 
   const isPlaying = state.status === 'playing';
   const isNotStarted = state.status === 'notStarted';
@@ -38,6 +42,29 @@ export function GameBoard({
 
   const selectedIds = (Array.isArray(safeGuess) ? safeGuess : []).filter(Boolean).map(s => s!.id);
 
+  const formatHistoryForClipboard = (history: AttemptResult[]): string => {
+    const lines = history
+      .slice()
+      .reverse()
+      .map((attempt, i) => {
+        const guess = attempt.guessSnapshot.join(' ');
+        const whites = attempt.feedbackSnapshot.whites;
+        const grays = attempt.feedbackSnapshot.grays;
+        return `#${i + 1}: [${guess}] → ⚪${whites} ⚫${grays}`;
+      });
+    return `SKEMIND - ${state.attempts} tentativas\nPontuação: ${state.score}\n\n${lines.join('\n')}`;
+  };
+
+  const handleCopyHistory = async () => {
+    if (safeHistory.length === 0) return;
+    try {
+      await navigator.clipboard.writeText(formatHistoryForClipboard(safeHistory));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Falha ao copiar:', err);
+    }
+  };
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -142,11 +169,24 @@ export function GameBoard({
         </>
       )}
 
-      {/* New Game */}
+      {/* Game Over Actions */}
       {isGameOver && (
-        <Button onClick={onNewGame} variant="primary" size="lg" className="w-full h-14 text-lg font-bold">
-          Novo Jogo
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={onNewGame} variant="primary" size="lg" className="flex-1 h-14 text-lg font-bold">
+            Novo Jogo
+          </Button>
+          {safeHistory.length > 0 && (
+            <Button
+              onClick={handleCopyHistory}
+              variant="outline"
+              size="lg"
+              className="h-14 px-4"
+              title="Copiar histórico"
+            >
+              {copied ? <Check className="w-5 h-5 text-success" /> : <Copy className="w-5 h-5" />}
+            </Button>
+          )}
+        </div>
       )}
 
       {/* History */}
