@@ -234,14 +234,24 @@ export function useGame() {
 
     try {
       const guessSnapshot: GuessSlot[] = currentGuessRef.current.map(s => (s ? { ...s } : null));
+      
+      // CRÍTICO: Copia o segredo de forma segura
       const secretSnapshot: string[] = [...secretRef.current];
 
       if (guessSnapshot.some(s => s === null)) return;
       const guessIds = guessSnapshot.map(s => (s as GameSymbol).id);
       if (!isValidGuess(guessIds)) return;
 
-      // Feedback
-      const result = evaluateGuess(secretSnapshot, [...guessIds]);
+      // DEBUG: Log para verificar consistência
+      console.log('=== SUBMIT DEBUG ===');
+      console.log('Segredo FIXO:', secretSnapshot.join(', '));
+      console.log('Palpite:', guessIds.join(', '));
+
+      // Feedback - passa cópias para garantir imutabilidade
+      const result = evaluateGuess([...secretSnapshot], [...guessIds]);
+      
+      console.log('Feedback:', `⚪${result.whites} ⚫${result.grays}`);
+      console.log('====================');
 
       const entry: AttemptResult = Object.freeze({
         id: crypto.randomUUID(),
