@@ -28,7 +28,7 @@ export function FeedbackPegs({ correctPosition, correctSymbol, total = 4, attemp
   const keyPrefix = attemptId || crypto.randomUUID();
   
   return (
-    <div className="flex gap-1.5 items-center">
+    <div className="flex gap-1.5 items-center bg-primary/20 px-2 py-1.5 rounded-lg border border-primary/30">
       {/* Acertos EXATOS primeiro (branco) */}
       {Array.from({ length: safeExact }).map((_, i) => (
         <motion.div
@@ -40,7 +40,7 @@ export function FeedbackPegs({ correctPosition, correctSymbol, total = 4, attemp
           title="Símbolo correto na posição correta"
         />
       ))}
-      {/* Acertos PARCIAIS depois (cinza) */}
+      {/* Acertos PARCIAIS depois (preto) */}
       {Array.from({ length: safePartial }).map((_, i) => (
         <motion.div
           key={`${keyPrefix}-partial-${i}`}
