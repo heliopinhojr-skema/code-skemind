@@ -353,17 +353,28 @@ export function SkemaLobby({
                 </div>
               )}
               
-              {/* Link para entrar */}
+              {/* Link para entrar + copiar */}
               <div className="mb-3">
                 <label className="text-xs text-white/50 mb-1 block">Link para entrar:</label>
-                <a 
-                  href={inviteLink} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="block bg-black/30 border border-white/20 rounded-lg px-3 py-2 text-xs text-blue-400 hover:text-blue-300 truncate underline"
-                >
-                  {inviteLink}
-                </a>
+                <div className="flex items-center gap-2">
+                  <a 
+                    href={inviteLink} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex-1 bg-black/30 border border-white/20 rounded-lg px-3 py-2 text-xs text-blue-400 hover:text-blue-300 truncate underline"
+                  >
+                    {inviteLink}
+                  </a>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    onClick={handleCopyInviteLink}
+                    className="shrink-0 h-10 w-10"
+                    title="Copiar link"
+                  >
+                    {copiedCode ? <Check className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5" />}
+                  </Button>
+                </div>
               </div>
               
               {/* Código para copiar */}
