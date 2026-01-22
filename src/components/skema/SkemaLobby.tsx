@@ -70,6 +70,12 @@ export function SkemaLobby({
   const canAffordBots = player.energy >= 0; // Treinar x Bots é grátis
   const canAffordOfficial = (buyIn: BuyInOption) => player.energy >= buyIn.total;
 
+  // Gera link de convite
+  const inviteLink = useMemo(() => {
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/?convite=${player.inviteCode}`;
+  }, [player.inviteCode]);
+
   const handleCopyInviteCode = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(player.inviteCode);
@@ -79,6 +85,16 @@ export function SkemaLobby({
       console.error('Erro ao copiar:', e);
     }
   }, [player.inviteCode]);
+
+  const handleCopyInviteLink = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+    } catch (e) {
+      console.error('Erro ao copiar:', e);
+    }
+  }, [inviteLink]);
 
   const handleSelectMode = useCallback((mode: GameMode) => {
     setSelectedMode(mode);
@@ -307,18 +323,20 @@ export function SkemaLobby({
               </div>
               
               <p className="text-sm text-white/60 mb-3">
-                Ganhe +k$10 para cada amigo que entrar com seu código!
+                Ganhe +k$10 para cada amigo que entrar com seu link!
               </p>
               
-              <div className="flex items-center gap-2">
-                <div className="flex-1 bg-black/30 border border-white/20 rounded-lg px-3 py-2 font-mono text-white tracking-wider">
-                  {player.inviteCode}
+              {/* Link de convite */}
+              <div className="flex items-center gap-2 mb-2">
+                <div className="flex-1 bg-black/30 border border-white/20 rounded-lg px-3 py-2 text-xs text-white/70 truncate">
+                  {inviteLink}
                 </div>
                 <Button
                   variant="secondary"
                   size="icon"
-                  onClick={handleCopyInviteCode}
+                  onClick={handleCopyInviteLink}
                   className="shrink-0"
+                  title="Copiar link"
                 >
                   {copiedCode ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
                 </Button>
@@ -326,17 +344,23 @@ export function SkemaLobby({
                   variant="secondary"
                   size="icon"
                   onClick={() => {
-                    const text = `Entre no SKEMA com meu código: ${player.inviteCode}`;
+                    const text = `🎮 Entre no SKEMA comigo!\n${inviteLink}`;
                     if (navigator.share) {
-                      navigator.share({ text });
+                      navigator.share({ text, url: inviteLink });
                     } else {
                       navigator.clipboard.writeText(text);
                     }
                   }}
                   className="shrink-0"
+                  title="Compartilhar"
                 >
                   <Share2 className="w-4 h-4" />
                 </Button>
+              </div>
+              
+              {/* Código alternativo */}
+              <div className="text-xs text-white/40 text-center">
+                Código: <span className="font-mono text-white/60">{player.inviteCode}</span>
               </div>
             </div>
           </motion.section>

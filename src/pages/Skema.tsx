@@ -8,7 +8,8 @@
  * - Economia de energia (localStorage)
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useSkemaPlayer } from '@/hooks/useSkemaPlayer';
 import { useGame } from '@/hooks/useGame';
 import { useTournament } from '@/hooks/useTournament';
@@ -26,6 +27,9 @@ import { UI_SYMBOLS } from '@/hooks/useGame';
 type SkemaView = 'lobby' | 'training' | 'bots' | 'official';
 
 export default function Skema() {
+  const [searchParams] = useSearchParams();
+  const inviteCodeFromUrl = useMemo(() => searchParams.get('convite') || searchParams.get('invite') || '', [searchParams]);
+  
   const skemaPlayer = useSkemaPlayer();
   const game = useGame();
   const tournament = useTournament();
@@ -64,6 +68,7 @@ export default function Skema() {
       <RegistrationScreen
         onRegister={skemaPlayer.actions.register}
         validateCode={skemaPlayer.actions.validateInviteCode}
+        initialInviteCode={inviteCodeFromUrl}
       />
     );
   }
