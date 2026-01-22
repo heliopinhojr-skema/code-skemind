@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, Trophy } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { TokenPicker } from './TokenPicker';
 import { GuessSlots } from './GuessSlots';
 import { HistoryLog } from './HistoryLog';
@@ -125,9 +126,19 @@ export function GameBoard({
             <p>⭐ Branco: +60 | Cinza: +25</p>
             <p>🏆 Vitória: +1000 + bônus de tempo</p>
           </div>
-          <Button onClick={onStartGame} variant="primary" size="lg" className="w-full h-14 text-lg font-bold">
-            Iniciar Jogo
-          </Button>
+          
+          <div className="space-y-3">
+            <Button onClick={onStartGame} variant="primary" size="lg" className="w-full h-14 text-lg font-bold">
+              Jogar Solo
+            </Button>
+            
+            <Link to="/tournament" className="block">
+              <Button variant="outline" size="lg" className="w-full h-14 text-lg font-bold border-yellow-500/50 hover:bg-yellow-500/10">
+                <Trophy className="w-5 h-5 mr-2 text-yellow-500" />
+                Torneio (vs 9 Bots)
+              </Button>
+            </Link>
+          </div>
         </motion.div>
       )}
 
