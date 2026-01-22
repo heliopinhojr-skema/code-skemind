@@ -274,6 +274,11 @@ export function SkemaLobby({
                   <Calendar className="w-3 h-3" />
                   <span>Ano {skemaYear} • Dia {skemaDay}</span>
                 </div>
+                {player.invitedByName && (
+                  <div className="text-xs text-purple-300 mt-0.5">
+                    🔗 Convidado por <span className="font-medium">{player.invitedByName}</span>
+                  </div>
+                )}
               </div>
             </div>
             
