@@ -1,25 +1,30 @@
 /**
  * Tournament - Página principal do modo torneio
+ * 
+ * Cada jogador (humano + bots) joga com seu próprio código secreto.
+ * Ranking baseado em: vitória > tentativas > score > tempo
  */
 
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useTournament } from '@/hooks/useTournament';
-import { useGame } from '@/hooks/useGame';
+import { useGame, UI_SYMBOLS } from '@/hooks/useGame';
 import { TournamentLobby } from '@/components/tournament/TournamentLobby';
 import { TournamentLeaderboard } from '@/components/tournament/TournamentLeaderboard';
 import { StatsBar } from '@/components/game/StatsBar';
 import { GameBoard } from '@/components/game/GameBoard';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Trophy, Coins } from 'lucide-react';
+import { ArrowLeft, Trophy, Coins, Eye } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Symbol } from '@/components/game/Symbol';
 
 export default function Tournament() {
   const tournament = useTournament();
   const game = useGame();
   
-  // Sincroniza resultado do jogo com torneio
-  const handleGameEnd = useCallback(() => {
-    if (game.state.status === 'won' || game.state.status === 'lost') {
+  // Quando o jogo termina, atualiza resultado no torneio
+  useEffect(() => {
+    if (tournament.state.status === 'playing' && 
+        (game.state.status === 'won' || game.state.status === 'lost')) {
       tournament.actions.updateHumanResult(
         game.state.status,
         game.state.attempts,
@@ -28,18 +33,18 @@ export default function Tournament() {
       );
       tournament.actions.finishTournament();
     }
-  }, [game.state, tournament.actions]);
+  }, [game.state.status, game.state.attempts, game.state.score, game.state.timeRemaining, tournament.state.status, tournament.actions]);
   
-  // Inicia torneio e jogo juntos
+  // Inicia torneio - passa código secreto do humano para o jogo
   const handleStartTournament = useCallback(() => {
     const result = tournament.actions.startTournament();
-    if (result.success) {
-      game.actions.startGame();
+    if (result.success && result.humanSecretCode) {
+      // Inicia jogo com o código secreto gerado pelo torneio
+      game.actions.startGameWithSecret(result.humanSecretCode);
     }
     return result;
   }, [tournament.actions, game.actions]);
   
-  // Volta ao lobby
   const handleReturnToLobby = useCallback(() => {
     tournament.actions.returnToLobby();
     game.actions.newGame();
@@ -58,13 +63,15 @@ export default function Tournament() {
     );
   }
   
-  // Torneio em andamento ou finalizado
   const isFinished = tournament.state.status === 'finished';
   const humanResult = tournament.state.results.get(tournament.state.humanPlayerId);
   const didWinPrize = isFinished && humanResult && humanResult.rank <= 4;
   const prizeAmount = didWinPrize 
     ? Math.floor(tournament.state.prizePool * [0.5, 0.25, 0.15, 0.1][humanResult!.rank - 1])
     : 0;
+  
+  // Mapa de símbolos para exibição
+  const symbolsById = new Map(UI_SYMBOLS.map(s => [s.id, s]));
   
   return (
     <div className="min-h-screen flex flex-col">
@@ -89,7 +96,7 @@ export default function Tournament() {
       />
       
       <main className="flex-1 overflow-hidden p-3">
-        <div className="h-full grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-3 max-w-5xl mx-auto">
+        <div className="h-full grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-3 max-w-6xl mx-auto">
           {/* Área do jogo */}
           <div className="overflow-y-auto">
             {isFinished ? (
@@ -113,6 +120,24 @@ export default function Tournament() {
                     ? `Você quebrou o código em ${humanResult.attempts} tentativas!`
                     : 'Não foi dessa vez, tente novamente!'}
                 </p>
+                
+                {/* Mostra seu código secreto */}
+                <div className="mb-4 p-3 bg-muted/30 rounded-lg border">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                    <Eye className="w-4 h-4" />
+                    <span>Seu código era:</span>
+                  </div>
+                  <div className="flex gap-2 justify-center">
+                    {tournament.state.humanSecretCode.map((id, i) => {
+                      const symbol = symbolsById.get(id);
+                      return symbol ? (
+                        <div key={i} className="w-10 h-10 rounded-lg bg-background border flex items-center justify-center">
+                          <Symbol symbol={symbol} size="sm" />
+                        </div>
+                      ) : null;
+                    })}
+                  </div>
+                </div>
                 
                 {didWinPrize && (
                   <motion.div
@@ -146,11 +171,7 @@ export default function Tournament() {
                 symbols={game.constants.SYMBOLS}
                 onSelectSymbol={game.actions.selectSymbol}
                 onClearSlot={game.actions.clearSlot}
-                onSubmit={() => {
-                  game.actions.submit();
-                  // Verifica se jogo terminou após submit
-                  setTimeout(handleGameEnd, 100);
-                }}
+                onSubmit={game.actions.submit}
                 onNewGame={handleReturnToLobby}
                 onStartGame={game.actions.startGame}
               />
@@ -164,18 +185,20 @@ export default function Tournament() {
               results={tournament.state.results}
               humanPlayerId={tournament.state.humanPlayerId}
               isFinished={isFinished}
+              symbolsById={symbolsById}
             />
           </div>
         </div>
       </main>
       
-      {/* Leaderboard mobile (compacto, fixo no bottom) */}
+      {/* Leaderboard mobile */}
       <div className="lg:hidden border-t bg-card p-3">
         <TournamentLeaderboard
           players={tournament.state.players}
           results={tournament.state.results}
           humanPlayerId={tournament.state.humanPlayerId}
           isFinished={isFinished}
+          symbolsById={symbolsById}
         />
       </div>
     </div>

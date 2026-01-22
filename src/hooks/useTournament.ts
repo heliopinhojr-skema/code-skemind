@@ -2,13 +2,13 @@
  * useTournament - Hook para gerenciar torneio de 10 jogadores
  * 
  * - 1 jogador real + 9 bots IQ80
- * - Todos jogam o mesmo código secreto
- * - Ranking por: vitória > pontuação > tempo
+ * - CADA jogador tem seu próprio código secreto
+ * - Ranking por: vitória > tentativas > score > tempo
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { generateSecret, CODE_LENGTH, MAX_ATTEMPTS, SYMBOLS } from '@/lib/mastermindEngine';
-import { createBot, simulateBotGame, BotPlayer, BotGameState } from '@/lib/botAI';
+import { generateSecret, CODE_LENGTH, MAX_ATTEMPTS } from '@/lib/mastermindEngine';
+import { createBot, simulateBotGame } from '@/lib/botAI';
 import { UI_SYMBOLS, GAME_DURATION } from './useGame';
 
 // ==================== TIPOS ====================
@@ -19,6 +19,7 @@ export interface TournamentPlayer {
   avatar: string;
   isBot: boolean;
   iq?: number;
+  secretCode?: string[]; // Cada jogador tem seu próprio código
 }
 
 export interface TournamentResult {
@@ -28,29 +29,19 @@ export interface TournamentResult {
   attempts: number;
   score: number;
   finishTime?: number;
+  secretCode?: string[]; // Revela no fim
 }
 
 export type TournamentStatus = 'lobby' | 'playing' | 'finished';
 
-export interface TournamentState {
-  status: TournamentStatus;
-  players: TournamentPlayer[];
-  results: Map<string, TournamentResult>;
-  secretCode: string[];
-  humanPlayerId: string;
-  entryFee: number;
-  prizePool: number;
-}
-
 // ==================== CONSTANTES ====================
 
-export const INITIAL_CREDITS = 1000; // K$ inicial
-export const TOURNAMENT_ENTRY_FEE = 100; // Taxa de entrada
+export const INITIAL_CREDITS = 1000;
+export const TOURNAMENT_ENTRY_FEE = 100;
 export const TOURNAMENT_PLAYERS = 10;
 export const BOT_COUNT = 9;
 
-// Prêmios por colocação (% do prize pool)
-const PRIZE_DISTRIBUTION = [0.5, 0.25, 0.15, 0.1]; // 1º: 50%, 2º: 25%, 3º: 15%, 4º: 10%
+const PRIZE_DISTRIBUTION = [0.5, 0.25, 0.15, 0.1];
 
 // ==================== HOOK ====================
 
@@ -58,9 +49,9 @@ export function useTournament() {
   const [status, setStatus] = useState<TournamentStatus>('lobby');
   const [players, setPlayers] = useState<TournamentPlayer[]>([]);
   const [results, setResults] = useState<Map<string, TournamentResult>>(new Map());
-  const [secretCode, setSecretCode] = useState<string[]>([]);
   const [credits, setCredits] = useState(INITIAL_CREDITS);
   const [humanPlayerId] = useState(`human-${Date.now()}`);
+  const [humanSecretCode, setHumanSecretCode] = useState<string[]>([]);
   
   const botSimulationRef = useRef<TournamentResult[]>([]);
   const revealIntervalRef = useRef<number | null>(null);
@@ -88,43 +79,47 @@ export function useTournament() {
     setPlayers([humanPlayer, ...bots]);
     setStatus('lobby');
     setResults(new Map());
+    setHumanSecretCode([]);
   }, [humanPlayerId]);
   
-  // Inicializa no mount
   useEffect(() => {
     initializeLobby();
   }, [initializeLobby]);
   
-  // Inicia torneio
+  // Inicia torneio - CADA jogador recebe código secreto único
   const startTournament = useCallback(() => {
     if (credits < TOURNAMENT_ENTRY_FEE) {
       return { success: false, error: 'Créditos insuficientes' };
     }
     
-    // Deduz taxa de entrada
     setCredits(prev => prev - TOURNAMENT_ENTRY_FEE);
     
-    // Gera código secreto único para todos
-    const secret = generateSecret(UI_SYMBOLS.map(s => s.id));
-    setSecretCode(secret);
+    const symbolIds = UI_SYMBOLS.map(s => s.id);
+    
+    // Gera código secreto ÚNICO para o humano
+    const humanSecret = generateSecret(symbolIds);
+    setHumanSecretCode(humanSecret);
     
     // Inicializa resultados
     const initialResults = new Map<string, TournamentResult>();
-    players.forEach(p => {
-      initialResults.set(p.id, {
-        playerId: p.id,
-        rank: 0,
-        status: p.isBot ? 'waiting' : 'playing',
-        attempts: 0,
-        score: 0,
-      });
-    });
-    setResults(initialResults);
     
-    // Simula partidas dos bots (pré-calcula, revela gradualmente)
+    // Resultado inicial do humano
+    initialResults.set(humanPlayerId, {
+      playerId: humanPlayerId,
+      rank: 0,
+      status: 'playing',
+      attempts: 0,
+      score: 0,
+      secretCode: humanSecret,
+    });
+    
+    // Simula CADA bot com seu próprio código secreto
     const botPlayers = players.filter(p => p.isBot);
     const botResults: TournamentResult[] = botPlayers.map(bot => {
-      const gameResult = simulateBotGame(secret, UI_SYMBOLS, MAX_ATTEMPTS, GAME_DURATION);
+      // Cada bot recebe um código secreto DIFERENTE
+      const botSecret = generateSecret(symbolIds);
+      const gameResult = simulateBotGame(botSecret, UI_SYMBOLS, MAX_ATTEMPTS, GAME_DURATION);
+      
       return {
         playerId: bot.id,
         rank: 0,
@@ -132,10 +127,32 @@ export function useTournament() {
         attempts: gameResult.attempts,
         score: gameResult.score,
         finishTime: gameResult.finishTime,
+        secretCode: botSecret,
       };
     });
     
+    // Ordena bots por tempo de conclusão (quem terminou primeiro aparece primeiro)
+    botResults.sort((a, b) => {
+      if (a.status === 'won' && b.status !== 'won') return -1;
+      if (b.status === 'won' && a.status !== 'won') return 1;
+      // Por tempo restante (menos tempo = terminou depois, então mostra primeiro quem tem mais tempo restante)
+      return (b.finishTime || 0) - (a.finishTime || 0);
+    });
+    
     botSimulationRef.current = botResults;
+    
+    // Inicializa bots como "waiting"
+    botPlayers.forEach(bot => {
+      initialResults.set(bot.id, {
+        playerId: bot.id,
+        rank: 0,
+        status: 'waiting',
+        attempts: 0,
+        score: 0,
+      });
+    });
+    
+    setResults(initialResults);
     
     // Revela resultados dos bots gradualmente
     let revealIndex = 0;
@@ -155,11 +172,11 @@ export function useTournament() {
       });
       
       revealIndex++;
-    }, 2000 + Math.random() * 3000); // 2-5s entre revelações
+    }, 2000 + Math.random() * 2000);
     
     setStatus('playing');
-    return { success: true };
-  }, [credits, players]);
+    return { success: true, humanSecretCode: humanSecret };
+  }, [credits, players, humanPlayerId]);
   
   // Atualiza resultado do jogador humano
   const updateHumanResult = useCallback((
@@ -170,6 +187,7 @@ export function useTournament() {
   ) => {
     setResults(prev => {
       const next = new Map(prev);
+      const existing = prev.get(humanPlayerId);
       next.set(humanPlayerId, {
         playerId: humanPlayerId,
         rank: 0,
@@ -177,10 +195,11 @@ export function useTournament() {
         attempts,
         score,
         finishTime: timeRemaining,
+        secretCode: existing?.secretCode || humanSecretCode,
       });
       return next;
     });
-  }, [humanPlayerId]);
+  }, [humanPlayerId, humanSecretCode]);
   
   // Finaliza torneio e calcula ranking
   const finishTournament = useCallback(() => {
@@ -202,11 +221,16 @@ export function useTournament() {
       const next = new Map(prev);
       const allResults = Array.from(next.values());
       
-      // Ordena: vencedores primeiro, depois por score, depois por tempo
+      // Ordena: vencedores primeiro, depois por menos tentativas, depois por score, depois por tempo
       allResults.sort((a, b) => {
         // Vencedores primeiro
         if (a.status === 'won' && b.status !== 'won') return -1;
         if (b.status === 'won' && a.status !== 'won') return 1;
+        
+        // Se ambos venceram: menos tentativas = melhor
+        if (a.status === 'won' && b.status === 'won') {
+          if (a.attempts !== b.attempts) return a.attempts - b.attempts;
+        }
         
         // Por score (maior melhor)
         if (a.score !== b.score) return b.score - a.score;
@@ -215,7 +239,6 @@ export function useTournament() {
         return (b.finishTime || 0) - (a.finishTime || 0);
       });
       
-      // Atribui ranks
       allResults.forEach((result, index) => {
         result.rank = index + 1;
         next.set(result.playerId, result);
@@ -224,12 +247,10 @@ export function useTournament() {
       return next;
     });
     
-    // Calcula prêmio
     const prizePool = TOURNAMENT_ENTRY_FEE * TOURNAMENT_PLAYERS;
     
     setStatus('finished');
     
-    // Pega resultado do humano e calcula prêmio
     setTimeout(() => {
       setResults(prev => {
         const humanResult = prev.get(humanPlayerId);
@@ -242,12 +263,10 @@ export function useTournament() {
     }, 500);
   }, [humanPlayerId]);
   
-  // Volta ao lobby
   const returnToLobby = useCallback(() => {
     initializeLobby();
   }, [initializeLobby]);
   
-  // Cleanup
   useEffect(() => {
     return () => {
       if (revealIntervalRef.current) {
@@ -261,7 +280,7 @@ export function useTournament() {
       status,
       players,
       results,
-      secretCode,
+      humanSecretCode,
       credits,
       humanPlayerId,
       entryFee: TOURNAMENT_ENTRY_FEE,
