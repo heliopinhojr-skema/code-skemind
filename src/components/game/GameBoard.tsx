@@ -34,7 +34,7 @@ export function GameBoard({
 }: GameBoardProps) {
   const [copied, setCopied] = useState(false);
   const [showAuditDetails, setShowAuditDetails] = useState(false);
-  const [showLastGuessInspector, setShowLastGuessInspector] = useState(false);
+  
 
   const safeGuess = Array.isArray(state.currentGuess) ? state.currentGuess : [];
   const safeSecret = Array.isArray(secretCode) ? secretCode : [];
@@ -292,23 +292,8 @@ export function GameBoard({
             Enviar Palpite
           </Button>
 
-          {safeHistory.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex justify-center">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowLastGuessInspector(v => !v)}
-                >
-                  {showLastGuessInspector ? 'Ocultar análise do último palpite' : 'Mostrar análise do último palpite'}
-                </Button>
-              </div>
-
-              {showLastGuessInspector && lastAttempt && (
-                <LastGuessInspector secretIds={secretIds} attempt={lastAttempt} symbols={safeSymbols} />
-              )}
-            </div>
+          {lastAttempt && (
+            <LastGuessInspector secretIds={secretIds} attempt={lastAttempt} symbols={safeSymbols} />
           )}
         </>
       )}
