@@ -282,6 +282,12 @@ export function useGame() {
       // Adiciona pontos da tentativa
       setScore(prev => prev + attemptPoints);
 
+      // Verifica se atingiu limite de tentativas (8)
+      if (nextHistory.length >= MAX_ATTEMPTS) {
+        setStatus('lost');
+        return;
+      }
+
       // Próxima tentativa
       const cleared: GuessSlot[] = [null, null, null, null];
       currentGuessRef.current = cleared;
