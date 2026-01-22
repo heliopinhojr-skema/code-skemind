@@ -4,21 +4,24 @@
  * Mostra:
  * - Saldo de K$
  * - Lista de jogadores (1 humano + 9 bots)
- * - Botão para iniciar torneio
+ * - Countdown de 10s antes de iniciar
  */
 
-import { motion } from 'framer-motion';
+import { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Users, Trophy, Coins, Play, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { TournamentPlayer, TOURNAMENT_ENTRY_FEE } from '@/hooks/useTournament';
+import { TournamentPlayer } from '@/hooks/useTournament';
 
 interface TournamentLobbyProps {
   players: TournamentPlayer[];
   credits: number;
   entryFee: number;
   prizePool: number;
-  onStart: () => { success: boolean; error?: string };
+  onStart: () => { success: boolean; error?: string; humanSecretCode?: string[] };
 }
+
+const COUNTDOWN_SECONDS = 10;
 
 export function TournamentLobby({
   players,
@@ -28,14 +31,43 @@ export function TournamentLobby({
   onStart,
 }: TournamentLobbyProps) {
   const canAfford = credits >= entryFee;
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
   
-  const handleStart = () => {
-    const result = onStart();
-    if (!result.success && result.error) {
-      // TODO: mostrar toast de erro
-      console.error(result.error);
+  // Inicia countdown
+  const handleStartCountdown = useCallback(() => {
+    if (!canAfford || isStarting) return;
+    setIsStarting(true);
+    setCountdown(COUNTDOWN_SECONDS);
+  }, [canAfford, isStarting]);
+  
+  // Cancela countdown
+  const handleCancelCountdown = useCallback(() => {
+    setIsStarting(false);
+    setCountdown(null);
+  }, []);
+  
+  // Timer do countdown
+  useEffect(() => {
+    if (countdown === null || countdown < 0) return;
+    
+    if (countdown === 0) {
+      // Countdown terminou - inicia o torneio
+      const result = onStart();
+      if (!result.success && result.error) {
+        console.error(result.error);
+        setIsStarting(false);
+        setCountdown(null);
+      }
+      return;
     }
-  };
+    
+    const timer = setTimeout(() => {
+      setCountdown(prev => (prev !== null ? prev - 1 : null));
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, [countdown, onStart]);
   
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 p-4">
@@ -55,6 +87,60 @@ export function TournamentLobby({
           <span className="font-bold text-lg">{credits.toLocaleString()} K$</span>
         </div>
       </motion.div>
+      
+      {/* Countdown overlay */}
+      <AnimatePresence>
+        {isStarting && countdown !== null && countdown > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-background/90 backdrop-blur-sm flex flex-col items-center justify-center"
+          >
+            <motion.div
+              key={countdown}
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 1.5, opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="text-center"
+            >
+              <div className="text-8xl font-black text-primary mb-4 tabular-nums">
+                {countdown}
+              </div>
+              <div className="text-xl text-muted-foreground mb-8">
+                Preparando torneio...
+              </div>
+            </motion.div>
+            
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <Button
+                variant="outline"
+                onClick={handleCancelCountdown}
+                className="text-muted-foreground"
+              >
+                Cancelar
+              </Button>
+            </motion.div>
+            
+            {/* Progress bar */}
+            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-64">
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-primary"
+                  initial={{ width: '100%' }}
+                  animate={{ width: '0%' }}
+                  transition={{ duration: COUNTDOWN_SECONDS, ease: 'linear' }}
+                />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       
       {/* Info do torneio */}
       <motion.div
@@ -145,8 +231,8 @@ export function TournamentLobby({
         transition={{ delay: 0.5 }}
       >
         <Button
-          onClick={handleStart}
-          disabled={!canAfford}
+          onClick={handleStartCountdown}
+          disabled={!canAfford || isStarting}
           className="w-full h-14 text-lg font-bold bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
         >
           <Play className="w-6 h-6 mr-2" />
