@@ -71,37 +71,59 @@ export function evaluateGuess(
 
   let whites = 0;
 
-  // Resto após remover brancos
-  const secretRemainder: string[] = [];
-  const guessRemainder: string[] = [];
+  // Arrays para debug
+  const whitePositions: number[] = [];
+  const grayMatches: { guessPos: number; secretPos: number; symbol: string }[] = [];
 
-  // PASSO 1 — BRANCOS (somente quando ambos são strings válidas)
+  // Resto após remover brancos
+  const secretRemainder: { symbol: string; originalPos: number }[] = [];
+  const guessRemainder: { symbol: string; originalPos: number }[] = [];
+
+  // PASSO 1 — BRANCOS (posição exata)
+  console.log('--- PASSO 1: BRANCOS (posição exata) ---');
   for (let i = 0; i < CODE_LENGTH; i++) {
     const s = secretCopy[i];
     const g = guessCopy[i];
 
+    console.log(`  Pos ${i}: secret="${s}" vs guess="${g}" → ${s === g ? '⚪ BRANCO' : '❌ não'}`);
+
     if (typeof s === 'string' && typeof g === 'string' && g === s) {
       whites++;
+      whitePositions.push(i);
       continue;
     }
 
-    // remove da comparação: só entra nos 'restantes'
-    if (typeof s === 'string') secretRemainder.push(s);
-    if (typeof g === 'string') guessRemainder.push(g);
+    // Não é match exato: guarda para passo 2
+    if (typeof s === 'string') secretRemainder.push({ symbol: s, originalPos: i });
+    if (typeof g === 'string') guessRemainder.push({ symbol: g, originalPos: i });
   }
+  console.log(`  → Total BRANCOS: ${whites} (posições: ${whitePositions.join(', ')})`);
 
-  // PASSO 2 — CINZAS
-  // Para cada símbolo restante no guess, procura 1 ocorrência no secret restante
-  // e remove para garantir que nunca conta duas vezes.
+  // PASSO 2 — CINZAS (símbolo certo, posição errada)
+  console.log('--- PASSO 2: PRETOS (símbolo certo, posição errada) ---');
+  console.log(`  Restantes no segredo: ${secretRemainder.map(x => `${x.symbol}@${x.originalPos}`).join(', ')}`);
+  console.log(`  Restantes no palpite: ${guessRemainder.map(x => `${x.symbol}@${x.originalPos}`).join(', ')}`);
+
   let grays = 0;
   const secretBag = [...secretRemainder];
+  
   for (const g of guessRemainder) {
-    const idx = secretBag.indexOf(g);
+    const idx = secretBag.findIndex(s => s.symbol === g.symbol);
     if (idx !== -1) {
       grays++;
+      grayMatches.push({ 
+        guessPos: g.originalPos, 
+        secretPos: secretBag[idx].originalPos, 
+        symbol: g.symbol 
+      });
+      console.log(`  ⚫ PRETO: "${g.symbol}" (palpite pos ${g.originalPos}) existe no segredo pos ${secretBag[idx].originalPos}`);
       secretBag.splice(idx, 1);
+    } else {
+      console.log(`  ❌ "${g.symbol}" (palpite pos ${g.originalPos}) NÃO existe no segredo restante`);
     }
   }
+  console.log(`  → Total PRETOS: ${grays}`);
+  console.log(`  → RESULTADO FINAL: ⚪${whites} ⚫${grays}`);
 
   return { whites, grays };
 }
