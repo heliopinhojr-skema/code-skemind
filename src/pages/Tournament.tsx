@@ -74,14 +74,14 @@ export default function Tournament() {
   const symbolsById = new Map(UI_SYMBOLS.map(s => [s.id, s]));
   
   return (
-    <div className="min-h-screen relative overflow-hidden">
+    <div className="min-h-screen relative">
       {/* Persistent cosmic background */}
       <CosmicBackground />
       
-      {/* Main content */}
-      <div className="relative z-10 min-h-screen flex flex-col">
+      {/* Main content - scrollable */}
+      <div className="relative z-10 min-h-screen">
         {/* Header com saldo */}
-        <div className="bg-black/30 backdrop-blur-sm border-b border-white/10 px-4 py-2 flex items-center justify-between">
+        <div className="sticky top-0 z-20 bg-black/50 backdrop-blur-md border-b border-white/10 px-4 py-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Trophy className="w-5 h-5 text-yellow-500" />
             <span className="font-bold text-white">Torneio</span>
@@ -100,10 +100,10 @@ export default function Tournament() {
           timeRemaining={game.state.timeRemaining}
         />
         
-        <main className="flex-1 overflow-hidden p-3">
-          <div className="h-full grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-3 max-w-6xl mx-auto">
+        <main className="p-3 pb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-3 max-w-6xl mx-auto">
           {/* Área do jogo */}
-          <div className="overflow-y-auto">
+          <div>
             {isFinished && humanResult ? (
               <div className="space-y-4">
                 <RaceSummary
@@ -139,8 +139,8 @@ export default function Tournament() {
             )}
           </div>
           
-          {/* Leaderboard lateral */}
-          <div className="hidden lg:block overflow-y-auto">
+          {/* Leaderboard lateral desktop */}
+          <div className="hidden lg:block">
             <TournamentLeaderboard
               players={tournament.state.players}
               results={tournament.state.results}
@@ -150,10 +150,9 @@ export default function Tournament() {
             />
           </div>
         </div>
-      </main>
-      
+        
         {/* Leaderboard mobile */}
-        <div className="lg:hidden border-t border-white/10 bg-black/30 backdrop-blur-sm p-3">
+        <div className="lg:hidden mt-4 border-t border-white/10 bg-black/30 backdrop-blur-sm p-3 rounded-t-xl">
           <TournamentLeaderboard
             players={tournament.state.players}
             results={tournament.state.results}
@@ -162,6 +161,7 @@ export default function Tournament() {
             symbolsById={symbolsById}
           />
         </div>
+        </main>
       </div>
     </div>
   );
