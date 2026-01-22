@@ -20,13 +20,14 @@ import universeBg from '@/assets/universe-bg.jpg';
 interface RegistrationScreenProps {
   onRegister: (name: string, inviteCode: string, emoji: string) => { success: boolean; error?: string };
   validateCode: (code: string) => { valid: boolean; inviterId: string | null };
+  initialInviteCode?: string;
 }
 
 const AVAILABLE_EMOJIS = ['🎮', '🚀', '⚡', '🔥', '💎', '🌟', '🎯', '👾', '🤖', '🧠', '💜', '🎲'];
 
-export function RegistrationScreen({ onRegister, validateCode }: RegistrationScreenProps) {
+export function RegistrationScreen({ onRegister, validateCode, initialInviteCode = '' }: RegistrationScreenProps) {
   const [step, setStep] = useState<'invite' | 'profile'>('invite');
-  const [inviteCode, setInviteCode] = useState('');
+  const [inviteCode, setInviteCode] = useState(initialInviteCode);
   const [name, setName] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState('🎮');
   const [error, setError] = useState<string | null>(null);
