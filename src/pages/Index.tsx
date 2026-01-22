@@ -10,7 +10,13 @@ const Index = () => {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-      <StatsBar attempts={state.attempts} maxAttempts={constants.MAX_ATTEMPTS} gameStatus={state.status} />
+      <StatsBar 
+        attempts={state.attempts} 
+        maxAttempts={constants.MAX_ATTEMPTS} 
+        gameStatus={state.status}
+        score={state.score}
+        timeRemaining={state.timeRemaining}
+      />
 
       <main className="flex-1 overflow-hidden px-3 py-3">
         <div className="h-full grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-3 max-w-4xl mx-auto">
