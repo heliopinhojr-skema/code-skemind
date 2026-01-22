@@ -54,7 +54,12 @@ export function HistoryLog({ history }: HistoryLogProps) {
                 })}
               </div>
 
-              <FeedbackPegs correctPosition={whites} correctSymbol={grays} attemptId={attempt.id} />
+              <div className="flex items-center gap-2">
+                <FeedbackPegs correctPosition={whites} correctSymbol={grays} attemptId={attempt.id} />
+                <span className="text-xs text-muted-foreground font-mono">
+                  ⚪{whites} ⚫{grays}
+                </span>
+              </div>
             </motion.div>
           );
         })}
