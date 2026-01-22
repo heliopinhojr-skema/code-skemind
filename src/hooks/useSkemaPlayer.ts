@@ -19,6 +19,7 @@ export interface SkemaPlayer {
   emoji: string;
   inviteCode: string;
   invitedBy: string | null;
+  invitedByName?: string | null; // Nome de quem convidou (ancestralidade)
   registeredAt: string;
   energy: number;
   lastRefillDate: string;
@@ -40,6 +41,7 @@ export interface InvitedPlayer {
 
 const STORAGE_KEY = 'skema_player';
 const INVITES_KEY = 'skema_invites';
+const CODE_REGISTRY_KEY = 'skema_code_registry'; // Mapeia códigos -> jogadores
 const INITIAL_ENERGY = 10;
 const REFERRAL_REWARD = 10;
 const MAX_REFERRAL_REWARDS = 10;
@@ -85,10 +87,17 @@ function getTodayDateString(): string {
 
 // ==================== HOOK ====================
 
+// Registro global de códigos → { name, id }
+interface CodeRegistryEntry {
+  id: string;
+  name: string;
+}
+
 export function useSkemaPlayer() {
   const [player, setPlayer] = useState<SkemaPlayer | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [allInvites, setAllInvites] = useState<Record<string, InvitedPlayer>>({});
+  const [codeRegistry, setCodeRegistry] = useState<Record<string, CodeRegistryEntry>>({});
 
   // Carrega do localStorage
   useEffect(() => {
@@ -112,6 +121,11 @@ export function useSkemaPlayer() {
       if (storedInvites) {
         setAllInvites(JSON.parse(storedInvites));
       }
+
+      const storedRegistry = localStorage.getItem(CODE_REGISTRY_KEY);
+      if (storedRegistry) {
+        setCodeRegistry(JSON.parse(storedRegistry));
+      }
     } catch (e) {
       console.error('Erro ao carregar jogador:', e);
     }
@@ -124,43 +138,27 @@ export function useSkemaPlayer() {
     setPlayer(updated);
   }, []);
 
-  // Valida código de convite
-  const validateInviteCode = useCallback((code: string): { valid: boolean; inviterId: string | null } => {
+  // Valida código de convite - busca no registro global
+  const validateInviteCode = useCallback((code: string): { valid: boolean; inviterId: string | null; inviterName?: string } => {
     const upperCode = code.toUpperCase().trim();
     
     // Master codes
     if (MASTER_INVITE_CODES.includes(upperCode)) {
-      return { valid: true, inviterId: null };
+      return { valid: true, inviterId: null, inviterName: 'SKEMA' };
     }
     
-    // Procura nos jogadores registrados
-    const storedInvites = localStorage.getItem(INVITES_KEY);
-    if (storedInvites) {
-      const invites = JSON.parse(storedInvites) as Record<string, InvitedPlayer>;
-      for (const [playerId, data] of Object.entries(invites)) {
-        // Verifica se o código pertence a algum jogador
-        const storedPlayer = localStorage.getItem(`${STORAGE_KEY}_${playerId}`);
-        if (storedPlayer) {
-          const p = JSON.parse(storedPlayer) as SkemaPlayer;
-          if (p.inviteCode === upperCode) {
-            return { valid: true, inviterId: playerId };
-          }
-        }
+    // Busca no registro global de códigos
+    const storedRegistry = localStorage.getItem(CODE_REGISTRY_KEY);
+    if (storedRegistry) {
+      const registry = JSON.parse(storedRegistry) as Record<string, CodeRegistryEntry>;
+      if (registry[upperCode]) {
+        return { valid: true, inviterId: registry[upperCode].id, inviterName: registry[upperCode].name };
       }
     }
     
-    // Verifica jogador atual
-    const currentPlayer = localStorage.getItem(STORAGE_KEY);
-    if (currentPlayer) {
-      const p = JSON.parse(currentPlayer) as SkemaPlayer;
-      if (p.inviteCode === upperCode) {
-        return { valid: true, inviterId: p.id };
-      }
-    }
-    
-    // Para demo: aceita qualquer código SK
+    // Para demo: aceita qualquer código SK (como código "órfão")
     if (upperCode.startsWith('SK') && upperCode.length >= 6) {
-      return { valid: true, inviterId: null };
+      return { valid: true, inviterId: null, inviterName: undefined };
     }
     
     return { valid: false, inviterId: null };
@@ -181,13 +179,16 @@ export function useSkemaPlayer() {
     if (trimmedName.length > 15) {
       return { success: false, error: 'Nome deve ter no máximo 15 caracteres' };
     }
+
+    const newInviteCode = generateInviteCode();
     
     const newPlayer: SkemaPlayer = {
       id: generatePlayerId(),
       name: trimmedName,
       emoji,
-      inviteCode: generateInviteCode(),
+      inviteCode: newInviteCode,
       invitedBy: validation.inviterId,
+      invitedByName: validation.inviterName || null, // Guarda nome de quem convidou
       registeredAt: new Date().toISOString(),
       energy: INITIAL_ENERGY,
       lastRefillDate: getTodayDateString(),
@@ -201,6 +202,12 @@ export function useSkemaPlayer() {
     
     savePlayer(newPlayer);
     
+    // Registra o código deste jogador no registro global
+    const updatedRegistry = { ...codeRegistry };
+    updatedRegistry[newInviteCode] = { id: newPlayer.id, name: newPlayer.name };
+    localStorage.setItem(CODE_REGISTRY_KEY, JSON.stringify(updatedRegistry));
+    setCodeRegistry(updatedRegistry);
+    
     // Registra quem convidou (para dar reward)
     if (validation.inviterId) {
       const invites = { ...allInvites };
@@ -211,12 +218,10 @@ export function useSkemaPlayer() {
       };
       localStorage.setItem(INVITES_KEY, JSON.stringify(invites));
       setAllInvites(invites);
-      
-      // TODO: Em um sistema real, daria +k$10 ao invitador
     }
     
     return { success: true };
-  }, [validateInviteCode, savePlayer, allInvites]);
+  }, [validateInviteCode, savePlayer, allInvites, codeRegistry]);
 
   // Atualiza energia
   const updateEnergy = useCallback((amount: number) => {
