@@ -6,6 +6,7 @@ import { GuessSlots } from './GuessSlots';
 import { HistoryLog } from './HistoryLog';
 import { Symbol } from './Symbol';
 import { AttemptAuditPanel } from './AttemptAuditPanel';
+import { LastGuessInspector } from './LastGuessInspector';
 import { Button } from '@/components/ui/button';
 import type { GameState, GameSymbol, AttemptResult } from '@/hooks/useGame';
 import { MAX_ATTEMPTS } from '@/hooks/useGame';
@@ -33,6 +34,7 @@ export function GameBoard({
 }: GameBoardProps) {
   const [copied, setCopied] = useState(false);
   const [showAuditDetails, setShowAuditDetails] = useState(false);
+  const [showLastGuessInspector, setShowLastGuessInspector] = useState(false);
 
   const safeGuess = Array.isArray(state.currentGuess) ? state.currentGuess : [];
   const safeSecret = Array.isArray(secretCode) ? secretCode : [];
@@ -73,6 +75,7 @@ export function GameBoard({
   const secretIds = useMemo(() => safeSecret.map(s => s.id), [safeSecret]);
 
   const historyChronological = useMemo(() => safeHistory.slice().reverse(), [safeHistory]);
+  const lastAttempt = safeHistory[0];
 
   const audit = useMemo(() => {
     if (!isGameOver) return null;
@@ -288,6 +291,25 @@ export function GameBoard({
           >
             Enviar Palpite
           </Button>
+
+          {safeHistory.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex justify-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowLastGuessInspector(v => !v)}
+                >
+                  {showLastGuessInspector ? 'Ocultar análise do último palpite' : 'Mostrar análise do último palpite'}
+                </Button>
+              </div>
+
+              {showLastGuessInspector && lastAttempt && (
+                <LastGuessInspector secretIds={secretIds} attempt={lastAttempt} symbols={safeSymbols} />
+              )}
+            </div>
+          )}
         </>
       )}
 
