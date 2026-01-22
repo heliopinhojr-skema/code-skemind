@@ -113,6 +113,7 @@ export function TournamentLobby({
   onStart,
 }: TournamentLobbyProps) {
   const [selectedMode, setSelectedMode] = useState<GameMode | null>(null);
+  const [enrollLabel, setEnrollLabel] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   
@@ -132,7 +133,20 @@ export function TournamentLobby({
   
   const handleSelectMode = useCallback((mode: GameMode) => {
     setSelectedMode(mode);
+    setEnrollLabel(null);
   }, []);
+
+  const handleEnrollRegistration = useCallback((reg: (typeof OPEN_REGISTRATIONS)[number]) => {
+    // Só suportamos inscrição em 9 Bots (fee 100) por enquanto (mesma mecânica do torneio atual)
+    if (reg.entryFee !== 100) return;
+
+    if (credits < reg.entryFee || isStarting) return;
+
+    setSelectedMode('arena');
+    setEnrollLabel(reg.name);
+    setIsStarting(true);
+    setCountdown(COUNTDOWN_SECONDS);
+  }, [credits, isStarting]);
   
   const handleStartCountdown = useCallback(() => {
     if (!selectedModeConfig || !canAfford || isStarting) return;
@@ -143,6 +157,7 @@ export function TournamentLobby({
   const handleCancelCountdown = useCallback(() => {
     setIsStarting(false);
     setCountdown(null);
+    setEnrollLabel(null);
   }, []);
   
   useEffect(() => {
@@ -174,18 +189,18 @@ export function TournamentLobby({
   };
   
   return (
-    <div className="min-h-screen relative overflow-hidden">
+    <div className="min-h-screen relative overflow-x-hidden">
       {/* Background do universo */}
       <div 
-        className="absolute inset-0 bg-cover bg-center"
+        className="fixed inset-0 bg-cover bg-center"
         style={{ backgroundImage: `url(${universeBg})` }}
       />
       
       {/* Overlay escuro */}
-      <div className="absolute inset-0 bg-black/70" />
+      <div className="fixed inset-0 bg-black/70" />
       
       {/* Estrelas animadas */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
         {stars.map(star => (
           <motion.div
             key={star.id}
@@ -305,6 +320,9 @@ export function TournamentLobby({
             </div>
           </div>
         </motion.header>
+
+        {/* Conteúdo rolável */}
+        <div className="flex-1 overflow-y-auto pb-28">
         
         {/* Corridas em andamento */}
         <motion.section
@@ -366,12 +384,29 @@ export function TournamentLobby({
                       <span><Timer className="w-3 h-3 inline mr-1" />Inicia em {reg.startsIn}</span>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="flex items-center gap-1 text-yellow-400">
-                      <Coins className="w-4 h-4" />
-                      <span className="font-bold">{reg.entryFee} K$</span>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <div className="flex items-center justify-end gap-1 text-yellow-400">
+                        <Coins className="w-4 h-4" />
+                        <span className="font-bold">{reg.entryFee} K$</span>
+                      </div>
+                      <div className="text-xs text-green-400 mt-1">Prêmio: {reg.prize} K$</div>
                     </div>
-                    <div className="text-xs text-green-400 mt-1">Prêmio: {reg.prize} K$</div>
+
+                    {reg.entryFee === 100 ? (
+                      <Button
+                        size="sm"
+                        onClick={() => handleEnrollRegistration(reg)}
+                        disabled={credits < reg.entryFee || isStarting}
+                        className="h-9"
+                      >
+                        Inscrever
+                      </Button>
+                    ) : (
+                      <Button size="sm" variant="secondary" disabled className="h-9">
+                        Em breve
+                      </Button>
+                    )}
                   </div>
                 </div>
               </motion.div>
@@ -517,9 +552,11 @@ export function TournamentLobby({
             </motion.section>
           )}
         </AnimatePresence>
+
+        </div>
         
         {/* Botão de iniciar */}
-        <div className="p-4 mt-auto">
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-background via-background/70 to-transparent backdrop-blur-sm">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -541,7 +578,7 @@ export function TournamentLobby({
               ) : canAfford ? (
                 <>
                   <Rocket className="w-6 h-6 mr-2" />
-                  ENTRAR {selectedModeConfig && selectedModeConfig.entryFee > 0 
+                  ENTRAR {enrollLabel ? `(${enrollLabel}) ` : ''}{selectedModeConfig && selectedModeConfig.entryFee > 0 
                     ? `(-${selectedModeConfig.entryFee} K$)` 
                     : '(Grátis)'
                   }
