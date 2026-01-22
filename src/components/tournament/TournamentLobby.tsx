@@ -83,6 +83,19 @@ const ONGOING_RACES = [
   { id: 2, name: 'Arena #43', players: 10, status: 'Iniciando', timeLeft: '0:10' },
 ];
 
+// Nomes dos bots para Arena
+const BOT_OPPONENTS = [
+  { name: 'Nova-X', avatar: '🤖', iq: 80 },
+  { name: 'Cipher', avatar: '🧠', iq: 82 },
+  { name: 'Quantum', avatar: '⚡', iq: 78 },
+  { name: 'Nexus', avatar: '🔮', iq: 85 },
+  { name: 'Axiom', avatar: '🎯', iq: 79 },
+  { name: 'Vector', avatar: '🚀', iq: 81 },
+  { name: 'Prism', avatar: '💎', iq: 77 },
+  { name: 'Helix', avatar: '🌀', iq: 83 },
+  { name: 'Zenith', avatar: '⭐', iq: 80 },
+];
+
 const COUNTDOWN_SECONDS = 10;
 
 export function TournamentLobby({
@@ -247,12 +260,12 @@ export function TournamentLobby({
           className="p-4 border-b border-white/10 backdrop-blur-sm bg-black/30"
         >
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-2xl">
-                👤
+                🔥
               </div>
               <div>
-                <h1 className="text-lg font-bold text-white">Piloto</h1>
+                <h1 className="text-lg font-bold text-white">Unstopable</h1>
                 <div className="flex items-center gap-2 text-xs text-white/60">
                   <Medal className="w-3 h-3 text-yellow-500" />
                   {playerStats.rank}
@@ -437,9 +450,20 @@ export function TournamentLobby({
                 </div>
                 
                 <div className="mt-3 pt-3 border-t border-white/10">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-white/60">Oponentes</span>
-                    <span className="text-white">9 Bots IQ80</span>
+                  <div className="text-xs text-white/60 mb-2">Seus oponentes:</div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {BOT_OPPONENTS.map((bot, i) => (
+                      <div 
+                        key={i}
+                        className="flex items-center gap-2 bg-black/30 rounded-lg px-2 py-1.5"
+                      >
+                        <span className="text-lg">{bot.avatar}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-medium text-white truncate">{bot.name}</div>
+                          <div className="text-[10px] text-white/50">IQ {bot.iq}</div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
