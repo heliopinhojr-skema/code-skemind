@@ -69,59 +69,31 @@ export function LastGuessInspector({
     recalculated.grays === stored.grays;
 
   return (
-    <div className="rounded-lg bg-muted/20 border border-border p-3 text-left">
-      <p className="text-xs font-semibold text-foreground">Análise do último palpite (por símbolo)</p>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Isto deixa explícito o que é branco (exato), preto (só presente) e ausente.
-      </p>
+    <div className="flex items-center justify-center gap-2 py-2">
+      {guessIds.map((id, i) => {
+        const symbol = symbolsById.get(id);
+        const status = slotStatuses[i] ?? 'absent';
 
-      <div className="mt-2 space-y-2">
-        {guessIds.map((id, i) => {
-          const symbol = symbolsById.get(id);
-          const status = slotStatuses[i] ?? 'absent';
-
-          return (
-            <div
-              key={`${attempt.id}-${i}-${id}`}
-              className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background/30 px-3 py-2"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-mono text-muted-foreground w-8">Pos {i + 1}</span>
-                <div className="w-6 h-6 flex items-center justify-center">
-                  {status === 'exact' ? (
-                    <span className="text-lg">⚪</span>
-                  ) : status === 'present' ? (
-                    <span className="text-lg">⚫</span>
-                  ) : (
-                    <span className="text-muted-foreground">✗</span>
-                  )}
-                </div>
-                <div className="w-8 h-8 rounded-lg bg-background/60 flex items-center justify-center">
-                  {symbol ? <Symbol symbol={symbol} size="sm" /> : null}
-                </div>
-              </div>
-
-              <span className={`text-xs font-medium ${statusClass(status)}`}>
-                {status === 'exact' ? 'posição certa!' : status === 'present' ? 'posição errada' : 'não está'}
-              </span>
+        return (
+          <div
+            key={`${attempt.id}-${i}-${id}`}
+            className="flex flex-col items-center gap-1"
+          >
+            <div className="w-10 h-10 rounded-lg bg-background/60 border border-border flex items-center justify-center">
+              {symbol ? <Symbol symbol={symbol} size="sm" /> : null}
             </div>
-          );
-        })}
-      </div>
-
-      <div className="mt-3 rounded-lg border border-border bg-background/30 px-3 py-2">
-        <p className="text-xs text-muted-foreground">
-          Feedback salvo: <span className="font-mono">⚪{stored.whites} ⚫{stored.grays}</span>
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Feedback recalculado: <span className="font-mono">{recalculated ? `⚪${recalculated.whites} ⚫${recalculated.grays}` : '—'}</span>{' '}
-          {recalculated ? (
-            <span className={matchesStored ? 'text-success' : 'text-destructive'}>
-              {matchesStored ? '✅ bate' : '❌ NÃO bate'}
-            </span>
-          ) : null}
-        </p>
-      </div>
+            <div className="w-5 h-5 flex items-center justify-center">
+              {status === 'exact' ? (
+                <span className="text-base">⚪</span>
+              ) : status === 'present' ? (
+                <span className="text-base">⚫</span>
+              ) : (
+                <span className="text-xs text-muted-foreground">✗</span>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
