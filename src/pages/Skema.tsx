@@ -33,6 +33,22 @@ export default function Skema() {
   const [currentView, setCurrentView] = useState<SkemaView>('lobby');
   const [gameMode, setGameMode] = useState<'training' | 'bots' | 'official'>('training');
   
+  // Atualiza resultado do torneio quando jogo termina
+  // MUST be before any conditional returns to follow Rules of Hooks
+  useEffect(() => {
+    if (currentView !== 'lobby' && (game.state.status === 'won' || game.state.status === 'lost')) {
+      if (gameMode === 'bots' || gameMode === 'official') {
+        tournament.actions.updateHumanResult(
+          game.state.status,
+          game.state.attempts,
+          game.state.score,
+          game.state.timeRemaining
+        );
+        tournament.actions.finishTournament();
+      }
+    }
+  }, [game.state.status, currentView, gameMode, tournament.actions]);
+  
   // Espera carregar localStorage
   if (!skemaPlayer.isLoaded) {
     return (
@@ -106,21 +122,6 @@ export default function Skema() {
     game.actions.newGame();
     tournament.actions.returnToLobby();
   };
-  
-  // Atualiza resultado do torneio quando jogo termina
-  useEffect(() => {
-    if (currentView !== 'lobby' && (game.state.status === 'won' || game.state.status === 'lost')) {
-      if (gameMode === 'bots' || gameMode === 'official') {
-        tournament.actions.updateHumanResult(
-          game.state.status,
-          game.state.attempts,
-          game.state.score,
-          game.state.timeRemaining
-        );
-        tournament.actions.finishTournament();
-      }
-    }
-  }, [game.state.status, currentView, gameMode]);
   
   // Lobby
   if (currentView === 'lobby') {
