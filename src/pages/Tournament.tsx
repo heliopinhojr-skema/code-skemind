@@ -10,12 +10,11 @@ import { useTournament } from '@/hooks/useTournament';
 import { useGame, UI_SYMBOLS } from '@/hooks/useGame';
 import { TournamentLobby } from '@/components/tournament/TournamentLobby';
 import { TournamentLeaderboard } from '@/components/tournament/TournamentLeaderboard';
+import { RaceSummary } from '@/components/tournament/RaceSummary';
 import { StatsBar } from '@/components/game/StatsBar';
 import { GameBoard } from '@/components/game/GameBoard';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Trophy, Coins, Eye } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { Symbol } from '@/components/game/Symbol';
+import { ArrowLeft, Trophy, Coins } from 'lucide-react';
 import { CosmicBackground } from '@/components/CosmicBackground';
 
 export default function Tournament() {
@@ -105,71 +104,27 @@ export default function Tournament() {
           <div className="h-full grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-3 max-w-6xl mx-auto">
           {/* Área do jogo */}
           <div className="overflow-y-auto">
-            {isFinished ? (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="flex flex-col items-center justify-center h-full text-center p-6"
-              >
-                <Trophy className={`w-20 h-20 mb-4 ${didWinPrize ? 'text-yellow-500' : 'text-muted-foreground'}`} />
-                
-                <h2 className="text-3xl font-bold mb-2">
-                  {humanResult?.rank === 1 ? '🏆 Campeão!' :
-                   humanResult?.rank === 2 ? '🥈 Vice-campeão!' :
-                   humanResult?.rank === 3 ? '🥉 Terceiro lugar!' :
-                   didWinPrize ? `${humanResult?.rank}º Lugar` :
-                   'Torneio Encerrado'}
-                </h2>
-                
-                <p className="text-muted-foreground mb-4">
-                  {humanResult?.status === 'won' 
-                    ? `Você quebrou o código em ${humanResult.attempts} tentativas!`
-                    : 'Não foi dessa vez, tente novamente!'}
-                </p>
-                
-                {/* Mostra seu código secreto */}
-                <div className="mb-4 p-3 bg-muted/30 rounded-lg border">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                    <Eye className="w-4 h-4" />
-                    <span>Seu código era:</span>
-                  </div>
-                  <div className="flex gap-2 justify-center">
-                    {tournament.state.humanSecretCode.map((id, i) => {
-                      const symbol = symbolsById.get(id);
-                      return symbol ? (
-                        <div key={i} className="w-10 h-10 rounded-lg bg-background border flex items-center justify-center">
-                          <Symbol symbol={symbol} size="sm" />
-                        </div>
-                      ) : null;
-                    })}
-                  </div>
-                </div>
-                
-                {didWinPrize && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.3, type: 'spring' }}
-                    className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 px-6 py-3 rounded-xl border border-yellow-500/30 mb-6"
-                  >
-                    <div className="text-sm text-muted-foreground">Prêmio</div>
-                    <div className="text-3xl font-bold text-yellow-500">+{prizeAmount} K$</div>
-                  </motion.div>
-                )}
-                
-                <div className="text-lg mb-6">
-                  Pontuação final: <span className="font-bold">{game.state.score.toLocaleString()}</span>
-                </div>
+            {isFinished && humanResult ? (
+              <div className="space-y-4">
+                <RaceSummary
+                  humanResult={humanResult}
+                  humanSecretCode={tournament.state.humanSecretCode}
+                  players={tournament.state.players}
+                  results={tournament.state.results}
+                  symbolsById={symbolsById}
+                  prizeAmount={prizeAmount}
+                  totalPlayers={tournament.state.players.length}
+                />
                 
                 <Button 
                   onClick={handleReturnToLobby}
                   size="lg"
-                  className="bg-gradient-to-r from-primary to-primary/80"
+                  className="w-full bg-gradient-to-r from-primary to-primary/80"
                 >
                   <ArrowLeft className="w-5 h-5 mr-2" />
                   Voltar ao Lobby
                 </Button>
-              </motion.div>
+              </div>
             ) : (
               <GameBoard
                 state={game.state}
