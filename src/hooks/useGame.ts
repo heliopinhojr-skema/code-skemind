@@ -34,9 +34,11 @@ export type GuessSlot = GameSymbol | null;
 
 export interface AttemptResult {
   id: string;
-  guess: string[];
-  whites: number;
-  grays: number;
+  guessSnapshot: readonly string[];
+  feedbackSnapshot: Readonly<{
+    whites: number;
+    grays: number;
+  }>;
 }
 
 export interface GameState {
@@ -240,12 +242,14 @@ export function useGame() {
       // Feedback
       const result = evaluateGuess(secretSnapshot, [...guessIds]);
 
-      const entry: AttemptResult = {
+      const entry: AttemptResult = Object.freeze({
         id: crypto.randomUUID(),
-        guess: [...guessIds],
-        whites: result.whites,
-        grays: result.grays,
-      };
+        guessSnapshot: Object.freeze([...guessIds]),
+        feedbackSnapshot: Object.freeze({
+          whites: result.whites,
+          grays: result.grays,
+        }),
+      });
 
       // Atualiza histórico
       const nextHistory = [entry, ...historyRef.current];
