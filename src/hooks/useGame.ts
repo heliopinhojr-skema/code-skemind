@@ -7,7 +7,7 @@
  * - Palpite: 4 símbolos únicos (bloqueia duplicados)
  * - Feedback: brancos (posição certa) + cinzas (posição errada)
  * - Vitória: 4 brancos
- * - Derrota: 8 tentativas
+ * - Derrota: tempo zera
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -44,9 +44,13 @@ export interface GameState {
   attempts: number;
   currentGuess: GuessSlot[];
   history: AttemptResult[];
+  score: number;
+  timeRemaining: number;
 }
 
-// ==================== CONSTANTES UI ====================
+// ==================== CONSTANTES ====================
+
+export const GAME_DURATION = 180; // 3 minutos em segundos
 
 export const UI_SYMBOLS: readonly GameSymbol[] = [
   { id: 'circle', color: '#E53935', shape: 'circle' },
@@ -56,6 +60,26 @@ export const UI_SYMBOLS: readonly GameSymbol[] = [
   { id: 'star', color: '#8E24AA', shape: 'star' },
   { id: 'hexagon', color: '#00BCD4', shape: 'hexagon' },
 ] as const;
+
+// Pontuação
+const POINTS = {
+  WHITE: 60,
+  GRAY: 25,
+  WIN: 1000,
+  TIME_BONUS: {
+    HIGH: 700,    // >120s
+    MEDIUM: 500,  // 60-119s
+    LOW: 300,     // 30-59s
+    MINIMAL: 100, // <30s
+  },
+} as const;
+
+function calculateTimeBonus(timeRemaining: number): number {
+  if (timeRemaining > 120) return POINTS.TIME_BONUS.HIGH;
+  if (timeRemaining >= 60) return POINTS.TIME_BONUS.MEDIUM;
+  if (timeRemaining >= 30) return POINTS.TIME_BONUS.LOW;
+  return POINTS.TIME_BONUS.MINIMAL;
+}
 
 // ==================== HOOK ====================
 
@@ -67,57 +91,61 @@ export function useGame() {
   const [status, setStatus] = useState<GameStatus>('notStarted');
   const [history, setHistory] = useState<AttemptResult[]>([]);
   const [currentGuess, setCurrentGuess] = useState<GuessSlot[]>([null, null, null, null]);
+  const [score, setScore] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState(GAME_DURATION);
 
-  // Mantém o palpite mais recente disponível de forma síncrona
-  // (evita depender de timing de render/batching para calcular feedback)
+  // Refs para acesso síncrono
   const currentGuessRef = useRef<GuessSlot[]>([null, null, null, null]);
-
-  // Evita submit duplo (double-click) no mesmo frame
   const submitLockRef = useRef(false);
+  const historyRef = useRef<AttemptResult[]>([]);
+  const timerRef = useRef<number | null>(null);
 
   const attempts = history.length;
 
-  // Mantém histórico mais recente disponível de forma síncrona
-  // (evita depender de timing de render/batching)
-  const historyRef = useRef<AttemptResult[]>([]);
-
-  // Detecta qualquer mudança inesperada do secret durante a rodada
-  const secretInvariantRef = useRef<string | null>(null);
-
+  // Sincroniza refs com estado
   useEffect(() => {
-    // mantém historyRef alinhado com o estado (blindagem)
     historyRef.current = Array.isArray(history) ? history : [];
   }, [history]);
 
+  // Timer regressivo
   useEffect(() => {
-    const key = Array.isArray(secretRef.current) ? secretRef.current.join('|') : null;
-
-    if (secretInvariantRef.current && key && secretInvariantRef.current !== key) {
-      const errorMsg = `[SKEMIND] SECRET_CHANGED_UNEXPECTEDLY: prev=${secretInvariantRef.current} next=${key} status=${status}`;
-      console.error(errorMsg);
-
-      // DEV ONLY: dispara erro para parar exatamente no ponto do bug
-      if (import.meta.env.DEV) {
-        throw new Error(errorMsg);
+    if (status === 'playing') {
+      timerRef.current = window.setInterval(() => {
+        setTimeRemaining(prev => {
+          if (prev <= 1) {
+            // Tempo esgotado - derrota
+            if (timerRef.current) clearInterval(timerRef.current);
+            setStatus('lost');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
       }
     }
 
-    secretInvariantRef.current = key;
-  }, [status, history.length]);
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [status]);
 
   // ==================== AÇÕES ====================
 
   /**
    * Inicia novo jogo
-   * - Gera código secreto único
-   * - Reseta estado
    */
   const startGame = useCallback(() => {
-    // Blindagem: evita gerar outro secret por clique duplo antes do React re-renderizar
     if (secretRef.current) return;
 
     const secret = generateSecret(UI_SYMBOLS.map(s => s.id));
-    secretRef.current = [...secret]; // imutável
+    secretRef.current = [...secret];
 
     const cleared: GuessSlot[] = [null, null, null, null];
     currentGuessRef.current = cleared;
@@ -126,6 +154,8 @@ export function useGame() {
     setStatus('playing');
     setHistory([]);
     setCurrentGuess(cleared);
+    setScore(0);
+    setTimeRemaining(GAME_DURATION);
   }, []);
 
   /**
@@ -141,14 +171,12 @@ export function useGame() {
     setStatus('notStarted');
     setHistory([]);
     setCurrentGuess(cleared);
+    setScore(0);
+    setTimeRemaining(GAME_DURATION);
   }, []);
 
   /**
    * Seleciona símbolo para o palpite
-   * - Bloqueia duplicados
-   * - Preenche próximo slot vazio
-   *
-   * IMPORTANTE: atualiza o ref de forma síncrona (sem depender do timing do React)
    */
   const selectSymbol = useCallback(
     (symbol: GameSymbol) => {
@@ -173,7 +201,7 @@ export function useGame() {
   );
 
   /**
-   * Limpa slot específico (síncrono via ref)
+   * Limpa slot específico
    */
   const clearSlot = useCallback(
     (index: number) => {
@@ -192,34 +220,24 @@ export function useGame() {
 
   /**
    * Envia palpite
-   * - Valida 4 símbolos únicos
-   * - Calcula feedback
-   * - Atualiza histórico
-   * - Verifica vitória/derrota
    */
   const submit = useCallback(() => {
     if (status !== 'playing') return;
     if (!secretRef.current) return;
 
-    // Bloqueia double-click / double submit no mesmo tick
+    // Bloqueia double-click
     if (submitLockRef.current) return;
     submitLockRef.current = true;
 
     try {
-      // snapshots IMEDIATOS (nunca usar state direto para avaliar)
       const guessSnapshot: GuessSlot[] = currentGuessRef.current.map(s => (s ? { ...s } : null));
       const secretSnapshot: string[] = [...secretRef.current];
 
-      // precisa estar completo (4 slots) e sem repetição
       if (guessSnapshot.some(s => s === null)) return;
       const guessIds = guessSnapshot.map(s => (s as GameSymbol).id);
       if (!isValidGuess(guessIds)) return;
 
-      // limite de tentativas (sincrono via ref)
-      const attemptsBefore = historyRef.current.length;
-      if (attemptsBefore >= MAX_ATTEMPTS) return;
-
-      // feedback 100% puro: apenas secret fixo + palpite daquele clique
+      // Feedback
       const result = evaluateGuess(secretSnapshot, [...guessIds]);
 
       const entry: AttemptResult = {
@@ -229,33 +247,37 @@ export function useGame() {
         grays: result.grays,
       };
 
+      // Atualiza histórico
       const nextHistory = [entry, ...historyRef.current];
       historyRef.current = nextHistory;
       setHistory(nextHistory);
 
-      // vitória/derrota
+      // Calcula pontos desta tentativa
+      const attemptPoints = (result.whites * POINTS.WHITE) + (result.grays * POINTS.GRAY);
+
+      // Vitória
       if (result.whites === CODE_LENGTH) {
+        const timeBonus = calculateTimeBonus(timeRemaining);
+        const finalScore = score + attemptPoints + POINTS.WIN + timeBonus;
+        setScore(finalScore);
         setStatus('won');
         return;
       }
 
-      if (attemptsBefore + 1 >= MAX_ATTEMPTS) {
-        setStatus('lost');
-        return;
-      }
+      // Adiciona pontos da tentativa
+      setScore(prev => prev + attemptPoints);
 
-      // próxima tentativa
+      // Próxima tentativa
       const cleared: GuessSlot[] = [null, null, null, null];
       currentGuessRef.current = cleared;
       setCurrentGuess(cleared);
     } finally {
       submitLockRef.current = false;
     }
-  }, [status]);
+  }, [status, score, timeRemaining]);
 
   // ==================== DADOS DERIVADOS ====================
 
-  // Converte código secreto para símbolos UI (para exibir na derrota)
   const secretCode: GameSymbol[] = secretRef.current
     ? secretRef.current.map(id => {
         const sym = getSymbolById(id);
@@ -273,6 +295,8 @@ export function useGame() {
       attempts,
       currentGuess,
       history,
+      score,
+      timeRemaining,
     },
     actions: {
       startGame,
@@ -285,6 +309,7 @@ export function useGame() {
       CODE_LENGTH,
       MAX_ATTEMPTS,
       SYMBOLS: UI_SYMBOLS,
+      GAME_DURATION,
     },
     secretCode,
   };
