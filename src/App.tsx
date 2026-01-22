@@ -18,6 +18,8 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Skema />} />
+          <Route path="/convite/:code" element={<Skema />} />
+          <Route path="/invite/:code" element={<Skema />} />
           <Route path="/classic" element={<Index />} />
           <Route path="/tournament" element={<Tournament />} />
           <Route path="*" element={<Skema />} />

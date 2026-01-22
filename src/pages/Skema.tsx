@@ -9,7 +9,7 @@
  */
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useSkemaPlayer } from '@/hooks/useSkemaPlayer';
 import { useGame } from '@/hooks/useGame';
 import { useTournament } from '@/hooks/useTournament';
@@ -27,8 +27,19 @@ import { UI_SYMBOLS } from '@/hooks/useGame';
 type SkemaView = 'lobby' | 'training' | 'bots' | 'official';
 
 export default function Skema() {
-  const [searchParams] = useSearchParams();
-  const inviteCodeFromUrl = useMemo(() => searchParams.get('convite') || searchParams.get('invite') || '', [searchParams]);
+  const { code: codeFromPath } = useParams<{ code?: string }>();
+  
+  // Captura código de convite da URL (path /convite/CODIGO ou query ?convite=CODIGO)
+  const inviteCodeFromUrl = useMemo(() => {
+    // Primeiro tenta via path param (mais confiável)
+    if (codeFromPath) {
+      return codeFromPath.toUpperCase();
+    }
+    // Fallback para query param
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('convite') || params.get('invite') || '';
+    return code.toUpperCase();
+  }, [codeFromPath]);
   
   const skemaPlayer = useSkemaPlayer();
   const game = useGame();
