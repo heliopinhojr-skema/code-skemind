@@ -5,6 +5,7 @@ import { TokenPicker } from './TokenPicker';
 import { GuessSlots } from './GuessSlots';
 import { HistoryLog } from './HistoryLog';
 import { Symbol } from './Symbol';
+import { AttemptAuditPanel } from './AttemptAuditPanel';
 import { Button } from '@/components/ui/button';
 import type { GameState, GameSymbol, AttemptResult } from '@/hooks/useGame';
 import { MAX_ATTEMPTS } from '@/hooks/useGame';
@@ -31,6 +32,7 @@ export function GameBoard({
   onStartGame,
 }: GameBoardProps) {
   const [copied, setCopied] = useState(false);
+  const [showAuditDetails, setShowAuditDetails] = useState(false);
 
   const safeGuess = Array.isArray(state.currentGuess) ? state.currentGuess : [];
   const safeSecret = Array.isArray(secretCode) ? secretCode : [];
@@ -69,6 +71,8 @@ export function GameBoard({
   };
 
   const secretIds = useMemo(() => safeSecret.map(s => s.id), [safeSecret]);
+
+  const historyChronological = useMemo(() => safeHistory.slice().reverse(), [safeHistory]);
 
   const audit = useMemo(() => {
     if (!isGameOver) return null;
@@ -171,6 +175,23 @@ export function GameBoard({
               )}
             </div>
           )}
+
+           {safeHistory.length > 0 && (
+             <div className="mt-3 flex justify-center">
+               <Button
+                 type="button"
+                 variant="outline"
+                 size="sm"
+                 onClick={() => setShowAuditDetails(v => !v)}
+               >
+                 {showAuditDetails ? 'Ocultar auditoria detalhada' : 'Mostrar auditoria detalhada'}
+               </Button>
+             </div>
+           )}
+
+           {showAuditDetails && (
+             <AttemptAuditPanel secretIds={secretIds} historyChronological={historyChronological} symbols={safeSymbols} />
+           )}
         </motion.div>
       )}
 
@@ -225,6 +246,23 @@ export function GameBoard({
               )}
             </div>
           )}
+
+           {safeHistory.length > 0 && (
+             <div className="mt-3 flex justify-center">
+               <Button
+                 type="button"
+                 variant="outline"
+                 size="sm"
+                 onClick={() => setShowAuditDetails(v => !v)}
+               >
+                 {showAuditDetails ? 'Ocultar auditoria detalhada' : 'Mostrar auditoria detalhada'}
+               </Button>
+             </div>
+           )}
+
+           {showAuditDetails && (
+             <AttemptAuditPanel secretIds={secretIds} historyChronological={historyChronological} symbols={safeSymbols} />
+           )}
         </motion.div>
       )}
 
