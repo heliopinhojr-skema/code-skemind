@@ -1,12 +1,14 @@
 import { motion } from 'framer-motion';
 import { Copy, Check } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { TokenPicker } from './TokenPicker';
 import { GuessSlots } from './GuessSlots';
 import { HistoryLog } from './HistoryLog';
 import { Symbol } from './Symbol';
 import { Button } from '@/components/ui/button';
 import type { GameState, GameSymbol, AttemptResult } from '@/hooks/useGame';
+import { MAX_ATTEMPTS } from '@/hooks/useGame';
+import { evaluateGuess } from '@/lib/mastermindEngine';
 interface GameBoardProps {
   state: GameState;
   secretCode: GameSymbol[];
@@ -65,6 +67,34 @@ export function GameBoard({
       console.error('Falha ao copiar:', err);
     }
   };
+
+  const secretIds = useMemo(() => safeSecret.map(s => s.id), [safeSecret]);
+
+  const audit = useMemo(() => {
+    if (!isGameOver) return null;
+    if (secretIds.length === 0 || safeHistory.length === 0) return null;
+
+    return safeHistory.map(attempt => {
+      const expected = evaluateGuess([...secretIds], [...attempt.guessSnapshot]);
+      const ok =
+        expected.whites === attempt.feedbackSnapshot.whites &&
+        expected.grays === attempt.feedbackSnapshot.grays;
+      return { id: attempt.id, ok, expected, attempt };
+    });
+  }, [isGameOver, safeHistory, secretIds]);
+
+  const auditHasData = Boolean(audit && audit.length > 0);
+  const auditAllOk = (audit ?? []).every(a => a.ok);
+
+  const lostReason: 'time' | 'attempts' | 'other' =
+    state.status !== 'lost'
+      ? 'other'
+      : state.timeRemaining === 0
+        ? 'time'
+        : state.attempts >= MAX_ATTEMPTS
+          ? 'attempts'
+          : 'other';
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -116,6 +146,31 @@ export function GameBoard({
               </div>
             ))}
           </div>
+
+          {auditHasData && (
+            <div className="mt-3 rounded-lg bg-muted/20 border border-border p-3 text-left">
+              <p className="text-xs font-semibold text-foreground">Auditoria do feedback</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {auditAllOk
+                  ? '✅ OK — todos os feedbacks batem com o código revelado.'
+                  : '❌ Inconsistência detectada — pelo menos uma rodada não bate com o código revelado.'}
+              </p>
+
+              {!auditAllOk && (
+                <div className="mt-2 space-y-1">
+                  {audit!
+                    .filter(a => !a.ok)
+                    .slice(0, 3)
+                    .map(a => (
+                      <p key={a.id} className="text-[11px] font-mono text-foreground break-words">
+                        [{a.attempt.guessSnapshot.join(' ')}] → esperado ⚪{a.expected.whites} ⚫{a.expected.grays} (tinha ⚪
+                        {a.attempt.feedbackSnapshot.whites} ⚫{a.attempt.feedbackSnapshot.grays})
+                      </p>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
         </motion.div>
       )}
 
@@ -126,9 +181,13 @@ export function GameBoard({
           animate={{ scale: 1, opacity: 1 }}
           className="p-4 rounded-xl bg-destructive/20 border border-destructive/50 text-center"
         >
-          <p className="text-xl font-bold text-destructive">⏱️ Tempo Esgotado!</p>
+          <p className="text-xl font-bold text-destructive">
+            {lostReason === 'attempts' ? '🧩 Tentativas Esgotadas!' : '⏱️ Tempo Esgotado!'}
+          </p>
           <p className="text-sm text-muted-foreground mt-1">
-            O tempo acabou após {state.attempts} tentativa(s).
+            {lostReason === 'attempts'
+              ? `Você usou ${state.attempts}/${MAX_ATTEMPTS} tentativa(s).`
+              : `O tempo acabou após ${state.attempts} tentativa(s).`}
           </p>
           <p className="text-lg font-bold text-foreground mt-2">
             Pontuação: {state.score} ⭐
@@ -141,27 +200,37 @@ export function GameBoard({
               </div>
             ))}
           </div>
+
+          {auditHasData && (
+            <div className="mt-3 rounded-lg bg-muted/20 border border-border p-3 text-left">
+              <p className="text-xs font-semibold text-foreground">Auditoria do feedback</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {auditAllOk
+                  ? '✅ OK — todos os feedbacks batem com o código revelado.'
+                  : '❌ Inconsistência detectada — pelo menos uma rodada não bate com o código revelado.'}
+              </p>
+
+              {!auditAllOk && (
+                <div className="mt-2 space-y-1">
+                  {audit!
+                    .filter(a => !a.ok)
+                    .slice(0, 3)
+                    .map(a => (
+                      <p key={a.id} className="text-[11px] font-mono text-foreground break-words">
+                        [{a.attempt.guessSnapshot.join(' ')}] → esperado ⚪{a.expected.whites} ⚫{a.expected.grays} (tinha ⚪
+                        {a.attempt.feedbackSnapshot.whites} ⚫{a.attempt.feedbackSnapshot.grays})
+                      </p>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
         </motion.div>
       )}
 
       {/* Playing */}
       {isPlaying && (
         <>
-          {/* DEBUG: Mostrar código secreto para verificação */}
-          <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-center">
-            <p className="text-xs text-destructive font-bold mb-2">🔓 DEBUG - CÓDIGO SECRETO:</p>
-            <div className="flex justify-center gap-2">
-              {safeSecret.map((symbol, i) => (
-                <div key={i} className="w-10 h-10 flex items-center justify-center bg-muted/30 rounded-lg border border-destructive/30">
-                  <Symbol symbol={symbol} size="md" />
-                </div>
-              ))}
-            </div>
-            <p className="mt-2 text-[11px] font-mono text-foreground font-bold">
-              {safeSecret.map(s => s.id).join(' | ')}
-            </p>
-          </div>
-
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground text-center">Seu palpite:</p>
             <GuessSlots guess={safeGuess} onClear={onClearSlot} disabled={!isPlaying} />
