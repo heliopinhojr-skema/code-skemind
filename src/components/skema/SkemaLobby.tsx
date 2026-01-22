@@ -70,10 +70,10 @@ export function SkemaLobby({
   const canAffordBots = player.energy >= 0; // Treinar x Bots é grátis
   const canAffordOfficial = (buyIn: BuyInOption) => player.energy >= buyIn.total;
 
-  // Gera link de convite
+  // Gera link de convite (formato /convite/CODIGO - mais confiável)
   const inviteLink = useMemo(() => {
     const baseUrl = window.location.origin;
-    return `${baseUrl}/?convite=${player.inviteCode}`;
+    return `${baseUrl}/convite/${player.inviteCode}`;
   }, [player.inviteCode]);
 
   const handleCopyInviteCode = useCallback(async () => {
