@@ -29,9 +29,9 @@ export function HistoryLog({ history }: HistoryLogProps) {
     <div className="space-y-2 max-h-32 overflow-y-auto">
       <AnimatePresence>
         {safeHistory.map((attempt, index) => {
-          const guessIds = Array.isArray(attempt.guess) ? attempt.guess : [];
-          const whites = Number.isFinite(attempt.whites) ? attempt.whites : 0;
-          const grays = Number.isFinite(attempt.grays) ? attempt.grays : 0;
+          const guessIds = Array.isArray(attempt.guessSnapshot) ? attempt.guessSnapshot : [];
+          const whites = Number.isFinite(attempt.feedbackSnapshot?.whites) ? attempt.feedbackSnapshot.whites : 0;
+          const grays = Number.isFinite(attempt.feedbackSnapshot?.grays) ? attempt.feedbackSnapshot.grays : 0;
 
           return (
             <motion.div
