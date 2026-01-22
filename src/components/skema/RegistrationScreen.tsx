@@ -7,7 +7,7 @@
  * 3. Recebe k$10 inicial
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Ticket, User, Sparkles, ArrowRight, Check, AlertCircle,
@@ -33,6 +33,13 @@ export function RegistrationScreen({ onRegister, validateCode, initialInviteCode
   const [error, setError] = useState<string | null>(null);
   const [isValidCode, setIsValidCode] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Sincroniza código da URL quando prop muda
+  useEffect(() => {
+    if (initialInviteCode && initialInviteCode !== inviteCode) {
+      setInviteCode(initialInviteCode);
+    }
+  }, [initialInviteCode]);
 
   const handleValidateCode = useCallback(() => {
     setError(null);
