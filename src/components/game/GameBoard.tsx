@@ -147,6 +147,20 @@ export function GameBoard({
       {/* Playing */}
       {isPlaying && (
         <>
+          {/* DEBUG: Mostrar código secreto para verificação */}
+          <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-center">
+            <p className="text-xs text-destructive font-bold mb-2">🔓 DEBUG - CÓDIGO SECRETO:</p>
+            <div className="flex justify-center gap-2">
+              {safeSecret.map((symbol, i) => (
+                <div key={i} className="w-10 h-10 flex items-center justify-center bg-muted/30 rounded-lg border border-destructive/30">
+                  <Symbol symbol={symbol} size="md" />
+                </div>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] font-mono text-foreground font-bold">
+              {safeSecret.map(s => s.id).join(' | ')}
+            </p>
+          </div>
 
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground text-center">Seu palpite:</p>
