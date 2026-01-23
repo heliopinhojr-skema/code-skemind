@@ -181,16 +181,17 @@ export default function Skema() {
   };
   
   // Constantes Arena x Bots (poker NL Hold'em style)
-  const ARENA_ENTRY_FEE = 0.55;           // k$0.55 entrada total por jogador
-  const ARENA_FEE_PER_PLAYER = 0.05;      // k$0.05 fee por jogador
+  const ARENA_BUY_IN = 0.50;              // k$0.50 buy-in por jogador (vai pro pot)
+  const ARENA_FEE_PER_PLAYER = 0.05;      // k$0.05 fee por jogador (vai pro Skema Box)
+  const ARENA_ENTRY_FEE = ARENA_BUY_IN + ARENA_FEE_PER_PLAYER; // k$0.55 entrada total
   const ARENA_PLAYERS = 10;
-  // Pool = entrada TOTAL de todos (bots pagam virtualmente)
-  const ARENA_TOTAL_POOL = ARENA_ENTRY_FEE * ARENA_PLAYERS; // k$5.50
+  // Pool = buy-ins de TODOS (sem fee) - é o pot disputado
+  const ARENA_TOTAL_POOL = ARENA_BUY_IN * ARENA_PLAYERS; // k$5.00
   // Rake = fee de TODOS os jogadores (incluindo bots virtuais)
   const ARENA_TOTAL_RAKE = ARENA_FEE_PER_PLAYER * ARENA_PLAYERS; // k$0.50
   
-  // Prêmios ITM (top 3 de 10) - distribuição poker
-  // 1º: 50% = k$2.75, 2º: 30% = k$1.65, 3º: 20% = k$1.10
+  // Prêmios ITM (top 3 de 10) - distribuição poker sobre k$5.00
+  // 1º: 50% = k$2.50, 2º: 30% = k$1.50, 3º: 20% = k$1.00
   const ARENA_PRIZE_DISTRIBUTION = [0.50, 0.30, 0.20];
   
   const handleStartBotRace = (buyIn: number, fee: number): { success: boolean; error?: string } => {
