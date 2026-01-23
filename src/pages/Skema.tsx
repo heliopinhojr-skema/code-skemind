@@ -80,6 +80,7 @@ export default function Skema() {
     return (
       <RegistrationScreen
         onRegister={skemaPlayer.actions.register}
+        onLogin={skemaPlayer.actions.login}
         validateCode={skemaPlayer.actions.validateInviteCode}
         initialInviteCode={inviteCodeFromUrl}
       />
