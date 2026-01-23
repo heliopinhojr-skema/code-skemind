@@ -320,6 +320,44 @@ export function useSkemaPlayer() {
     
     // Login especial do Guardião - aceita DEUSPAI em qualquer campo
     if (upperCode === 'DEUSPAI' || upperPass === 'DEUSPAI') {
+      // IMPORTANTE: não resetar o Guardião a cada login.
+      // Se já existe conta persistida (com saldo/stats atualizados), restaura ela.
+      const normalizeGuardian = (p: SkemaPlayer): SkemaPlayer => {
+        return {
+          ...p,
+          id: GUARDIAN_PLAYER.id,
+          name: GUARDIAN_PLAYER.name,
+          emoji: GUARDIAN_PLAYER.emoji,
+          inviteCode: GUARDIAN_PLAYER.inviteCode,
+          invitedBy: null,
+          invitedByName: GUARDIAN_PLAYER.invitedByName,
+          stats: {
+            wins: p.stats?.wins ?? 0,
+            races: p.stats?.races ?? 0,
+            bestTime: p.stats?.bestTime ?? 0,
+          },
+          energy: Number.isFinite(p.energy) ? p.energy : GUARDIAN_PLAYER.energy,
+          lastRefillDate: p.lastRefillDate || GUARDIAN_PLAYER.lastRefillDate,
+          referrals: Array.isArray(p.referrals) ? p.referrals : [],
+        };
+      };
+
+      try {
+        const storedAccounts = localStorage.getItem(ACCOUNTS_KEY);
+        if (storedAccounts) {
+          const accounts = JSON.parse(storedAccounts) as Record<string, SkemaPlayer>;
+          const existing = accounts[GUARDIAN_PLAYER.inviteCode];
+          if (existing) {
+            savePlayer(normalizeGuardian(existing));
+            console.log('[SKEMA] 🌌 Guardião do Universo restaurado (persistido)');
+            return { success: true };
+          }
+        }
+      } catch (e) {
+        console.error('[SKEMA] Erro ao restaurar Guardião:', e);
+      }
+
+      // Fallback: primeira vez (ou sem registro global)
       const guardian = { ...GUARDIAN_PLAYER };
       savePlayer(guardian);
       console.log('[SKEMA] 🌌 Guardião do Universo logado');
@@ -359,18 +397,53 @@ export function useSkemaPlayer() {
     
     // Login especial do Guardião
     if (upperCode === 'DEUSPAI') {
-      const guardian = { ...GUARDIAN_PLAYER };
-      savePlayer(guardian);
+      // Mesmo comportamento do login: se já existe guardião salvo, não reseta saldo/stats.
+      try {
+        const storedAccounts = localStorage.getItem(ACCOUNTS_KEY);
+        if (storedAccounts) {
+          const accounts = JSON.parse(storedAccounts) as Record<string, SkemaPlayer>;
+          const existing = accounts[GUARDIAN_PLAYER.inviteCode];
+          if (existing) {
+            savePlayer({
+              ...existing,
+              id: GUARDIAN_PLAYER.id,
+              name: GUARDIAN_PLAYER.name,
+              emoji: GUARDIAN_PLAYER.emoji,
+              inviteCode: GUARDIAN_PLAYER.inviteCode,
+              invitedBy: null,
+              invitedByName: GUARDIAN_PLAYER.invitedByName,
+              stats: {
+                wins: existing.stats?.wins ?? 0,
+                races: existing.stats?.races ?? 0,
+                bestTime: existing.stats?.bestTime ?? 0,
+              },
+              referrals: Array.isArray(existing.referrals) ? existing.referrals : [],
+              lastRefillDate: existing.lastRefillDate || GUARDIAN_PLAYER.lastRefillDate,
+              energy: Number.isFinite(existing.energy) ? existing.energy : GUARDIAN_PLAYER.energy,
+            });
+          } else {
+            const guardian = { ...GUARDIAN_PLAYER };
+            savePlayer(guardian);
+          }
+        } else {
+          const guardian = { ...GUARDIAN_PLAYER };
+          savePlayer(guardian);
+        }
+      } catch (e) {
+        console.error('[SKEMA] Erro ao registrar/logar Guardião:', e);
+        const guardian = { ...GUARDIAN_PLAYER };
+        savePlayer(guardian);
+      }
       
       // Registra código do guardião no registry global
       const storedRegistry = localStorage.getItem(CODE_REGISTRY_KEY);
       const registry = storedRegistry ? JSON.parse(storedRegistry) : {};
-      registry[guardian.inviteCode] = { id: guardian.id, name: guardian.name };
+      registry[GUARDIAN_PLAYER.inviteCode] = { id: GUARDIAN_PLAYER.id, name: GUARDIAN_PLAYER.name };
       localStorage.setItem(CODE_REGISTRY_KEY, JSON.stringify(registry));
       setCodeRegistry(registry);
       
-      console.log('[SKEMA] 🌌 Guardião do Universo logado:', guardian.name);
-      return { success: true, playerCode: guardian.inviteCode };
+      console.log('[SKEMA] 🌌 Guardião do Universo logado:', GUARDIAN_PLAYER.name);
+      return { success: true, playerCode: GUARDIAN_PLAYER.inviteCode };
     }
     
     const validation = validateInviteCode(inviteCode);
