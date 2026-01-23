@@ -30,6 +30,7 @@ interface SkemaLobbyProps {
   onStartBotRace: (buyIn: number, fee: number) => { success: boolean; error?: string };
   onStartOfficialRace: (raceId: string, buyIn: number, fee: number) => { success: boolean; error?: string };
   onDeductEnergy: (amount: number) => boolean;
+  onAddEnergy: (amount: number) => void;
   onLogout: () => void;
 }
 
@@ -49,6 +50,7 @@ export function SkemaLobby({
   onStartBotRace,
   onStartOfficialRace,
   onDeductEnergy,
+  onAddEnergy,
   onLogout,
 }: SkemaLobbyProps) {
   const officialRace = useOfficialRace();
@@ -577,7 +579,7 @@ export function SkemaLobby({
                     )}
                   </div>
                   
-                  {/* Botão de inscrição */}
+                  {/* Botão de inscrição / cancelamento */}
                   {!isPlayerRegisteredInRace ? (
                     <Button
                       onClick={() => {
@@ -599,7 +601,8 @@ export function SkemaLobby({
                           emoji: player.emoji,
                         });
                         if (!result.success) {
-                          // Se falhou inscrição, devolve energia (não implementado - simplificado)
+                          // Se falhou inscrição, devolve energia
+                          onAddEnergy(officialRace.constants.entryFee);
                           setError(result.error || 'Erro ao inscrever');
                         }
                       }}
@@ -611,9 +614,27 @@ export function SkemaLobby({
                       Inscrever-se (k${officialRace.constants.entryFee.toFixed(2)})
                     </Button>
                   ) : (
-                    <div className="flex items-center justify-center gap-2 p-3 bg-green-500/10 border border-green-500/30 rounded-lg text-green-400">
-                      <UserCheck className="w-5 h-5" />
-                      <span className="font-medium">Você está inscrito!</span>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-center gap-2 p-3 bg-green-500/10 border border-green-500/30 rounded-lg text-green-400">
+                        <UserCheck className="w-5 h-5" />
+                        <span className="font-medium">Você está inscrito!</span>
+                      </div>
+                      <Button
+                        onClick={() => {
+                          const result = officialRace.actions.unregisterPlayer(player.id);
+                          if (result.success) {
+                            // Devolve energia ao jogador
+                            onAddEnergy(officialRace.constants.entryFee);
+                            setError(null);
+                          } else {
+                            setError(result.error || 'Erro ao cancelar inscrição');
+                          }
+                        }}
+                        variant="outline"
+                        className="w-full text-red-400 border-red-500/30 hover:bg-red-500/10"
+                      >
+                        Cancelar Inscrição (+k${officialRace.constants.entryFee.toFixed(2)})
+                      </Button>
                     </div>
                   )}
                 </div>
