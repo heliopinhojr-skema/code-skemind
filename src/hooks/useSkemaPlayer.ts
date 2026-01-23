@@ -260,7 +260,7 @@ export function useSkemaPlayer() {
     setPlayer(updated);
   }, []);
 
-  // Valida código de convite - verifica pending invites também
+  // Valida código de convite - verifica pending invites E código principal
   const validateInviteCode = useCallback((code: string): { 
     valid: boolean; 
     inviterId: string | null; 
@@ -269,24 +269,34 @@ export function useSkemaPlayer() {
     pendingInviteCode?: string;
   } => {
     const upperCode = code.toUpperCase().trim();
-    console.log('[SKEMA] Validando código:', upperCode);
+    console.log('[SKEMA] 🔍 Validando código:', upperCode);
     
     // Master codes
     if (MASTER_INVITE_CODES.includes(upperCode)) {
-      console.log('[SKEMA] Código master válido');
+      console.log('[SKEMA] ✅ Código master válido');
       return { valid: true, inviterId: null, inviterName: 'SKEMA' };
     }
     
-    // Verifica pending invites primeiro (SKINVXXXXX)
+    // 1. Verifica pending invites primeiro (SKINVXXXXX) - deve ser NÃO usado
     const storedPending = localStorage.getItem(PENDING_INVITES_KEY);
     if (storedPending) {
       try {
         const pendingList = JSON.parse(storedPending) as PendingInvite[];
-        const pendingInvite = pendingList.find(p => p.code === upperCode && !p.used);
+        console.log('[SKEMA] 📋 Pending invites no sistema:', pendingList.length);
+        
+        // Procura o código - pode estar usado ou não
+        const pendingInvite = pendingList.find(p => p.code === upperCode);
+        
         if (pendingInvite) {
-          // Busca info do criador
+          if (pendingInvite.used) {
+            console.log('[SKEMA] ❌ Código SKINV já foi usado por:', pendingInvite.usedBy);
+            return { valid: false, inviterId: null };
+          }
+          
+          // Código válido e não usado!
           const registry = JSON.parse(localStorage.getItem(CODE_REGISTRY_KEY) || '{}') as Record<string, CodeRegistryEntry>;
           const creator = registry[pendingInvite.creatorCode];
+          console.log('[SKEMA] ✅ Código SKINV válido! Criador:', creator?.name || pendingInvite.creatorCode);
           return { 
             valid: true, 
             inviterId: pendingInvite.creatorId, 
@@ -300,12 +310,15 @@ export function useSkemaPlayer() {
       }
     }
     
-    // Busca no registro global de códigos (SK prefix - código principal)
+    // 2. Busca no registro global de códigos (SK prefix - código principal do jogador)
     const storedRegistry = localStorage.getItem(CODE_REGISTRY_KEY);
     if (storedRegistry) {
       try {
         const registry = JSON.parse(storedRegistry) as Record<string, CodeRegistryEntry>;
+        console.log('[SKEMA] 📋 Códigos no registry:', Object.keys(registry).length);
+        
         if (registry[upperCode]) {
+          console.log('[SKEMA] ✅ Código principal SK válido! Jogador:', registry[upperCode].name);
           return { valid: true, inviterId: registry[upperCode].id, inviterName: registry[upperCode].name };
         }
       } catch (e) {
@@ -313,7 +326,8 @@ export function useSkemaPlayer() {
       }
     }
     
-    console.log('[SKEMA] Código não encontrado');
+    console.log('[SKEMA] ❌ Código não encontrado em nenhum registro');
+    console.log('[SKEMA] 💡 Códigos válidos: SKINVXXXXX (convite único) ou SKXXXXXX (código do jogador)');
     return { valid: false, inviterId: null };
   }, []);
 
@@ -397,6 +411,7 @@ export function useSkemaPlayer() {
   // Registra novo jogador
   const register = useCallback((name: string, inviteCode: string, emoji: string = '🎮', password?: string): { success: boolean; error?: string } => {
     const upperCode = inviteCode.toUpperCase().trim();
+    console.log('[SKEMA] 📝 Iniciando registro:', { name, code: upperCode });
     
     // Login especial do Guardião
     if (upperCode === 'DEUSPAI') {
@@ -421,8 +436,11 @@ export function useSkemaPlayer() {
     }
     
     const validation = validateInviteCode(inviteCode);
+    console.log('[SKEMA] 🔍 Resultado validação:', validation);
+    
     if (!validation.valid) {
-      return { success: false, error: 'Código de convite inválido' };
+      console.log('[SKEMA] ❌ Código inválido:', upperCode);
+      return { success: false, error: 'Código de convite inválido. Use um código SKINVXXXXX não utilizado ou o código SK de um jogador.' };
     }
     
     const trimmedName = name.trim();
@@ -462,6 +480,8 @@ export function useSkemaPlayer() {
     // ========== Atualiza referrals e marca pending invite como usado ==========
     const isMasterCode = MASTER_INVITE_CODES.includes(upperCode);
     
+    console.log('[SKEMA] 📊 Processando referral:', { isMasterCode, inviterId: validation.inviterId, isPending: validation.isPendingInvite });
+    
     if (!isMasterCode && validation.inviterId) {
       try {
         // 1. Salva no registro global de referrals
@@ -481,6 +501,8 @@ export function useSkemaPlayer() {
           }
         }
         
+        console.log('[SKEMA] 🔗 Código principal do inviter:', inviterMainCode);
+        
         if (inviterMainCode) {
           if (!referralsByInvite[inviterMainCode]) {
             referralsByInvite[inviterMainCode] = [];
@@ -488,10 +510,12 @@ export function useSkemaPlayer() {
           
           if (!referralsByInvite[inviterMainCode].includes(newPlayer.id)) {
             referralsByInvite[inviterMainCode].push(newPlayer.id);
-            console.log(`[SKEMA] ✅ Convite contabilizado para ${inviterMainCode}: ${newPlayer.name}`);
+            console.log(`[SKEMA] ✅ Referral salvo para ${inviterMainCode}: agora tem ${referralsByInvite[inviterMainCode].length} referrals`);
           }
           
           localStorage.setItem(REFERRALS_BY_INVITE_KEY, JSON.stringify(referralsByInvite));
+        } else {
+          console.log('[SKEMA] ⚠️ Não encontrou código principal do inviter no registry');
         }
         
         // 2. Se era pending invite, marca como usado
@@ -506,6 +530,7 @@ export function useSkemaPlayer() {
             );
             localStorage.setItem(PENDING_INVITES_KEY, JSON.stringify(updated));
             setPendingInvites(updated);
+            console.log(`[SKEMA] 🎟️ Pending invite ${validation.pendingInviteCode} marcado como usado por ${newPlayer.name}`);
           }
         }
       } catch (e) {

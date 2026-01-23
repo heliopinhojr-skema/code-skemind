@@ -57,14 +57,22 @@ export function RegistrationScreen({ onRegister, onLogin, validateCode, initialI
       return;
     }
     
+    console.log('[SKEMA] 🔍 Validando código na UI:', trimmedCode);
     const result = validateCode(trimmedCode);
-    console.log('[SKEMA] Validando código:', trimmedCode, result);
+    console.log('[SKEMA] 📋 Resultado:', result);
     
     if (result.valid) {
       setInviterName(result.inviterName || null);
       setMode('profile');
     } else {
-      setError('Código de convite inválido');
+      // Mensagem mais específica
+      if (trimmedCode.startsWith('SKINV')) {
+        setError('Este código de convite já foi usado ou não existe.');
+      } else if (trimmedCode.startsWith('SK')) {
+        setError('Código de jogador não encontrado. Peça um SKINV ao inviter.');
+      } else {
+        setError('Código inválido. Use um código SKINVXXXXX de convite.');
+      }
     }
   }, [inviteCode, validateCode]);
 
