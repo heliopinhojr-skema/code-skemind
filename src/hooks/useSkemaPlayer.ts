@@ -145,33 +145,43 @@ export function useSkemaPlayer() {
   useEffect(() => {
     const syncReferrals = (currentPlayer: SkemaPlayer): SkemaPlayer => {
       const REFERRALS_BY_INVITE_KEY = 'skema_referrals_by_invite_code';
-      const storedReferrals = localStorage.getItem(REFERRALS_BY_INVITE_KEY);
+      const INVITER_ENERGY_KEY = 'skema_inviter_energy_credits';
       
       let updatedPlayer = { ...currentPlayer };
-      let referralsUpdated = false;
+      let needsSave = false;
       
+      // 1. Sincroniza créditos de energia pendentes (novo sistema)
+      try {
+        const storedCredits = localStorage.getItem(INVITER_ENERGY_KEY);
+        if (storedCredits) {
+          const energyCredits = JSON.parse(storedCredits);
+          if (energyCredits[currentPlayer.id]?.pending > 0) {
+            const pending = energyCredits[currentPlayer.id].pending;
+            updatedPlayer.energy += pending;
+            console.log(`[SKEMA] ✅ +k$${pending} sincronizado de convites realizados!`);
+            
+            // Zera os créditos pendentes
+            energyCredits[currentPlayer.id].pending = 0;
+            localStorage.setItem(INVITER_ENERGY_KEY, JSON.stringify(energyCredits));
+            needsSave = true;
+          }
+        }
+      } catch (e) {
+        console.error('[SKEMA] Erro ao sincronizar créditos pendentes:', e);
+      }
+      
+      // 2. Sincroniza lista de referrals
+      const storedReferrals = localStorage.getItem(REFERRALS_BY_INVITE_KEY);
       if (storedReferrals) {
         try {
           const referralsByInvite = JSON.parse(storedReferrals);
           if (referralsByInvite[currentPlayer.inviteCode]) {
             const globalReferrals = referralsByInvite[currentPlayer.inviteCode] as string[];
-            const oldCount = currentPlayer.referrals?.length || 0;
             const mergedReferrals = [...new Set([...(currentPlayer.referrals || []), ...globalReferrals])];
             
-            const newReferralsCount = mergedReferrals.length - oldCount;
-            
-            if (newReferralsCount > 0) {
-              const rewardsGiven = Math.min(oldCount, MAX_REFERRAL_REWARDS);
-              const rewardsAvailable = MAX_REFERRAL_REWARDS - rewardsGiven;
-              const rewardsToGive = Math.min(newReferralsCount, rewardsAvailable);
-              
-              if (rewardsToGive > 0) {
-                updatedPlayer.energy += REFERRAL_REWARD * rewardsToGive;
-                console.log(`[SKEMA] ✅ +k$${REFERRAL_REWARD * rewardsToGive} por ${rewardsToGive} novos convites!`);
-              }
-              
+            if (mergedReferrals.length > (updatedPlayer.referrals?.length || 0)) {
               updatedPlayer.referrals = mergedReferrals;
-              referralsUpdated = true;
+              needsSave = true;
             }
           }
         } catch (e) {
@@ -179,7 +189,7 @@ export function useSkemaPlayer() {
         }
       }
       
-      // Migração: verifica também o registro antigo por ID
+      // 3. Migração: verifica também o registro antigo por ID
       try {
         const OLD_REFERRALS_KEY = 'skema_referrals_by_player';
         const oldReferrals = localStorage.getItem(OLD_REFERRALS_KEY);
@@ -190,7 +200,7 @@ export function useSkemaPlayer() {
             const mergedReferrals = [...new Set([...(updatedPlayer.referrals || []), ...oldGlobalReferrals])];
             if (mergedReferrals.length > (updatedPlayer.referrals?.length || 0)) {
               updatedPlayer.referrals = mergedReferrals;
-              referralsUpdated = true;
+              needsSave = true;
             }
           }
         }
@@ -198,7 +208,7 @@ export function useSkemaPlayer() {
         console.error('[SKEMA] Erro ao migrar referrals antigos:', e);
       }
       
-      if (referralsUpdated) {
+      if (needsSave) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedPlayer));
       }
       
@@ -338,8 +348,10 @@ export function useSkemaPlayer() {
     const usedInviteCode = inviteCode.toUpperCase().trim();
     const isMasterCode = MASTER_INVITE_CODES.includes(usedInviteCode);
     
-    if (!isMasterCode && validation.inviterId) {
+    if (!isMasterCode) {
       const REFERRALS_BY_INVITE_KEY = 'skema_referrals_by_invite_code';
+      const INVITER_ENERGY_KEY = 'skema_inviter_energy_credits';
+      
       try {
         // 1. Salva no registro global de referrals (persistente entre sessões)
         const storedReferrals = localStorage.getItem(REFERRALS_BY_INVITE_KEY);
@@ -349,30 +361,39 @@ export function useSkemaPlayer() {
           referralsByInvite[usedInviteCode] = [];
         }
         
-        if (!referralsByInvite[usedInviteCode].includes(newPlayer.id)) {
+        const isNewReferral = !referralsByInvite[usedInviteCode].includes(newPlayer.id);
+        
+        if (isNewReferral) {
           referralsByInvite[usedInviteCode].push(newPlayer.id);
           console.log(`[SKEMA] ✅ Convite contabilizado: ${usedInviteCode} convidou ${newPlayer.name} (${newPlayer.id})`);
           console.log(`[SKEMA] Total referrals para ${usedInviteCode}:`, referralsByInvite[usedInviteCode].length);
-        }
-        
-        localStorage.setItem(REFERRALS_BY_INVITE_KEY, JSON.stringify(referralsByInvite));
-        
-        // 2. ANTES de sobrescrever, atualiza o inviter se ele estiver logado
-        const currentPlayerData = localStorage.getItem(STORAGE_KEY);
-        if (currentPlayerData) {
-          const currentPlayer = JSON.parse(currentPlayerData) as SkemaPlayer;
-          // Verifica se o jogador atual É o inviter (código bate)
-          if (currentPlayer.inviteCode === usedInviteCode) {
-            currentPlayer.referrals = [...new Set([...(currentPlayer.referrals || []), newPlayer.id])];
-            const rewardCount = currentPlayer.referrals.length;
-            if (rewardCount <= MAX_REFERRAL_REWARDS) {
-              currentPlayer.energy += REFERRAL_REWARD;
-              console.log(`[SKEMA] ✅ +k$${REFERRAL_REWARD} para ${currentPlayer.name} (referral #${rewardCount})`);
+          
+          localStorage.setItem(REFERRALS_BY_INVITE_KEY, JSON.stringify(referralsByInvite));
+          
+          // 2. Busca inviter pelo código no registry global (NÃO pelo player atual)
+          const storedRegistry = localStorage.getItem(CODE_REGISTRY_KEY);
+          const globalRegistry = storedRegistry ? JSON.parse(storedRegistry) : {};
+          const inviterEntry = globalRegistry[usedInviteCode];
+          
+          if (inviterEntry) {
+            // 3. Credita energia no registro de créditos pendentes (será sincronizado no login do inviter)
+            const storedCredits = localStorage.getItem(INVITER_ENERGY_KEY);
+            const energyCredits = storedCredits ? JSON.parse(storedCredits) : {};
+            
+            if (!energyCredits[inviterEntry.id]) {
+              energyCredits[inviterEntry.id] = { pending: 0, referralCount: 0 };
             }
-            // Salva o inviter atualizado (isso será sobrescrito logo em seguida pelo novo jogador)
-            // MAS o registro global de referrals já foi salvo acima
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(currentPlayer));
+            
+            const currentCount = energyCredits[inviterEntry.id].referralCount || 0;
+            if (currentCount < MAX_REFERRAL_REWARDS) {
+              energyCredits[inviterEntry.id].pending = (energyCredits[inviterEntry.id].pending || 0) + REFERRAL_REWARD;
+              energyCredits[inviterEntry.id].referralCount = currentCount + 1;
+              localStorage.setItem(INVITER_ENERGY_KEY, JSON.stringify(energyCredits));
+              console.log(`[SKEMA] 💰 +k$${REFERRAL_REWARD} creditado para ${inviterEntry.name} (aguardando sync)`);
+            }
           }
+        } else {
+          localStorage.setItem(REFERRALS_BY_INVITE_KEY, JSON.stringify(referralsByInvite));
         }
       } catch (e) {
         console.error('[SKEMA] Erro ao registrar referral:', e);
