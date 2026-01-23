@@ -348,7 +348,16 @@ export function SkemaLobby({
             </div>
             {/* Skema Box - só Guardian vê */}
             {player.id === 'guardian-skema-universe' && (
-              <div className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-lg p-2 text-center border border-yellow-500/30">
+              <div 
+                className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-lg p-2 text-center border border-yellow-500/30 cursor-pointer hover:border-yellow-500/50 transition-colors"
+                onClick={() => {
+                  if (confirm('Zerar o Skema Box?')) {
+                    localStorage.setItem('skema_box_balance', '0');
+                    window.location.reload();
+                  }
+                }}
+                title="Clique para zerar"
+              >
                 <div className="text-lg font-bold text-yellow-400">k${skemaBoxBalance.toFixed(2)}</div>
                 <div className="text-xs text-yellow-400/70">Skema Box</div>
               </div>
