@@ -188,14 +188,18 @@ export default function Skema() {
       return { success: false, error: 'Energia insuficiente (k$0.55)' };
     }
     
-    // Deduz entrada
+    // Deduz entrada do humano
     skemaPlayer.actions.deductEnergy(total);
     
-    // Credita rake para conta skema (localStorage)
+    // Rake total = fee de TODOS os 10 jogadores (humano + 9 bots)
+    // Os bots também "pagam" entrada, contribuindo pro pool e pro rake
+    const totalRake = fee * ARENA_PLAYERS; // k$0.05 × 10 = k$0.50
+    
+    // Credita rake total para conta skema (localStorage)
     const SKEMA_BOX_KEY = 'skema_box_balance';
     const currentBox = parseFloat(localStorage.getItem(SKEMA_BOX_KEY) || '0');
-    localStorage.setItem(SKEMA_BOX_KEY, (currentBox + fee).toFixed(2));
-    console.log(`[SKEMA] 💰 Rake +k$${fee.toFixed(2)} → Caixa Skema: k$${(currentBox + fee).toFixed(2)}`);
+    localStorage.setItem(SKEMA_BOX_KEY, (currentBox + totalRake).toFixed(2));
+    console.log(`[SKEMA] 💰 Rake (10 jogadores × k$${fee.toFixed(2)}) = +k$${totalRake.toFixed(2)} → Caixa Skema: k$${(currentBox + totalRake).toFixed(2)}`);
     
     setGameMode('bots');
     setCurrentView('bots');
@@ -204,7 +208,7 @@ export default function Skema() {
     if (result.success && result.humanSecretCode) {
       game.actions.startGameWithSecret(result.humanSecretCode);
     } else {
-      // Se falhou, devolve a energia
+      // Se falhou, devolve a energia do humano
       skemaPlayer.actions.addEnergy(total);
       // Remove rake da caixa
       localStorage.setItem(SKEMA_BOX_KEY, currentBox.toFixed(2));
