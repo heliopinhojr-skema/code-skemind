@@ -83,7 +83,15 @@ export function LastGuessInspector({
     return map;
   }, [symbols]);
 
-  const slotStatuses = useMemo(() => computeSlotStatuses(secretIds, guessIds), [secretIds, guessIds]);
+  const slotStatuses = useMemo(() => {
+    console.log('=== LastGuessInspector DEBUG ===');
+    console.log('secretIds recebido:', secretIds);
+    console.log('guessIds recebido:', guessIds);
+    const result = computeSlotStatuses(secretIds, guessIds);
+    console.log('slotStatuses calculado:', result);
+    console.log('================================');
+    return result;
+  }, [secretIds, guessIds]);
 
   const recalculated = useMemo(() => {
     try {
