@@ -141,7 +141,7 @@ export default function Skema() {
   };
   
   const handleStartBotRace = (buyIn: number, fee: number): { success: boolean; error?: string } => {
-    // Treinar x Bots é grátis
+    // Arena: entrada já foi deduzida no SkemaLobby
     setGameMode('bots');
     setCurrentView('bots');
     
@@ -181,6 +181,16 @@ export default function Skema() {
         won: game.state.status === 'won',
         time: game.state.status === 'won' ? game.state.timeRemaining : undefined,
       });
+      
+      // Adiciona prêmio ao saldo se ganhou na arena/oficial
+      const humanResult = tournament.state.results.get(tournament.state.humanPlayerId);
+      if (humanResult && humanResult.rank <= 3 && (gameMode === 'bots' || gameMode === 'official')) {
+        const prize = tournament.actions.calculatePrize(humanResult.rank);
+        if (prize > 0) {
+          skemaPlayer.actions.addEnergy(prize);
+          console.log(`[SKEMA] 🏆 Prêmio adicionado: k$${prize.toFixed(2)} (${humanResult.rank}º lugar)`);
+        }
+      }
     }
     
     setCurrentView('lobby');
@@ -214,9 +224,9 @@ export default function Skema() {
   const humanResult = tournament.state.results.get(tournament.state.humanPlayerId);
   const symbolsById = new Map(UI_SYMBOLS.map(s => [s.id, s]));
   
-  // Cálculo de prêmio para bots
-  const prizeAmount = humanResult && humanResult.rank <= 4 && (gameMode === 'bots' || gameMode === 'official')
-    ? Math.floor(tournament.state.prizePool * [0.5, 0.25, 0.15, 0.1][humanResult.rank - 1])
+  // Cálculo de prêmio para arena/oficial - top 3 ITM
+  const prizeAmount = humanResult && humanResult.rank <= 3 && (gameMode === 'bots' || gameMode === 'official')
+    ? tournament.actions.calculatePrize(humanResult.rank)
     : 0;
   
   return (

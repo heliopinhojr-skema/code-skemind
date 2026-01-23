@@ -37,10 +37,25 @@ export type TournamentStatus = 'lobby' | 'playing' | 'finished';
 // ==================== CONSTANTES ====================
 
 export const INITIAL_CREDITS = 1000;
-export const TOURNAMENT_ENTRY_FEE = 100;
+export const TOURNAMENT_ENTRY_FEE = 100; // Legacy - não usado no SKEMA
 export const TOURNAMENT_PLAYERS = 10;
 export const BOT_COUNT = 9;
 
+// Arena economy - estilo poker
+export const ARENA_ENTRY_TOTAL = 0.55;    // Total que jogador paga
+export const ARENA_RAKE = 0.05;            // Fica com o Universo SKEMA
+export const ARENA_PRIZE_CONTRIBUTION = 0.50;  // Vai pro pote de prêmios
+export const ARENA_PRIZE_POOL = ARENA_PRIZE_CONTRIBUTION * TOURNAMENT_PLAYERS; // k$5.00
+
+// ITM = 25% = top 3 de 10 jogadores
+// Distribuição estilo poker: maior pro 1º, menor pro 3º
+const ARENA_PRIZE_DISTRIBUTION = [
+  { rank: 1, percent: 0.50 },  // k$2.50 (50%)
+  { rank: 2, percent: 0.30 },  // k$1.50 (30%)
+  { rank: 3, percent: 0.20 },  // k$1.00 (20%)
+];
+
+// Legacy prize distribution (para referência)
 const PRIZE_DISTRIBUTION = [0.5, 0.25, 0.15, 0.1];
 
 // ==================== HOOK ====================
@@ -275,6 +290,13 @@ export function useTournament() {
     };
   }, []);
   
+  // Calcula prêmio do jogador baseado no rank
+  const calculatePrize = useCallback((rank: number): number => {
+    const distribution = ARENA_PRIZE_DISTRIBUTION.find(d => d.rank === rank);
+    if (!distribution) return 0;
+    return Math.round(ARENA_PRIZE_POOL * distribution.percent * 100) / 100;
+  }, []);
+
   return {
     state: {
       status,
@@ -283,14 +305,17 @@ export function useTournament() {
       humanSecretCode,
       credits,
       humanPlayerId,
-      entryFee: TOURNAMENT_ENTRY_FEE,
-      prizePool: TOURNAMENT_ENTRY_FEE * TOURNAMENT_PLAYERS,
+      entryFee: ARENA_ENTRY_TOTAL,
+      prizePool: ARENA_PRIZE_POOL,
+      rake: ARENA_RAKE,
+      prizeDistribution: ARENA_PRIZE_DISTRIBUTION,
     },
     actions: {
       startTournament,
       updateHumanResult,
       finishTournament,
       returnToLobby,
+      calculatePrize,
     },
   };
 }

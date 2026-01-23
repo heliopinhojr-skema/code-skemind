@@ -464,7 +464,7 @@ export function SkemaLobby({
                 </div>
               </motion.button>
               
-              {/* Treinar x Bots */}
+              {/* Arena x Bots - k$0.55 entrada */}
               <motion.button
                 whileTap={{ scale: 0.98 }}
                 onClick={() => handleSelectMode('bots')}
@@ -485,9 +485,30 @@ export function SkemaLobby({
                       <h3 className="font-bold text-white text-sm">Arena</h3>
                       <span className="text-xs font-medium text-yellow-400">k$0.55</span>
                     </div>
-                    <p className="text-xs text-white/60">9 bots • Mesa de 10</p>
+                    <p className="text-xs text-white/60">9 bots • Pote k$5 • Top 3 ITM</p>
                   </div>
                 </div>
+                {/* Info economia poker */}
+                {selectedMode === 'bots' && (
+                  <div className="mt-2 pt-2 border-t border-white/10 grid grid-cols-4 gap-1 text-center text-[10px]">
+                    <div>
+                      <div className="text-white/40">Entrada</div>
+                      <div className="text-white font-medium">k$0.55</div>
+                    </div>
+                    <div>
+                      <div className="text-white/40">1º</div>
+                      <div className="text-green-400 font-medium">k$2.50</div>
+                    </div>
+                    <div>
+                      <div className="text-white/40">2º</div>
+                      <div className="text-blue-400 font-medium">k$1.50</div>
+                    </div>
+                    <div>
+                      <div className="text-white/40">3º</div>
+                      <div className="text-purple-400 font-medium">k$1.00</div>
+                    </div>
+                  </div>
+                )}
               </motion.button>
               
               {/* Corrida Oficial */}
@@ -665,7 +686,12 @@ export function SkemaLobby({
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/90 to-transparent z-20">
           <Button
             onClick={handleStartCountdown}
-            disabled={!selectedMode || isStarting || (selectedMode === 'official' && !isPlayerRegisteredInRace)}
+            disabled={
+              !selectedMode || 
+              isStarting || 
+              (selectedMode === 'bots' && !canAffordArena) ||
+              (selectedMode === 'official' && !isPlayerRegisteredInRace)
+            }
             className="w-full h-14 text-lg font-bold touch-manipulation"
             size="lg"
           >
@@ -678,7 +704,7 @@ export function SkemaLobby({
             {selectedMode === 'bots' && (
               <>
                 <Swords className="w-5 h-5 mr-2" />
-                Entrar na Arena
+                {canAffordArena ? 'Entrar na Arena (k$0.55)' : 'Saldo insuficiente'}
               </>
             )}
             {selectedMode === 'official' && (
