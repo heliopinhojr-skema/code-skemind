@@ -99,6 +99,18 @@ export function useOfficialRace() {
           const parsed = JSON.parse(stored) as OfficialRace;
           parsed.scheduledDate = new Date(parsed.scheduledDate);
           
+          // Remove duplicatas de nome (mantém primeira ocorrência)
+          const seenNames = new Set<string>();
+          parsed.registeredPlayers = parsed.registeredPlayers.filter(p => {
+            const normalizedName = p.name.trim().toLowerCase();
+            if (seenNames.has(normalizedName)) {
+              console.log('[OFFICIAL RACE] Removendo duplicata:', p.name);
+              return false;
+            }
+            seenNames.add(normalizedName);
+            return true;
+          });
+          
           // Garante que o Guardião esteja inscrito
           const guardianRegistered = parsed.registeredPlayers.some(p => p.id === UNIVERSE_CREATOR.id);
           if (!guardianRegistered) {
@@ -108,10 +120,10 @@ export function useOfficialRace() {
               emoji: UNIVERSE_CREATOR.emoji,
               registeredAt: '2024-01-01T00:00:00.000Z',
             });
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
             console.log('[OFFICIAL RACE] Guardião inscrito na corrida');
           }
           
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
           console.log('[OFFICIAL RACE] Corrida carregada:', parsed.name, '- Inscritos:', parsed.registeredPlayers.length);
           setRace(parsed);
         } else {
@@ -186,6 +198,13 @@ export function useOfficialRace() {
     return race.registeredPlayers.some(p => p.id === playerId);
   }, [race]);
 
+  // Verifica se nome já está em uso na corrida
+  const isNameTaken = useCallback((name: string): boolean => {
+    if (!race) return false;
+    const normalizedName = name.trim().toLowerCase();
+    return race.registeredPlayers.some(p => p.name.trim().toLowerCase() === normalizedName);
+  }, [race]);
+
   // Inscreve jogador
   const registerPlayer = useCallback((player: { id: string; name: string; emoji: string }): { success: boolean; error?: string } => {
     if (!race) return { success: false, error: 'Corrida não encontrada' };
@@ -200,6 +219,11 @@ export function useOfficialRace() {
     
     if (isPlayerRegistered(player.id)) {
       return { success: false, error: 'Você já está inscrito' };
+    }
+    
+    // Bloqueia nomes duplicados
+    if (isNameTaken(player.name)) {
+      return { success: false, error: 'Nome já em uso nesta corrida' };
     }
     
     const updatedRace: OfficialRace = {
@@ -219,7 +243,7 @@ export function useOfficialRace() {
     setRace(updatedRace);
     
     return { success: true };
-  }, [race, isPlayerRegistered]);
+  }, [race, isPlayerRegistered, isNameTaken]);
 
   // Cancela inscrição
   const unregisterPlayer = useCallback((playerId: string): { success: boolean; error?: string } => {

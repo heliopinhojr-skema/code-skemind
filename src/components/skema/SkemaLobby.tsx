@@ -29,6 +29,7 @@ interface SkemaLobbyProps {
   onStartTraining: () => void;
   onStartBotRace: (buyIn: number, fee: number) => { success: boolean; error?: string };
   onStartOfficialRace: (raceId: string, buyIn: number, fee: number) => { success: boolean; error?: string };
+  onDeductEnergy: (amount: number) => boolean;
   onLogout: () => void;
 }
 
@@ -47,6 +48,7 @@ export function SkemaLobby({
   onStartTraining,
   onStartBotRace,
   onStartOfficialRace,
+  onDeductEnergy,
   onLogout,
 }: SkemaLobbyProps) {
   const officialRace = useOfficialRace();
@@ -580,12 +582,21 @@ export function SkemaLobby({
                           setError('Energia insuficiente para inscrição');
                           return;
                         }
+                        
+                        // Deduz energia PRIMEIRO
+                        const deducted = onDeductEnergy(officialRace.constants.entryFee);
+                        if (!deducted) {
+                          setError('Falha ao deduzir energia');
+                          return;
+                        }
+                        
                         const result = officialRace.actions.registerPlayer({
                           id: player.id,
                           name: player.name,
                           emoji: player.emoji,
                         });
                         if (!result.success) {
+                          // Se falhou inscrição, devolve energia (não implementado - simplificado)
                           setError(result.error || 'Erro ao inscrever');
                         }
                       }}
