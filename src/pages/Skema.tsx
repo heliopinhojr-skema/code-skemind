@@ -78,6 +78,7 @@ export default function Skema() {
     return (
       <RegistrationScreen
         onRegister={skemaPlayer.actions.register}
+        onLogin={skemaPlayer.actions.login}
         validateCode={skemaPlayer.actions.validateInviteCode}
         initialInviteCode={inviteCodeFromUrl}
       />
@@ -148,11 +149,13 @@ export default function Skema() {
         skemaDay={skemaPlayer.skemaDay}
         remainingReferralRewards={skemaPlayer.remainingReferralRewards}
         transferTax={skemaPlayer.transferTax}
+        pendingInvites={skemaPlayer.pendingInvites}
         onStartTraining={handleStartTraining}
         onStartBotRace={handleStartBotRace}
         onStartOfficialRace={handleStartOfficialRace}
         onDeductEnergy={skemaPlayer.actions.deductEnergy}
         onAddEnergy={skemaPlayer.actions.addEnergy}
+        onGenerateInvite={skemaPlayer.actions.generatePendingInvite}
         onLogout={skemaPlayer.actions.logout}
       />
     );
