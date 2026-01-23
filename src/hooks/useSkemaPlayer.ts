@@ -50,7 +50,7 @@ const MAX_REFERRAL_REWARDS = 10;
 const TRANSFER_TAX = 0.0643; // 6.43%
 
 // Códigos de convite master (para primeiros jogadores)
-const MASTER_INVITE_CODES = ['SKEMA2024', 'PRIMEIROSJOGADORES', 'BETATESTER', 'DEUSPAI'];
+const MASTER_INVITE_CODES = ['SKEMA1', 'SKEMA2024', 'PRIMEIROSJOGADORES', 'BETATESTER', 'DEUSPAI'];
 
 // Guardião do Universo - jogador fixo "skema"
 const GUARDIAN_PLAYER: SkemaPlayer = {
