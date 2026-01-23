@@ -51,7 +51,9 @@ export default function Skema() {
   // Atualiza resultado do torneio quando jogo termina
   // MUST be before any conditional returns to follow Rules of Hooks
   useEffect(() => {
-    if (currentView !== 'lobby' && (game.state.status === 'won' || game.state.status === 'lost')) {
+    if (currentView !== 'lobby' && 
+        (game.state.status === 'won' || game.state.status === 'lost') &&
+        tournament.state.status === 'playing') { // Guard: só se ainda estiver jogando
       if (gameMode === 'bots' || gameMode === 'official') {
         tournament.actions.updateHumanResult(
           game.state.status,
@@ -62,7 +64,7 @@ export default function Skema() {
         tournament.actions.finishTournament();
       }
     }
-  }, [game.state.status, currentView, gameMode, tournament.actions]);
+  }, [game.state.status, currentView, gameMode, tournament.state.status, tournament.actions]);
   
   // Espera carregar localStorage
   if (!skemaPlayer.isLoaded) {
@@ -91,14 +93,43 @@ export default function Skema() {
     game.actions.startGame();
   };
   
+  // Constantes Arena x Bots (poker NL Hold'em style)
+  const ARENA_POOL_PER_PLAYER = 0.50;  // k$0.50 vai pro pool
+  const ARENA_RAKE = 0.05;              // k$0.05 vai pro skema
+  const ARENA_TOTAL_ENTRY = ARENA_POOL_PER_PLAYER + ARENA_RAKE; // k$0.55
+  const ARENA_PLAYERS = 10;
+  const ARENA_TOTAL_POOL = ARENA_POOL_PER_PLAYER * ARENA_PLAYERS; // k$5.00
+  
+  // Prêmios ITM (25% = top 3 de 10) - distribuição poker
+  const ARENA_PRIZE_DISTRIBUTION = [0.50, 0.30, 0.20]; // 1º 50%, 2º 30%, 3º 20%
+  
   const handleStartBotRace = (buyIn: number, fee: number): { success: boolean; error?: string } => {
-    // Treinar x Bots é grátis
+    const total = buyIn + fee; // 0.50 + 0.05 = 0.55
+    
+    if (skemaPlayer.player!.energy < total) {
+      return { success: false, error: 'Energia insuficiente (k$0.55)' };
+    }
+    
+    // Deduz entrada
+    skemaPlayer.actions.deductEnergy(total);
+    
+    // Credita rake para conta skema (localStorage)
+    const SKEMA_BOX_KEY = 'skema_box_balance';
+    const currentBox = parseFloat(localStorage.getItem(SKEMA_BOX_KEY) || '0');
+    localStorage.setItem(SKEMA_BOX_KEY, (currentBox + fee).toFixed(2));
+    console.log(`[SKEMA] 💰 Rake +k$${fee.toFixed(2)} → Caixa Skema: k$${(currentBox + fee).toFixed(2)}`);
+    
     setGameMode('bots');
     setCurrentView('bots');
     
     const result = tournament.actions.startTournament();
     if (result.success && result.humanSecretCode) {
       game.actions.startGameWithSecret(result.humanSecretCode);
+    } else {
+      // Se falhou, devolve a energia
+      skemaPlayer.actions.addEnergy(total);
+      // Remove rake da caixa
+      localStorage.setItem(SKEMA_BOX_KEY, currentBox.toFixed(2));
     }
     
     return result;
@@ -132,6 +163,20 @@ export default function Skema() {
         won: game.state.status === 'won',
         time: game.state.status === 'won' ? game.state.timeRemaining : undefined,
       });
+      
+      // Distribui prêmios para Arena x Bots
+      if (gameMode === 'bots') {
+        const humanResult = tournament.state.results.get(tournament.state.humanPlayerId);
+        if (humanResult && humanResult.rank >= 1 && humanResult.rank <= 3) {
+          // ITM: top 3 ganham
+          const prizePercent = ARENA_PRIZE_DISTRIBUTION[humanResult.rank - 1];
+          const prize = ARENA_TOTAL_POOL * prizePercent;
+          skemaPlayer.actions.addEnergy(prize);
+          console.log(`[SKEMA] 🏆 Prêmio ${humanResult.rank}º lugar: +k$${prize.toFixed(2)}`);
+        } else {
+          console.log(`[SKEMA] ❌ Fora do ITM (${humanResult?.rank || '?'}º lugar) - sem prêmio`);
+        }
+      }
     }
     
     setCurrentView('lobby');
@@ -163,10 +208,17 @@ export default function Skema() {
   const humanResult = tournament.state.results.get(tournament.state.humanPlayerId);
   const symbolsById = new Map(UI_SYMBOLS.map(s => [s.id, s]));
   
-  // Cálculo de prêmio para bots
-  const prizeAmount = humanResult && humanResult.rank <= 4 && (gameMode === 'bots' || gameMode === 'official')
-    ? Math.floor(tournament.state.prizePool * [0.5, 0.25, 0.15, 0.1][humanResult.rank - 1])
-    : 0;
+  // Cálculo de prêmio para display
+  let prizeAmount = 0;
+  if (humanResult && (gameMode === 'bots' || gameMode === 'official')) {
+    if (gameMode === 'bots' && humanResult.rank >= 1 && humanResult.rank <= 3) {
+      // Arena x Bots: ITM top 3
+      prizeAmount = ARENA_TOTAL_POOL * ARENA_PRIZE_DISTRIBUTION[humanResult.rank - 1];
+    } else if (gameMode === 'official' && humanResult.rank <= 4) {
+      // Official usa distribuição diferente
+      prizeAmount = Math.floor(tournament.state.prizePool * [0.5, 0.25, 0.15, 0.1][humanResult.rank - 1]);
+    }
+  }
   
   return (
     <div className="min-h-screen relative">
