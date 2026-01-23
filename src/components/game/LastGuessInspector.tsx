@@ -5,12 +5,43 @@ import { evaluateGuess } from '@/lib/mastermindEngine';
 
 type SlotStatus = 'exact' | 'present' | 'absent';
 
+/**
+ * Computa status por slot seguindo algoritmo Mastermind clássico:
+ * 1. Marca "exact" onde símbolo e posição coincidem
+ * 2. Para cada símbolo restante, verifica se há match parcial disponível
+ * 
+ * IMPORTANTE: Um símbolo só pode ser contado uma vez (exact OU present, não ambos)
+ */
 function computeSlotStatuses(secretIds: string[], guessIds: string[]): SlotStatus[] {
-  return guessIds.map((id, i) => {
-    const secretPos = secretIds.indexOf(id);
-    if (secretPos === -1) return 'absent';
-    return secretPos === i ? 'exact' : 'present';
-  });
+  const result: SlotStatus[] = new Array(guessIds.length).fill('absent');
+  const secretUsed = new Array(secretIds.length).fill(false);
+  const guessUsed = new Array(guessIds.length).fill(false);
+
+  // Passo 1: Marcar todos os "exact" (branco)
+  for (let i = 0; i < guessIds.length; i++) {
+    if (guessIds[i] === secretIds[i]) {
+      result[i] = 'exact';
+      secretUsed[i] = true;
+      guessUsed[i] = true;
+    }
+  }
+
+  // Passo 2: Para cada guess não usado, procurar match parcial no segredo
+  for (let i = 0; i < guessIds.length; i++) {
+    if (guessUsed[i]) continue; // já é exact
+    
+    for (let j = 0; j < secretIds.length; j++) {
+      if (secretUsed[j]) continue; // já foi consumido
+      
+      if (guessIds[i] === secretIds[j]) {
+        result[i] = 'present';
+        secretUsed[j] = true;
+        break; // só pode usar uma vez
+      }
+    }
+  }
+
+  return result;
 }
 
 function statusLabel(status: SlotStatus) {
