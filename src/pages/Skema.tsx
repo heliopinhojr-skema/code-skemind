@@ -9,7 +9,7 @@
  * - Economia de energia (localStorage)
  */
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useSkemaPlayer } from '@/hooks/useSkemaPlayer';
 import { useGame } from '@/hooks/useGame';
@@ -35,7 +35,8 @@ export default function Skema() {
   const { code: codeFromPath } = useParams<{ code?: string }>();
   
   // Captura código de convite da URL (path /convite/CODIGO ou query ?convite=CODIGO)
-  const inviteCodeFromUrl = useMemo(() => {
+  // Usa state para permitir limpeza manual quando usuário escolhe continuar
+  const [inviteCodeFromUrl, setInviteCodeFromUrl] = useState<string>(() => {
     // Primeiro tenta via path param (mais confiável)
     if (codeFromPath) {
       return codeFromPath.toUpperCase();
@@ -44,6 +45,13 @@ export default function Skema() {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('convite') || params.get('invite') || '';
     return code.toUpperCase();
+  });
+  
+  // Sincroniza quando path param muda (navegação)
+  useEffect(() => {
+    if (codeFromPath) {
+      setInviteCodeFromUrl(codeFromPath.toUpperCase());
+    }
   }, [codeFromPath]);
   
   const skemaPlayer = useSkemaPlayer();
@@ -112,8 +120,9 @@ export default function Skema() {
     const handleContinueAsCurrentUser = () => {
       setShowSessionConflict(false);
       setPendingInviteCode(null);
-      // Limpa a URL do convite
-      window.history.replaceState({}, '', '/skema');
+      // Limpa o código da URL E do state para evitar loop
+      setInviteCodeFromUrl('');
+      window.history.replaceState({}, '', '/');
     };
     
     const handleLogoutAndUseInvite = () => {
