@@ -65,6 +65,12 @@ export function SkemaLobby({
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Saldo do Skema Box (conta mãe)
+  const skemaBoxBalance = useMemo(() => {
+    const stored = localStorage.getItem('skema_box_balance');
+    return stored ? parseFloat(stored) : 0;
+  }, []);
 
   // Estrelas animadas
   const stars = useMemo(() => 
@@ -325,7 +331,7 @@ export function SkemaLobby({
           </div>
           
           {/* Stats rápidos */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-2">
             <div className="bg-white/5 rounded-lg p-2 text-center">
               <div className="text-lg font-bold text-green-400">{player.stats.wins}</div>
               <div className="text-xs text-white/50">Vitórias</div>
@@ -339,6 +345,10 @@ export function SkemaLobby({
                 {player.stats.bestTime ? `${Math.floor(player.stats.bestTime / 60)}:${String(player.stats.bestTime % 60).padStart(2, '0')}` : '-'}
               </div>
               <div className="text-xs text-white/50">Melhor</div>
+            </div>
+            <div className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-lg p-2 text-center border border-yellow-500/30">
+              <div className="text-lg font-bold text-yellow-400">k${skemaBoxBalance.toFixed(2)}</div>
+              <div className="text-xs text-yellow-400/70">Skema Box</div>
             </div>
           </div>
         </motion.header>
