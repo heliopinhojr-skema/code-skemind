@@ -19,7 +19,7 @@ import universeBg from '@/assets/universe-bg.jpg';
 
 interface RegistrationScreenProps {
   onRegister: (name: string, inviteCode: string, emoji: string) => { success: boolean; error?: string };
-  validateCode: (code: string) => { valid: boolean; inviterId: string | null };
+  validateCode: (code: string) => { valid: boolean; inviterId: string | null; inviterName?: string };
   initialInviteCode?: string;
 }
 
@@ -33,6 +33,7 @@ export function RegistrationScreen({ onRegister, validateCode, initialInviteCode
   const [error, setError] = useState<string | null>(null);
   const [isValidCode, setIsValidCode] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [inviterName, setInviterName] = useState<string | null>(null);
 
   // Sincroniza código da URL quando prop muda
   useEffect(() => {
@@ -43,10 +44,19 @@ export function RegistrationScreen({ onRegister, validateCode, initialInviteCode
 
   const handleValidateCode = useCallback(() => {
     setError(null);
-    const result = validateCode(inviteCode);
+    const trimmedCode = inviteCode.trim().toUpperCase();
+    
+    if (trimmedCode.length < 4) {
+      setError('Código muito curto');
+      return;
+    }
+    
+    const result = validateCode(trimmedCode);
+    console.log('[SKEMA] Validando código:', trimmedCode, result);
     
     if (result.valid) {
       setIsValidCode(true);
+      setInviterName(result.inviterName || null);
       setStep('profile');
     } else {
       setError('Código de convite inválido');
@@ -167,7 +177,12 @@ export function RegistrationScreen({ onRegister, validateCode, initialInviteCode
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-white">Código Válido!</h2>
-                  <p className="text-sm text-white/50">Agora crie seu perfil</p>
+                  <p className="text-sm text-white/50">
+                    {inviterName 
+                      ? `Convidado por ${inviterName}`
+                      : 'Agora crie seu perfil'
+                    }
+                  </p>
                 </div>
               </div>
               
