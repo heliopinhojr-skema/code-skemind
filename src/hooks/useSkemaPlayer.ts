@@ -234,7 +234,51 @@ export function useSkemaPlayer() {
     localStorage.setItem(CODE_REGISTRY_KEY, JSON.stringify(updatedRegistry));
     setCodeRegistry(updatedRegistry);
     
-    // Registra quem convidou (para dar reward) e atualiza referrals do inviter
+    // Registra quem convidou usando o CÓDIGO DE CONVITE como chave
+    // Isso garante que o convite seja contabilizado mesmo se o inviter não estiver logado
+    const usedInviteCode = inviteCode.toUpperCase().trim();
+    
+    // Não conta master codes como convites de referral
+    const isMasterCode = MASTER_INVITE_CODES.includes(usedInviteCode);
+    
+    if (!isMasterCode) {
+      // SEMPRE salva no registro global usando o código de convite USADO
+      // O código usado É o inviteCode do jogador que convidou!
+      const REFERRALS_BY_INVITE_KEY = 'skema_referrals_by_invite_code';
+      try {
+        const storedReferrals = localStorage.getItem(REFERRALS_BY_INVITE_KEY);
+        const referralsByInvite = storedReferrals ? JSON.parse(storedReferrals) : {};
+        
+        if (!referralsByInvite[usedInviteCode]) {
+          referralsByInvite[usedInviteCode] = [];
+        }
+        
+        // Adiciona o novo jogador à lista de referrals do código usado (se ainda não existe)
+        if (!referralsByInvite[usedInviteCode].includes(newPlayer.id)) {
+          referralsByInvite[usedInviteCode].push(newPlayer.id);
+          console.log(`[SKEMA] Convite contabilizado: ${usedInviteCode} convidou ${newPlayer.name} (${newPlayer.id})`);
+        }
+        
+        localStorage.setItem(REFERRALS_BY_INVITE_KEY, JSON.stringify(referralsByInvite));
+        
+        // Se o inviter estiver logado neste navegador, atualiza diretamente também
+        const storedInviter = localStorage.getItem(STORAGE_KEY);
+        if (storedInviter && validation.inviterId) {
+          const inviterPlayer = JSON.parse(storedInviter) as SkemaPlayer;
+          if (inviterPlayer.id === validation.inviterId) {
+            inviterPlayer.referrals = [...new Set([...(inviterPlayer.referrals || []), newPlayer.id])];
+            if (inviterPlayer.referrals.length <= MAX_REFERRAL_REWARDS) {
+              inviterPlayer.energy += REFERRAL_REWARD;
+            }
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(inviterPlayer));
+          }
+        }
+      } catch (e) {
+        console.error('Erro ao registrar referral:', e);
+      }
+    }
+    
+    // Registro auxiliar de convites (metadata)
     if (validation.inviterId) {
       const invites = { ...allInvites };
       invites[newPlayer.id] = {
@@ -244,53 +288,6 @@ export function useSkemaPlayer() {
       };
       localStorage.setItem(INVITES_KEY, JSON.stringify(invites));
       setAllInvites(invites);
-      
-      // Atualiza o array referrals do jogador que convidou
-      try {
-        const storedInviter = localStorage.getItem(STORAGE_KEY);
-        if (storedInviter) {
-          const inviterPlayer = JSON.parse(storedInviter) as SkemaPlayer;
-          if (inviterPlayer.id === validation.inviterId) {
-            // O inviter é o jogador atual logado - atualiza diretamente
-            inviterPlayer.referrals = [...(inviterPlayer.referrals || []), newPlayer.id];
-            if (inviterPlayer.referrals.length <= MAX_REFERRAL_REWARDS) {
-              inviterPlayer.energy += REFERRAL_REWARD;
-            }
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(inviterPlayer));
-          }
-        }
-        
-        // Salva em registro global usando o INVITE CODE do inviter (persiste entre sessões/dispositivos)
-        // Busca o inviteCode do inviter no CODE_REGISTRY
-        const storedRegistry = localStorage.getItem(CODE_REGISTRY_KEY);
-        let inviterInviteCode: string | null = null;
-        
-        if (storedRegistry) {
-          const registry = JSON.parse(storedRegistry) as Record<string, CodeRegistryEntry>;
-          // Procura o inviteCode cujo ID corresponde ao inviterId
-          for (const [code, entry] of Object.entries(registry)) {
-            if (entry.id === validation.inviterId) {
-              inviterInviteCode = code;
-              break;
-            }
-          }
-        }
-        
-        if (inviterInviteCode) {
-          const REFERRALS_BY_INVITE_KEY = 'skema_referrals_by_invite_code';
-          const storedReferrals = localStorage.getItem(REFERRALS_BY_INVITE_KEY);
-          const referralsByInvite = storedReferrals ? JSON.parse(storedReferrals) : {};
-          if (!referralsByInvite[inviterInviteCode]) {
-            referralsByInvite[inviterInviteCode] = [];
-          }
-          if (!referralsByInvite[inviterInviteCode].includes(newPlayer.id)) {
-            referralsByInvite[inviterInviteCode].push(newPlayer.id);
-          }
-          localStorage.setItem(REFERRALS_BY_INVITE_KEY, JSON.stringify(referralsByInvite));
-        }
-      } catch (e) {
-        console.error('Erro ao atualizar referrals do inviter:', e);
-      }
     }
     
     return { success: true };
