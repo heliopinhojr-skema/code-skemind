@@ -251,34 +251,26 @@ export function useSkemaPlayer() {
     return { valid: false, inviterId: null };
   }, []);
 
-  // Login do Guardião (senha especial)
-  const loginAsGuardian = useCallback((password: string): { success: boolean; error?: string } => {
-    if (password !== 'Deuspai') {
-      return { success: false, error: 'Senha incorreta' };
-    }
-    
-    // Cria/atualiza o guardião
-    const guardian = { ...GUARDIAN_PLAYER };
-    savePlayer(guardian);
-    
-    // Registra código do guardião no registry global
-    const storedRegistry = localStorage.getItem(CODE_REGISTRY_KEY);
-    const registry = storedRegistry ? JSON.parse(storedRegistry) : {};
-    registry[guardian.inviteCode] = { id: guardian.id, name: guardian.name };
-    localStorage.setItem(CODE_REGISTRY_KEY, JSON.stringify(registry));
-    setCodeRegistry(registry);
-    
-    console.log('[SKEMA] 🌌 Guardião do Universo logado:', guardian.name);
-    return { success: true };
-  }, [savePlayer]);
-
   // Registra novo jogador
   const register = useCallback((name: string, inviteCode: string, emoji: string = '🎮'): { success: boolean; error?: string } => {
     const upperCode = inviteCode.toUpperCase().trim();
     
     // Login especial do Guardião
     if (upperCode === 'DEUSPAI') {
-      return loginAsGuardian(inviteCode.trim());
+      // Cria/atualiza o guardião
+      const guardian = { ...GUARDIAN_PLAYER };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(guardian));
+      setPlayer(guardian);
+      
+      // Registra código do guardião no registry global
+      const storedRegistry = localStorage.getItem(CODE_REGISTRY_KEY);
+      const registry = storedRegistry ? JSON.parse(storedRegistry) : {};
+      registry[guardian.inviteCode] = { id: guardian.id, name: guardian.name };
+      localStorage.setItem(CODE_REGISTRY_KEY, JSON.stringify(registry));
+      setCodeRegistry(registry);
+      
+      console.log('[SKEMA] 🌌 Guardião do Universo logado:', guardian.name);
+      return { success: true };
     }
     
     const validation = validateInviteCode(inviteCode);
@@ -482,7 +474,6 @@ export function useSkemaPlayer() {
     actions: {
       register,
       validateInviteCode,
-      loginAsGuardian,
       updateEnergy,
       deductEnergy,
       addEnergy,
