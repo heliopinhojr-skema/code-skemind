@@ -53,6 +53,20 @@ export default function Skema() {
   
   const [currentView, setCurrentView] = useState<SkemaView>('lobby');
   const [gameMode, setGameMode] = useState<'training' | 'bots' | 'official' | 'party'>('training');
+  const [showSessionConflict, setShowSessionConflict] = useState(false);
+  const [pendingInviteCode, setPendingInviteCode] = useState<string | null>(null);
+  
+  // Detecta conflito de sessão: usuário logado + convite na URL
+  useEffect(() => {
+    if (skemaPlayer.isLoaded && skemaPlayer.isRegistered && skemaPlayer.player && inviteCodeFromUrl) {
+      // Verifica se o código é diferente do código do jogador atual
+      const currentPlayerInvite = skemaPlayer.player.inviteCode;
+      if (inviteCodeFromUrl !== currentPlayerInvite && inviteCodeFromUrl.length > 0) {
+        setShowSessionConflict(true);
+        setPendingInviteCode(inviteCodeFromUrl);
+      }
+    }
+  }, [skemaPlayer.isLoaded, skemaPlayer.isRegistered, skemaPlayer.player, inviteCodeFromUrl]);
   
   // Atualiza resultado do torneio quando jogo termina
   // MUST be before any conditional returns to follow Rules of Hooks
@@ -90,6 +104,63 @@ export default function Skema() {
         validateCode={skemaPlayer.actions.validateInviteCode}
         initialInviteCode={inviteCodeFromUrl}
       />
+    );
+  }
+  
+  // Tela de conflito de sessão: usuário logado mas link de convite na URL
+  if (showSessionConflict && pendingInviteCode) {
+    const handleContinueAsCurrentUser = () => {
+      setShowSessionConflict(false);
+      setPendingInviteCode(null);
+      // Limpa a URL do convite
+      window.history.replaceState({}, '', '/skema');
+    };
+    
+    const handleLogoutAndUseInvite = () => {
+      setShowSessionConflict(false);
+      skemaPlayer.actions.logout();
+      // O código do convite já está na URL, será capturado pelo RegistrationScreen
+    };
+    
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center p-4">
+        <CosmicBackground />
+        <div className="relative z-10 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 max-w-md w-full text-center space-y-6">
+          <div className="text-5xl">⚠️</div>
+          <div>
+            <h2 className="text-xl font-bold text-white mb-2">Sessão Ativa</h2>
+            <p className="text-white/70">
+              Você já está logado como <span className="font-bold text-white">{skemaPlayer.player.emoji} {skemaPlayer.player.name}</span>.
+            </p>
+            <p className="text-white/50 text-sm mt-2">
+              Esse link é um convite para novos jogadores.
+            </p>
+          </div>
+          
+          <div className="space-y-3">
+            <Button
+              onClick={handleContinueAsCurrentUser}
+              className="w-full"
+              size="lg"
+            >
+              Continuar como {skemaPlayer.player.name}
+            </Button>
+            
+            <Button
+              onClick={handleLogoutAndUseInvite}
+              variant="outline"
+              className="w-full border-white/20 text-white hover:bg-white/10"
+              size="lg"
+            >
+              Sair e usar convite
+            </Button>
+          </div>
+          
+          <p className="text-white/40 text-xs">
+            Código do convite: {pendingInviteCode}
+          </p>
+        </div>
+      </div>
     );
   }
   
