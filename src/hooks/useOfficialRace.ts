@@ -88,17 +88,41 @@ export function useOfficialRace() {
   const [timeUntilRace, setTimeUntilRace] = useState('');
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Inicializa corrida fixa
+  // Inicializa corrida fixa - SEMPRE cria se não existir
   useEffect(() => {
     const loadOrCreateRace = () => {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      
-      if (stored) {
-        const parsed = JSON.parse(stored) as OfficialRace;
-        parsed.scheduledDate = new Date(parsed.scheduledDate);
-        setRace(parsed);
-      } else {
-        // Cria corrida inicial
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        
+        if (stored) {
+          const parsed = JSON.parse(stored) as OfficialRace;
+          parsed.scheduledDate = new Date(parsed.scheduledDate);
+          console.log('[OFFICIAL RACE] Corrida carregada:', parsed.name, '- Inscritos:', parsed.registeredPlayers.length);
+          setRace(parsed);
+        } else {
+          // Cria corrida inicial
+          const initialRace: OfficialRace = {
+            id: 'official-race-2026-03-03',
+            name: 'Corrida Inaugural SKEMA',
+            scheduledDate: FIXED_RACE_DATE,
+            entryFee: ENTRY_FEE,
+            prizePerPlayer: PRIZE_PER_PLAYER,
+            skemaBoxFee: SKEMA_BOX_FEE,
+            minPlayers: MIN_PLAYERS,
+            maxPlayers: MAX_PLAYERS,
+            registeredPlayers: [],
+            status: 'registration',
+            creatorId: UNIVERSE_CREATOR.id,
+            creatorName: UNIVERSE_CREATOR.name,
+          };
+          
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(initialRace));
+          console.log('[OFFICIAL RACE] Corrida criada:', initialRace.name);
+          setRace(initialRace);
+        }
+      } catch (e) {
+        console.error('[OFFICIAL RACE] Erro ao carregar corrida:', e);
+        // Recria corrida em caso de erro
         const initialRace: OfficialRace = {
           id: 'official-race-2026-03-03',
           name: 'Corrida Inaugural SKEMA',
@@ -113,7 +137,6 @@ export function useOfficialRace() {
           creatorId: UNIVERSE_CREATOR.id,
           creatorName: UNIVERSE_CREATOR.name,
         };
-        
         localStorage.setItem(STORAGE_KEY, JSON.stringify(initialRace));
         setRace(initialRace);
       }

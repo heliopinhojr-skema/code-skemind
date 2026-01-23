@@ -99,12 +99,69 @@ export function useSkemaPlayer() {
   const [allInvites, setAllInvites] = useState<Record<string, InvitedPlayer>>({});
   const [codeRegistry, setCodeRegistry] = useState<Record<string, CodeRegistryEntry>>({});
 
+  // Sincroniza referrals do registro global
+  const syncReferrals = useCallback((currentPlayer: SkemaPlayer): SkemaPlayer => {
+    const REFERRALS_BY_INVITE_KEY = 'skema_referrals_by_invite_code';
+    const storedReferrals = localStorage.getItem(REFERRALS_BY_INVITE_KEY);
+    
+    let updatedPlayer = { ...currentPlayer };
+    let referralsUpdated = false;
+    
+    if (storedReferrals) {
+      const referralsByInvite = JSON.parse(storedReferrals);
+      if (referralsByInvite[currentPlayer.inviteCode]) {
+        const globalReferrals = referralsByInvite[currentPlayer.inviteCode] as string[];
+        const oldCount = currentPlayer.referrals?.length || 0;
+        const mergedReferrals = [...new Set([...(currentPlayer.referrals || []), ...globalReferrals])];
+        
+        // Calcula quantos novos referrals foram adicionados
+        const newReferralsCount = mergedReferrals.length - oldCount;
+        
+        if (newReferralsCount > 0) {
+          // Adiciona energia pelos novos referrals (máximo 10 no total)
+          const rewardsGiven = Math.min(oldCount, MAX_REFERRAL_REWARDS);
+          const rewardsAvailable = MAX_REFERRAL_REWARDS - rewardsGiven;
+          const rewardsToGive = Math.min(newReferralsCount, rewardsAvailable);
+          
+          if (rewardsToGive > 0) {
+            updatedPlayer.energy += REFERRAL_REWARD * rewardsToGive;
+            console.log(`[SKEMA] ✅ +k$${REFERRAL_REWARD * rewardsToGive} por ${rewardsToGive} novos convites!`);
+          }
+          
+          updatedPlayer.referrals = mergedReferrals;
+          referralsUpdated = true;
+        }
+      }
+    }
+    
+    // Migração: verifica também o registro antigo por ID
+    const OLD_REFERRALS_KEY = 'skema_referrals_by_player';
+    const oldReferrals = localStorage.getItem(OLD_REFERRALS_KEY);
+    if (oldReferrals) {
+      const oldByPlayer = JSON.parse(oldReferrals);
+      if (oldByPlayer[currentPlayer.id]) {
+        const oldGlobalReferrals = oldByPlayer[currentPlayer.id] as string[];
+        const mergedReferrals = [...new Set([...(updatedPlayer.referrals || []), ...oldGlobalReferrals])];
+        if (mergedReferrals.length > (updatedPlayer.referrals?.length || 0)) {
+          updatedPlayer.referrals = mergedReferrals;
+          referralsUpdated = true;
+        }
+      }
+    }
+    
+    if (referralsUpdated) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedPlayer));
+    }
+    
+    return updatedPlayer;
+  }, []);
+
   // Carrega do localStorage
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        const parsed = JSON.parse(stored) as SkemaPlayer;
+        let parsed = JSON.parse(stored) as SkemaPlayer;
         
         // Verifica refill diário
         const today = getTodayDateString();
@@ -113,31 +170,8 @@ export function useSkemaPlayer() {
           parsed.lastRefillDate = today;
         }
         
-        // Carrega referrals do registro global (usa inviteCode como chave para persistir entre sessões)
-        const REFERRALS_BY_INVITE_KEY = 'skema_referrals_by_invite_code';
-        const storedReferrals = localStorage.getItem(REFERRALS_BY_INVITE_KEY);
-        if (storedReferrals) {
-          const referralsByInvite = JSON.parse(storedReferrals);
-          // Usa o inviteCode do jogador como chave (persiste entre sessões)
-          if (referralsByInvite[parsed.inviteCode]) {
-            const globalReferrals = referralsByInvite[parsed.inviteCode] as string[];
-            // Merge com referrals locais (evita duplicatas)
-            const mergedReferrals = [...new Set([...(parsed.referrals || []), ...globalReferrals])];
-            parsed.referrals = mergedReferrals;
-          }
-        }
-        
-        // Migração: verifica também o registro antigo por ID para não perder dados
-        const OLD_REFERRALS_KEY = 'skema_referrals_by_player';
-        const oldReferrals = localStorage.getItem(OLD_REFERRALS_KEY);
-        if (oldReferrals) {
-          const oldByPlayer = JSON.parse(oldReferrals);
-          if (oldByPlayer[parsed.id]) {
-            const oldGlobalReferrals = oldByPlayer[parsed.id] as string[];
-            const mergedReferrals = [...new Set([...(parsed.referrals || []), ...oldGlobalReferrals])];
-            parsed.referrals = mergedReferrals;
-          }
-        }
+        // Sincroniza referrals do registro global
+        parsed = syncReferrals(parsed);
         
         localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
         setPlayer(parsed);
@@ -156,7 +190,7 @@ export function useSkemaPlayer() {
       console.error('Erro ao carregar jogador:', e);
     }
     setIsLoaded(true);
-  }, []);
+  }, [syncReferrals]);
 
   // Salva no localStorage
   const savePlayer = useCallback((updated: SkemaPlayer) => {
