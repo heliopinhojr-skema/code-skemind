@@ -18,6 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { SkemaPlayer, getSkemaHour } from '@/hooks/useSkemaPlayer';
 import { useOfficialRace } from '@/hooks/useOfficialRace';
+import { RegisteredPlayersPanel } from './RegisteredPlayersPanel';
 import universeBg from '@/assets/universe-bg.jpg';
 
 interface SkemaLobbyProps {
@@ -515,6 +516,15 @@ export function SkemaLobby({
               </motion.button>
             </div>
           </motion.section>
+          
+          {/* Painel de Jogadores Registrados - sempre visível */}
+          {officialRace.race && (
+            <RegisteredPlayersPanel
+              tournamentPlayers={officialRace.race.registeredPlayers}
+              currentPlayerId={player.id}
+              maxPlayers={officialRace.constants.maxPlayers}
+            />
+          )}
           
           {/* Detalhes da Corrida Oficial */}
           <AnimatePresence>
