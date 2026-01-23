@@ -335,6 +335,27 @@ export function useSkemaPlayer() {
       }
     }
     
+    // 3. Fallback: Busca diretamente na lista de jogadores pelo inviteCode
+    const storedPlayers = localStorage.getItem(STORAGE_KEY);
+    if (storedPlayers) {
+      try {
+        // Pode ser objeto único ou array (dependendo da estrutura)
+        const playersData = JSON.parse(storedPlayers);
+        const playersList = Array.isArray(playersData) ? playersData : [playersData];
+        
+        console.log('[SKEMA] 🔎 Buscando em skema_players:', playersList.length, 'jogador(es)');
+        console.log('[SKEMA] 📋 InviteCodes existentes:', playersList.map((p: any) => p.inviteCode).filter(Boolean).join(', '));
+        
+        const playerWithCode = playersList.find((p: any) => p.inviteCode === upperCode);
+        if (playerWithCode) {
+          console.log('[SKEMA] ✅ Código encontrado em skema_players! Jogador:', playerWithCode.name);
+          return { valid: true, inviterId: playerWithCode.id, inviterName: playerWithCode.name };
+        }
+      } catch (e) {
+        console.error('[SKEMA] Erro ao buscar em skema_players:', e);
+      }
+    }
+    
     console.log('[SKEMA] ❌ Código não encontrado em nenhum registro');
     console.log('[SKEMA] 💡 Códigos válidos: SKINVXXXXX (convite único) ou SKXXXXXX (código do jogador)');
     return { valid: false, inviterId: null };
