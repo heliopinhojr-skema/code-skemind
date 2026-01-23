@@ -38,6 +38,29 @@ export function RegistrationScreen({ onRegister, onLogin, validateCode, initialI
   const [isLoading, setIsLoading] = useState(false);
   const [inviterName, setInviterName] = useState<string | null>(null);
 
+  // Permite colar tanto o CÓDIGO (SKINVXXXXX) quanto o LINK inteiro (…/?convite=SKINVXXXXX)
+  const extractSkemaInviteCode = useCallback((input: string) => {
+    const raw = input.trim();
+    if (!raw) return '';
+
+    const upper = raw.toUpperCase();
+
+    // 1) Match direto (funciona mesmo se o usuário colar texto com mais coisas)
+    const directMatch = upper.match(/SKINV[A-Z0-9]{5}/);
+    if (directMatch) return directMatch[0];
+
+    // 2) Match por query (?convite=... / ?invite=...)
+    const queryMatch = raw.match(/[?&](convite|invite)=([^&#]+)/i);
+    if (queryMatch?.[2]) return decodeURIComponent(queryMatch[2]).trim().toUpperCase();
+
+    // 3) Match por path (/convite/CODIGO ou /invite/CODIGO)
+    const pathMatch = raw.match(/\/(convite|invite)\/([^/?#]+)/i);
+    if (pathMatch?.[2]) return decodeURIComponent(pathMatch[2]).trim().toUpperCase();
+
+    // 4) Fallback: deixa o que o usuário digitou
+    return upper;
+  }, []);
+
   // Se veio com código, vai direto pra validação
   useEffect(() => {
     if (initialInviteCode && initialInviteCode !== inviteCode) {
@@ -50,7 +73,12 @@ export function RegistrationScreen({ onRegister, onLogin, validateCode, initialI
 
   const handleValidateCode = useCallback(() => {
     setError(null);
-    const trimmedCode = inviteCode.trim().toUpperCase();
+    const trimmedCode = extractSkemaInviteCode(inviteCode);
+
+    // Se o usuário colou o link inteiro, refletimos o código extraído no input.
+    if (trimmedCode && trimmedCode !== inviteCode.trim().toUpperCase()) {
+      setInviteCode(trimmedCode);
+    }
     
     if (trimmedCode.length < 4) {
       setError('Código muito curto');
@@ -74,7 +102,7 @@ export function RegistrationScreen({ onRegister, onLogin, validateCode, initialI
         setError('Código inválido. Use um código SKINVXXXXX de convite.');
       }
     }
-  }, [inviteCode, validateCode]);
+  }, [inviteCode, validateCode, extractSkemaInviteCode]);
 
   const handleRegister = useCallback(() => {
     setError(null);
@@ -87,14 +115,18 @@ export function RegistrationScreen({ onRegister, onLogin, validateCode, initialI
     setIsLoading(true);
     
     setTimeout(() => {
-      const result = onRegister(name, inviteCode, selectedEmoji, password);
+      const normalizedInvite = extractSkemaInviteCode(inviteCode);
+      if (normalizedInvite && normalizedInvite !== inviteCode.trim().toUpperCase()) {
+        setInviteCode(normalizedInvite);
+      }
+      const result = onRegister(name, normalizedInvite || inviteCode, selectedEmoji, password);
       
       if (!result.success) {
         setError(result.error || 'Erro ao registrar');
         setIsLoading(false);
       }
     }, 500);
-  }, [name, inviteCode, selectedEmoji, password, onRegister]);
+  }, [name, inviteCode, selectedEmoji, password, onRegister, extractSkemaInviteCode]);
 
   const handleLogin = useCallback(() => {
     setError(null);
