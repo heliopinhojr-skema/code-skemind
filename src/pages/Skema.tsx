@@ -304,6 +304,11 @@ export default function Skema() {
   };
 
   const handleBackToLobby = () => {
+    console.log('[SKEMA] 🔙 handleBackToLobby chamado');
+    console.log('[SKEMA] gameMode:', gameMode);
+    console.log('[SKEMA] game.state.status:', game.state.status);
+    console.log('[SKEMA] tournament.state.status:', tournament.state.status);
+    
     // Atualiza stats do jogador
     if (game.state.status === 'won' || game.state.status === 'lost') {
       skemaPlayer.actions.updateStats({
@@ -315,19 +320,35 @@ export default function Skema() {
       if (gameMode === 'bots') {
         const humanResult = tournament.state.results.get(tournament.state.humanPlayerId);
         console.log('[SKEMA] 💰 Verificando prêmio Arena...');
+        console.log('[SKEMA] humanResult:', humanResult);
         console.log('[SKEMA] Saldo ANTES:', skemaPlayer.player?.energy);
+        
         if (humanResult && humanResult.rank >= 1 && humanResult.rank <= 3) {
           // ITM: top 3 ganham
           const prizePercent = ARENA_PRIZE_DISTRIBUTION[humanResult.rank - 1];
           const prize = ARENA_TOTAL_POOL * prizePercent;
-          console.log(`[SKEMA] 🏆 Rank: ${humanResult.rank}º | ${prizePercent * 100}% de k$${ARENA_TOTAL_POOL} = k$${prize.toFixed(2)}`);
+          console.log(`[SKEMA] 🏆 Rank: ${humanResult.rank}º | ${prizePercent * 100}% de k$${ARENA_TOTAL_POOL.toFixed(2)} = k$${prize.toFixed(2)}`);
+          
+          // Adiciona prêmio
           skemaPlayer.actions.addEnergy(prize);
-          console.log('[SKEMA] Saldo DEPOIS (esperado):', (skemaPlayer.player?.energy || 0) + prize);
+          
+          // Verifica localStorage diretamente
+          setTimeout(() => {
+            const stored = localStorage.getItem('skema_player');
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              console.log('[SKEMA] ✅ Saldo NO STORAGE após prêmio:', parsed.energy);
+            }
+          }, 100);
         } else {
           console.log(`[SKEMA] ❌ Fora do ITM (${humanResult?.rank || '?'}º lugar) - sem prêmio`);
         }
       }
     }
+    
+    // Verifica Skema Box
+    const boxBalance = localStorage.getItem('skema_box_balance');
+    console.log('[SKEMA] 📦 Skema Box atual:', boxBalance);
     
     setCurrentView('lobby');
     game.actions.newGame();
