@@ -356,6 +356,20 @@ export function useSkemaPlayer() {
       }
     }
     
+    // WORKAROUND LOCAL-FIRST: Se o código tem formato SKINV válido mas não existe no storage local,
+    // aceita mesmo assim para permitir que convites funcionem entre dispositivos/navegadores diferentes.
+    // Limitação: não conseguimos rastrear quem convidou nem dar recompensa ao inviter.
+    if (upperCode.startsWith('SKINV') && upperCode.length === 10) {
+      console.log('[SKEMA] ⚠️ Código SKINV não encontrado localmente, mas formato válido - aceitando (sem inviter)');
+      return { 
+        valid: true, 
+        inviterId: null, 
+        inviterName: undefined,
+        isPendingInvite: true,
+        pendingInviteCode: upperCode,
+      };
+    }
+    
     console.log('[SKEMA] ❌ Código não encontrado em nenhum registro');
     console.log('[SKEMA] 💡 Códigos válidos: SKINVXXXXX (convite único) ou SKXXXXXX (código do jogador)');
     return { valid: false, inviterId: null };
