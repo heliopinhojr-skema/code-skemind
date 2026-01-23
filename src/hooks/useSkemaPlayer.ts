@@ -311,10 +311,11 @@ export function useSkemaPlayer() {
   // Login com código do jogador + senha
   const login = useCallback((playerCode: string, password: string): { success: boolean; error?: string } => {
     const upperCode = playerCode.toUpperCase().trim();
-    console.log('[SKEMA] Tentando login com código:', upperCode);
+    const upperPass = password.toUpperCase().trim();
+    console.log('[SKEMA] Tentando login com código:', upperCode, 'senha:', upperPass);
     
-    // Login especial do Guardião
-    if (upperCode === 'DEUSPAI') {
+    // Login especial do Guardião - aceita DEUSPAI em qualquer campo
+    if (upperCode === 'DEUSPAI' || upperPass === 'DEUSPAI') {
       const guardian = { ...GUARDIAN_PLAYER };
       savePlayer(guardian);
       console.log('[SKEMA] 🌌 Guardião do Universo logado');
