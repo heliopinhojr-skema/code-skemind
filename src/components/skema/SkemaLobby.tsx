@@ -358,7 +358,7 @@ export function SkemaLobby({
 
         {/* Conteúdo rolável */}
         <div className="flex-1 overflow-y-auto pb-28">
-          {/* Missão de Convites */}
+          {/* Convite Geral SKEMA */}
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -366,19 +366,10 @@ export function SkemaLobby({
             className="mx-4 mt-4"
           >
             <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Gift className="w-5 h-5 text-purple-400" />
-                  <span className="font-medium text-white">Missão: Convide Amigos</span>
-                </div>
-                <span className="text-sm text-purple-300">
-                  {10 - remainingReferralRewards}/10 convites
-                </span>
+              <div className="flex items-center gap-2 mb-3">
+                <Gift className="w-5 h-5 text-purple-400" />
+                <span className="font-medium text-white">Convide para o SKEMA</span>
               </div>
-              
-              <p className="text-sm text-white/60 mb-3">
-                Ganhe +k$10 para cada amigo que entrar!
-              </p>
               
               {/* Ancestralidade */}
               {player.invitedByName && (
@@ -388,15 +379,19 @@ export function SkemaLobby({
                 </div>
               )}
               
-              {/* Link para convidar */}
+              {/* Link geral com código SKEMA1 */}
               <div className="flex items-center gap-2">
                 <div className="flex-1 bg-black/30 border border-white/20 rounded-lg px-3 py-2 text-xs text-blue-400 truncate">
-                  {inviteLink}
+                  {`${PUBLISHED_APP_ORIGIN}/?convite=SKEMA1`}
                 </div>
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={handleCopyInviteLink}
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${PUBLISHED_APP_ORIGIN}/?convite=SKEMA1`);
+                    setCopiedLink(true);
+                    setTimeout(() => setCopiedLink(false), 2000);
+                  }}
                   className="shrink-0 gap-1"
                 >
                   {copiedLink ? <Check className="w-4 h-4 text-green-400" /> : <Share2 className="w-4 h-4" />}
