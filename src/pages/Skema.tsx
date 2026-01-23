@@ -294,12 +294,15 @@ export default function Skema() {
       // Distribui prêmios para Arena x Bots
       if (gameMode === 'bots') {
         const humanResult = tournament.state.results.get(tournament.state.humanPlayerId);
+        console.log('[SKEMA] 💰 Verificando prêmio Arena...');
+        console.log('[SKEMA] Saldo ANTES:', skemaPlayer.player?.energy);
         if (humanResult && humanResult.rank >= 1 && humanResult.rank <= 3) {
           // ITM: top 3 ganham
           const prizePercent = ARENA_PRIZE_DISTRIBUTION[humanResult.rank - 1];
           const prize = ARENA_TOTAL_POOL * prizePercent;
+          console.log(`[SKEMA] 🏆 Rank: ${humanResult.rank}º | ${prizePercent * 100}% de k$${ARENA_TOTAL_POOL} = k$${prize.toFixed(2)}`);
           skemaPlayer.actions.addEnergy(prize);
-          console.log(`[SKEMA] 🏆 Prêmio ${humanResult.rank}º lugar: +k$${prize.toFixed(2)}`);
+          console.log('[SKEMA] Saldo DEPOIS (esperado):', (skemaPlayer.player?.energy || 0) + prize);
         } else {
           console.log(`[SKEMA] ❌ Fora do ITM (${humanResult?.rank || '?'}º lugar) - sem prêmio`);
         }
