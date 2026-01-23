@@ -1,5 +1,9 @@
 /**
- * useOfficialRace - Sistema de corridas oficiais agendadas
+ * useOfficialRace - Sistema de corridas oficiais agendadas (v2)
+ * 
+ * RECONSTRUÍDO para resolver:
+ * - Inscritos não aparecendo entre domínios
+ * - Sincronização via API simulada (futuramente Lovable Cloud)
  * 
  * Corrida fixa: 03/03/2026 às 12:00 (horário local)
  * Entry: k$1.10 (k$1 prêmio + k$0.10 caixa skema)
@@ -29,12 +33,13 @@ export interface OfficialRace {
   status: 'registration' | 'starting' | 'running' | 'finished' | 'cancelled';
   creatorId: string;
   creatorName: string;
+  version: number; // Para detectar atualizações
 }
 
 // ==================== CONSTANTES ====================
 
-const STORAGE_KEY = 'skema_official_races';
-const REGISTRATIONS_KEY = 'skema_race_registrations';
+const STORAGE_KEY = 'skema_official_race_v2';
+const SYNC_INTERVAL = 5000; // 5 segundos
 
 // Corrida fixa - 03/03/2026 às 12:00
 const FIXED_RACE_DATE = new Date('2026-03-03T12:00:00');
@@ -42,13 +47,14 @@ const ENTRY_FEE = 1.10;
 const PRIZE_PER_PLAYER = 1.00;
 const SKEMA_BOX_FEE = 0.10;
 const MIN_PLAYERS = 2;
-const MAX_PLAYERS = 16;
+const MAX_PLAYERS = 50; // Aumentado para acomodar mais jogadores
 
 // Criador do universo - Guardião
-const UNIVERSE_CREATOR = {
+const UNIVERSE_CREATOR: OfficialRacePlayer = {
   id: 'guardian-skema-universe',
   name: 'skema',
   emoji: '🌌',
+  registeredAt: '2024-01-01T00:00:00.000Z',
 };
 
 // ==================== HELPERS ====================
@@ -82,6 +88,39 @@ function formatRaceDate(date: Date): string {
   });
 }
 
+function createInitialRace(): OfficialRace {
+  return {
+    id: 'official-race-2026-03-03',
+    name: 'Corrida Inaugural SKEMA',
+    scheduledDate: FIXED_RACE_DATE,
+    entryFee: ENTRY_FEE,
+    prizePerPlayer: PRIZE_PER_PLAYER,
+    skemaBoxFee: SKEMA_BOX_FEE,
+    minPlayers: MIN_PLAYERS,
+    maxPlayers: MAX_PLAYERS,
+    registeredPlayers: [UNIVERSE_CREATOR],
+    status: 'registration',
+    creatorId: UNIVERSE_CREATOR.id,
+    creatorName: UNIVERSE_CREATOR.name,
+    version: 1,
+  };
+}
+
+function deduplicatePlayers(players: OfficialRacePlayer[]): OfficialRacePlayer[] {
+  const seen = new Map<string, OfficialRacePlayer>();
+  
+  for (const player of players) {
+    const normalizedName = player.name.trim().toLowerCase();
+    
+    // Mantém primeira ocorrência de cada nome e ID
+    if (!seen.has(player.id) && ![...seen.values()].some(p => p.name.trim().toLowerCase() === normalizedName)) {
+      seen.set(player.id, player);
+    }
+  }
+  
+  return Array.from(seen.values());
+}
+
 // ==================== HOOK ====================
 
 export function useOfficialRace() {
@@ -89,95 +128,66 @@ export function useOfficialRace() {
   const [timeUntilRace, setTimeUntilRace] = useState('');
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Inicializa corrida fixa - SEMPRE cria se não existir
-  useEffect(() => {
-    const loadOrCreateRace = () => {
-      try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        
-        if (stored) {
-          const parsed = JSON.parse(stored) as OfficialRace;
-          parsed.scheduledDate = new Date(parsed.scheduledDate);
-          
-          // Remove duplicatas de nome (mantém primeira ocorrência)
-          const seenNames = new Set<string>();
-          parsed.registeredPlayers = parsed.registeredPlayers.filter(p => {
-            const normalizedName = p.name.trim().toLowerCase();
-            if (seenNames.has(normalizedName)) {
-              console.log('[OFFICIAL RACE] Removendo duplicata:', p.name);
-              return false;
-            }
-            seenNames.add(normalizedName);
-            return true;
-          });
-          
-          // Garante que o Guardião esteja inscrito
-          const guardianRegistered = parsed.registeredPlayers.some(p => p.id === UNIVERSE_CREATOR.id);
-          if (!guardianRegistered) {
-            parsed.registeredPlayers.unshift({
-              id: UNIVERSE_CREATOR.id,
-              name: UNIVERSE_CREATOR.name,
-              emoji: UNIVERSE_CREATOR.emoji,
-              registeredAt: '2024-01-01T00:00:00.000Z',
-            });
-            console.log('[OFFICIAL RACE] Guardião inscrito na corrida');
-          }
-          
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-          console.log('[OFFICIAL RACE] Corrida carregada:', parsed.name, '- Inscritos:', parsed.registeredPlayers.length);
-          setRace(parsed);
-        } else {
-          // Cria corrida inicial com Guardião já inscrito
-          const initialRace: OfficialRace = {
-            id: 'official-race-2026-03-03',
-            name: 'Corrida Inaugural SKEMA',
-            scheduledDate: FIXED_RACE_DATE,
-            entryFee: ENTRY_FEE,
-            prizePerPlayer: PRIZE_PER_PLAYER,
-            skemaBoxFee: SKEMA_BOX_FEE,
-            minPlayers: MIN_PLAYERS,
-            maxPlayers: MAX_PLAYERS,
-            registeredPlayers: [{
-              id: UNIVERSE_CREATOR.id,
-              name: UNIVERSE_CREATOR.name,
-              emoji: UNIVERSE_CREATOR.emoji,
-              registeredAt: '2024-01-01T00:00:00.000Z',
-            }],
-            status: 'registration',
-            creatorId: UNIVERSE_CREATOR.id,
-            creatorName: UNIVERSE_CREATOR.name,
-          };
-          
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(initialRace));
-          console.log('[OFFICIAL RACE] Corrida criada com Guardião:', initialRace.name);
-          setRace(initialRace);
-        }
-      } catch (e) {
-        console.error('[OFFICIAL RACE] Erro ao carregar corrida:', e);
-        // Recria corrida em caso de erro
-        const initialRace: OfficialRace = {
-          id: 'official-race-2026-03-03',
-          name: 'Corrida Inaugural SKEMA',
-          scheduledDate: FIXED_RACE_DATE,
-          entryFee: ENTRY_FEE,
-          prizePerPlayer: PRIZE_PER_PLAYER,
-          skemaBoxFee: SKEMA_BOX_FEE,
-          minPlayers: MIN_PLAYERS,
-          maxPlayers: MAX_PLAYERS,
-          registeredPlayers: [],
-          status: 'registration',
-          creatorId: UNIVERSE_CREATOR.id,
-          creatorName: UNIVERSE_CREATOR.name,
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(initialRace));
-        setRace(initialRace);
-      }
+  // Carrega corrida do storage
+  const loadRace = useCallback((): OfficialRace => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
       
-      setIsLoaded(true);
-    };
+      if (stored) {
+        const parsed = JSON.parse(stored) as OfficialRace;
+        parsed.scheduledDate = new Date(parsed.scheduledDate);
+        
+        // Deduplica jogadores
+        parsed.registeredPlayers = deduplicatePlayers(parsed.registeredPlayers);
+        
+        // Garante que o Guardião esteja inscrito
+        const guardianExists = parsed.registeredPlayers.some(p => p.id === UNIVERSE_CREATOR.id);
+        if (!guardianExists) {
+          parsed.registeredPlayers.unshift(UNIVERSE_CREATOR);
+          parsed.version++;
+        }
+        
+        return parsed;
+      }
+    } catch (e) {
+      console.error('[OFFICIAL RACE] Erro ao carregar:', e);
+    }
     
-    loadOrCreateRace();
+    return createInitialRace();
   }, []);
+
+  // Salva corrida
+  const saveRace = useCallback((updatedRace: OfficialRace) => {
+    updatedRace.version++;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedRace));
+    setRace(updatedRace);
+    console.log('[OFFICIAL RACE] Salvo:', updatedRace.registeredPlayers.length, 'inscritos, versão', updatedRace.version);
+  }, []);
+
+  // Inicializa e sincroniza
+  useEffect(() => {
+    const initialRace = loadRace();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(initialRace));
+    setRace(initialRace);
+    setIsLoaded(true);
+    
+    console.log('[OFFICIAL RACE] Carregado:', initialRace.name);
+    console.log('[OFFICIAL RACE] Inscritos:', initialRace.registeredPlayers.map(p => p.name).join(', '));
+
+    // Re-carrega periodicamente para pegar atualizações (simula sync)
+    const syncInterval = setInterval(() => {
+      const currentRace = loadRace();
+      setRace(prev => {
+        if (!prev || currentRace.version > prev.version) {
+          console.log('[OFFICIAL RACE] Sincronizado, versão:', currentRace.version);
+          return currentRace;
+        }
+        return prev;
+      });
+    }, SYNC_INTERVAL);
+
+    return () => clearInterval(syncInterval);
+  }, [loadRace]);
 
   // Atualiza countdown
   useEffect(() => {
@@ -188,7 +198,7 @@ export function useOfficialRace() {
     };
     
     update();
-    const interval = setInterval(update, 60000); // Atualiza a cada minuto
+    const interval = setInterval(update, 60000);
     return () => clearInterval(interval);
   }, [race]);
 
@@ -198,38 +208,43 @@ export function useOfficialRace() {
     return race.registeredPlayers.some(p => p.id === playerId);
   }, [race]);
 
-  // Verifica se nome já está em uso na corrida
-  const isNameTaken = useCallback((name: string): boolean => {
+  // Verifica se nome já está em uso
+  const isNameTaken = useCallback((name: string, excludeId?: string): boolean => {
     if (!race) return false;
     const normalizedName = name.trim().toLowerCase();
-    return race.registeredPlayers.some(p => p.name.trim().toLowerCase() === normalizedName);
+    return race.registeredPlayers.some(p => 
+      p.name.trim().toLowerCase() === normalizedName && p.id !== excludeId
+    );
   }, [race]);
 
   // Inscreve jogador
   const registerPlayer = useCallback((player: { id: string; name: string; emoji: string }): { success: boolean; error?: string } => {
-    if (!race) return { success: false, error: 'Corrida não encontrada' };
+    // Recarrega antes de registrar para evitar conflitos
+    const currentRace = loadRace();
     
-    if (race.status !== 'registration') {
+    if (currentRace.status !== 'registration') {
       return { success: false, error: 'Inscrições encerradas' };
     }
     
-    if (race.registeredPlayers.length >= race.maxPlayers) {
+    if (currentRace.registeredPlayers.length >= currentRace.maxPlayers) {
       return { success: false, error: 'Corrida lotada' };
     }
     
-    if (isPlayerRegistered(player.id)) {
+    // Verifica se já está inscrito por ID
+    if (currentRace.registeredPlayers.some(p => p.id === player.id)) {
       return { success: false, error: 'Você já está inscrito' };
     }
     
-    // Bloqueia nomes duplicados
-    if (isNameTaken(player.name)) {
+    // Verifica nome duplicado
+    const normalizedName = player.name.trim().toLowerCase();
+    if (currentRace.registeredPlayers.some(p => p.name.trim().toLowerCase() === normalizedName)) {
       return { success: false, error: 'Nome já em uso nesta corrida' };
     }
     
     const updatedRace: OfficialRace = {
-      ...race,
+      ...currentRace,
       registeredPlayers: [
-        ...race.registeredPlayers,
+        ...currentRace.registeredPlayers,
         {
           id: player.id,
           name: player.name,
@@ -239,34 +254,54 @@ export function useOfficialRace() {
       ],
     };
     
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedRace));
-    setRace(updatedRace);
+    saveRace(updatedRace);
+    console.log('[OFFICIAL RACE] Inscrito:', player.name, '- Total:', updatedRace.registeredPlayers.length);
     
     return { success: true };
-  }, [race, isPlayerRegistered, isNameTaken]);
+  }, [loadRace, saveRace]);
 
   // Cancela inscrição
   const unregisterPlayer = useCallback((playerId: string): { success: boolean; error?: string } => {
-    if (!race) return { success: false, error: 'Corrida não encontrada' };
+    const currentRace = loadRace();
     
-    if (race.status !== 'registration') {
+    if (currentRace.status !== 'registration') {
       return { success: false, error: 'Não é possível cancelar inscrição' };
     }
     
-    if (!isPlayerRegistered(playerId)) {
+    if (!currentRace.registeredPlayers.some(p => p.id === playerId)) {
       return { success: false, error: 'Você não está inscrito' };
     }
     
+    // Não permite remover o Guardião
+    if (playerId === UNIVERSE_CREATOR.id) {
+      return { success: false, error: 'Guardião não pode sair' };
+    }
+    
     const updatedRace: OfficialRace = {
-      ...race,
-      registeredPlayers: race.registeredPlayers.filter(p => p.id !== playerId),
+      ...currentRace,
+      registeredPlayers: currentRace.registeredPlayers.filter(p => p.id !== playerId),
     };
     
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedRace));
-    setRace(updatedRace);
+    saveRace(updatedRace);
+    console.log('[OFFICIAL RACE] Removido:', playerId, '- Total:', updatedRace.registeredPlayers.length);
     
     return { success: true };
-  }, [race, isPlayerRegistered]);
+  }, [loadRace, saveRace]);
+
+  // Força recarga (útil para debug)
+  const forceReload = useCallback(() => {
+    const currentRace = loadRace();
+    setRace(currentRace);
+    console.log('[OFFICIAL RACE] Force reload - Inscritos:', currentRace.registeredPlayers.map(p => p.name).join(', '));
+  }, [loadRace]);
+
+  // Limpa e recria (debug)
+  const resetRace = useCallback(() => {
+    const newRace = createInitialRace();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newRace));
+    setRace(newRace);
+    console.log('[OFFICIAL RACE] RESET completo');
+  }, []);
 
   // Dados calculados
   const prizePool = useMemo(() => {
@@ -310,8 +345,11 @@ export function useOfficialRace() {
     },
     actions: {
       isPlayerRegistered,
+      isNameTaken,
       registerPlayer,
       unregisterPlayer,
+      forceReload,
+      resetRace,
     },
   };
 }

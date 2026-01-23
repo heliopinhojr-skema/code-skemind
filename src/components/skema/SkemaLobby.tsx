@@ -82,12 +82,14 @@ export function SkemaLobby({
   const pendingUnused = pendingInvites.filter(p => !p.used);
   const lastPendingCode = pendingUnused.length > 0 ? pendingUnused[pendingUnused.length - 1].code : null;
 
-  // Gera link de convite
+  // Gera link de convite - SEMPRE usa domínio publicado para evitar login Lovable
+  const PUBLISHED_ORIGIN = 'https://skemind-code-guess.lovable.app';
+  
   const getInviteLink = useCallback((code: string) => {
-    // Importante: este app é local-first (convites ficam no localStorage).
-    // Portanto, o link DEVE usar o mesmo origin onde o código foi gerado;
-    // caso contrário, o destinatário cai em outro domínio e o SKINV não existe lá.
-    return `${window.location.origin}/?convite=${encodeURIComponent(code)}`;
+    // IMPORTANTE: Links de convite DEVEM usar o domínio publicado.
+    // Se usar preview, visitantes veem tela de login Google/GitHub do Lovable.
+    // O código SKINV precisa ser gerado no mesmo domínio publicado para funcionar.
+    return `${PUBLISHED_ORIGIN}/?convite=${encodeURIComponent(code)}`;
   }, []);
 
   const handleCopyInvite = useCallback(async (code: string) => {
@@ -113,6 +115,10 @@ export function SkemaLobby({
     setError(null);
   }, []);
 
+  // Arena entry fee
+  const ARENA_ENTRY_FEE = 0.55;
+  const canAffordArena = player.energy >= ARENA_ENTRY_FEE;
+
   const handleStartCountdown = useCallback(() => {
     if (isStarting) return;
     
@@ -120,6 +126,10 @@ export function SkemaLobby({
       setIsStarting(true);
       setCountdown(COUNTDOWN_SECONDS);
     } else if (selectedMode === 'bots') {
+      if (!canAffordArena) {
+        setError('Energia insuficiente (k$0.55)');
+        return;
+      }
       setIsStarting(true);
       setCountdown(COUNTDOWN_SECONDS);
     } else if (selectedMode === 'official') {
@@ -130,7 +140,7 @@ export function SkemaLobby({
       setIsStarting(true);
       setCountdown(COUNTDOWN_SECONDS);
     }
-  }, [selectedMode, isStarting, canAffordOfficial]);
+  }, [selectedMode, isStarting, canAffordOfficial, canAffordArena]);
 
   const handleCancelCountdown = useCallback(() => {
     setIsStarting(false);
@@ -145,8 +155,17 @@ export function SkemaLobby({
       if (selectedMode === 'training') {
         onStartTraining();
       } else if (selectedMode === 'bots') {
-        const result = onStartBotRace(0, 0);
+        // Deduz entrada da arena antes de iniciar
+        const deducted = onDeductEnergy(ARENA_ENTRY_FEE);
+        if (!deducted) {
+          setError('Falha ao deduzir energia');
+          setIsStarting(false);
+          setCountdown(null);
+          return;
+        }
+        const result = onStartBotRace(ARENA_ENTRY_FEE, 0);
         if (!result.success) {
+          onAddEnergy(ARENA_ENTRY_FEE); // Reembolsa
           setError(result.error || 'Erro ao iniciar');
           setIsStarting(false);
           setCountdown(null);
@@ -270,7 +289,7 @@ export function SkemaLobby({
                 <h1 className="text-base font-bold text-white">{player.name}</h1>
                 <div className="flex items-center gap-1 text-xs text-white/60">
                   <Calendar className="w-3 h-3" />
-                  <span>Ano {skemaYear} • Dia {skemaDay}</span>
+                  <span>Ano {skemaYear} • Dia {skemaDay} • {skemaHour}h</span>
                 </div>
               </div>
             </div>
@@ -464,7 +483,7 @@ export function SkemaLobby({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <h3 className="font-bold text-white text-sm">Arena</h3>
-                      <span className="text-xs font-medium text-green-400">Grátis</span>
+                      <span className="text-xs font-medium text-yellow-400">k$0.55</span>
                     </div>
                     <p className="text-xs text-white/60">9 bots • Mesa de 10</p>
                   </div>
