@@ -9,7 +9,7 @@
  */
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useSkemaPlayer } from '@/hooks/useSkemaPlayer';
 import { useGame } from '@/hooks/useGame';
 import { useTournament } from '@/hooks/useTournament';
@@ -28,6 +28,8 @@ type SkemaView = 'lobby' | 'training' | 'bots' | 'official';
 
 export default function Skema() {
   const { code: codeFromPath } = useParams<{ code?: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
   
   // Captura código de convite da URL (path /convite/CODIGO ou query ?convite=CODIGO)
   const inviteCodeFromUrl = useMemo(() => {
@@ -82,6 +84,52 @@ export default function Skema() {
         validateCode={skemaPlayer.actions.validateInviteCode}
         initialInviteCode={inviteCodeFromUrl}
       />
+    );
+  }
+
+  const hasInviteInUrl = !!inviteCodeFromUrl;
+
+  // Se já existe jogador logado neste navegador e chegou um convite pela URL,
+  // precisamos permitir ao usuário escolher entre continuar logado ou sair para usar o convite.
+  if (hasInviteInUrl) {
+    const handleContinue = () => {
+      // Remove convite da URL para não ficar preso em loop
+      navigate({ pathname: '/', search: '' }, { replace: true });
+    };
+
+    const handleLogoutAndUseInvite = () => {
+      // Mantém a URL do convite (path/query) para cair direto na RegistrationScreen
+      skemaPlayer.actions.logout();
+      navigate({ pathname: location.pathname, search: location.search }, { replace: true });
+    };
+
+    return (
+      <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
+        <CosmicBackground />
+        <div className="relative z-10 w-full max-w-md">
+          <div className="bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6 space-y-4">
+            <h1 className="text-xl font-bold text-white">Convite detectado</h1>
+            <p className="text-sm text-white/70">
+              Você está logado como <span className="font-semibold text-white">{skemaPlayer.player.name}</span>. Para usar este convite e criar/entrar
+              em outra conta neste mesmo dispositivo, você precisa sair primeiro.
+            </p>
+            <div className="text-xs text-white/50">
+              Convite: <span className="font-mono text-white/70">{inviteCodeFromUrl}</span>
+            </div>
+            <div className="grid gap-3">
+              <Button onClick={handleContinue} className="w-full h-12">
+                Continuar como {skemaPlayer.player.name}
+              </Button>
+              <Button onClick={handleLogoutAndUseInvite} variant="outline" className="w-full h-12">
+                Sair e usar convite
+              </Button>
+            </div>
+            <p className="text-xs text-white/40">
+              Dica para testes: use Aba Anônima / outro navegador para simular outro convidado sem deslogar sua conta principal.
+            </p>
+          </div>
+        </div>
+      </div>
     );
   }
   
