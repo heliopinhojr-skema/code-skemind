@@ -10,7 +10,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useSkemaPlayer } from '@/hooks/useSkemaPlayer';
 import { useGame } from '@/hooks/useGame';
 import { useTournament } from '@/hooks/useTournament';
@@ -33,6 +33,7 @@ type SkemaView = 'lobby' | 'training' | 'bots' | 'official' | 'party-setup' | 'p
 
 export default function Skema() {
   const { code: codeFromPath } = useParams<{ code?: string }>();
+  const navigate = useNavigate();
   
   // Captura código de convite da URL (path /convite/CODIGO ou query ?convite=CODIGO)
   // Usa state para permitir limpeza manual quando usuário escolhe continuar
@@ -66,6 +67,8 @@ export default function Skema() {
   
   // Detecta conflito de sessão: usuário logado + convite na URL
   useEffect(() => {
+    if (showSessionConflict) return;
+
     if (skemaPlayer.isLoaded && skemaPlayer.isRegistered && skemaPlayer.player && inviteCodeFromUrl) {
       // Verifica se o código é diferente do código do jogador atual
       const currentPlayerInvite = skemaPlayer.player.inviteCode;
@@ -74,7 +77,7 @@ export default function Skema() {
         setPendingInviteCode(inviteCodeFromUrl);
       }
     }
-  }, [skemaPlayer.isLoaded, skemaPlayer.isRegistered, skemaPlayer.player, inviteCodeFromUrl]);
+  }, [skemaPlayer.isLoaded, skemaPlayer.isRegistered, skemaPlayer.player, inviteCodeFromUrl, showSessionConflict]);
   
   // Atualiza resultado do torneio quando jogo termina
   // MUST be before any conditional returns to follow Rules of Hooks
@@ -122,7 +125,9 @@ export default function Skema() {
       setPendingInviteCode(null);
       // Limpa o código da URL E do state para evitar loop
       setInviteCodeFromUrl('');
-      window.history.replaceState({}, '', '/');
+      // IMPORTANTE (mobile): usar o roteador para realmente atualizar a rota atual
+      // e evitar que o parâmetro :code continue “preso” no BrowserRouter.
+      navigate('/', { replace: true });
     };
     
     const handleLogoutAndUseInvite = () => {
