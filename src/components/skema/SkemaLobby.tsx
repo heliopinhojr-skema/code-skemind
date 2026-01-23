@@ -331,7 +331,7 @@ export function SkemaLobby({
           </div>
           
           {/* Stats rápidos */}
-          <div className="grid grid-cols-4 gap-2">
+          <div className={`grid gap-2 ${player.id === 'guardian-skema-universe' ? 'grid-cols-4' : 'grid-cols-3'}`}>
             <div className="bg-white/5 rounded-lg p-2 text-center">
               <div className="text-lg font-bold text-green-400">{player.stats.wins}</div>
               <div className="text-xs text-white/50">Vitórias</div>
@@ -346,10 +346,13 @@ export function SkemaLobby({
               </div>
               <div className="text-xs text-white/50">Melhor</div>
             </div>
-            <div className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-lg p-2 text-center border border-yellow-500/30">
-              <div className="text-lg font-bold text-yellow-400">k${skemaBoxBalance.toFixed(2)}</div>
-              <div className="text-xs text-yellow-400/70">Skema Box</div>
-            </div>
+            {/* Skema Box - só Guardian vê */}
+            {player.id === 'guardian-skema-universe' && (
+              <div className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-lg p-2 text-center border border-yellow-500/30">
+                <div className="text-lg font-bold text-yellow-400">k${skemaBoxBalance.toFixed(2)}</div>
+                <div className="text-xs text-yellow-400/70">Skema Box</div>
+              </div>
+            )}
           </div>
         </motion.header>
 
