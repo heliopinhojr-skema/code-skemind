@@ -80,20 +80,47 @@ function generatePlayerId(): string {
   return `player-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
+/**
+ * Calendário SKEMA:
+ * - Nascimento: 12/07/1970 às 00:18 (epoch)
+ * - 1 dia Skema = 2 horas reais (ratio 1:12)
+ * - 1 ano Skema = 365 dias Skema = ~30.4 dias reais
+ */
+const SKEMA_EPOCH = new Date('1970-07-12T00:18:00').getTime();
+const REAL_HOURS_PER_SKEMA_DAY = 2;
+const SKEMA_DAYS_PER_YEAR = 365;
+
+function getSkemaTimeSinceEpoch(): { years: number; days: number; hours: number } {
+  const now = Date.now();
+  const msElapsed = now - SKEMA_EPOCH;
+  
+  // Converte para horas reais
+  const realHours = msElapsed / (1000 * 60 * 60);
+  
+  // Converte para dias Skema (2h real = 1 dia Skema)
+  const totalSkemaDays = Math.floor(realHours / REAL_HOURS_PER_SKEMA_DAY);
+  
+  // Calcula anos e dias
+  const years = Math.floor(totalSkemaDays / SKEMA_DAYS_PER_YEAR);
+  const days = (totalSkemaDays % SKEMA_DAYS_PER_YEAR) + 1; // 1-indexed
+  
+  // Hora dentro do dia Skema (0-23 equivalente)
+  const hoursIntoCurrentSkemaDay = (realHours % REAL_HOURS_PER_SKEMA_DAY);
+  const skemaHour = Math.floor((hoursIntoCurrentSkemaDay / REAL_HOURS_PER_SKEMA_DAY) * 24);
+  
+  return { years: years + 1, days, hours: skemaHour }; // year 1-indexed
+}
+
 function getSkemaYear(): number {
-  const startDate = new Date('2024-01-01');
-  const now = new Date();
-  const diff = now.getTime() - startDate.getTime();
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  return Math.floor(days / 365) + 1;
+  return getSkemaTimeSinceEpoch().years;
 }
 
 function getSkemaDay(): number {
-  const startDate = new Date('2024-01-01');
-  const now = new Date();
-  const diff = now.getTime() - startDate.getTime();
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  return (days % 365) + 1;
+  return getSkemaTimeSinceEpoch().days;
+}
+
+export function getSkemaHour(): number {
+  return getSkemaTimeSinceEpoch().hours;
 }
 
 function getTodayDateString(): string {
@@ -307,24 +334,14 @@ export function useSkemaPlayer() {
       },
     };
     
-    savePlayer(newPlayer);
-    
-    // Registra o código deste jogador no registro global
-    const updatedRegistry = { ...codeRegistry };
-    updatedRegistry[newInviteCode] = { id: newPlayer.id, name: newPlayer.name };
-    localStorage.setItem(CODE_REGISTRY_KEY, JSON.stringify(updatedRegistry));
-    setCodeRegistry(updatedRegistry);
-    
-    // Registra quem convidou usando o CÓDIGO DE CONVITE como chave
+    // ========== IMPORTANTE: Atualiza referrals ANTES de trocar jogador ==========
     const usedInviteCode = inviteCode.toUpperCase().trim();
-    
-    // Não conta master codes como convites de referral
     const isMasterCode = MASTER_INVITE_CODES.includes(usedInviteCode);
     
     if (!isMasterCode && validation.inviterId) {
-      // SEMPRE salva no registro global usando o código de convite USADO
       const REFERRALS_BY_INVITE_KEY = 'skema_referrals_by_invite_code';
       try {
+        // 1. Salva no registro global de referrals (persistente entre sessões)
         const storedReferrals = localStorage.getItem(REFERRALS_BY_INVITE_KEY);
         const referralsByInvite = storedReferrals ? JSON.parse(storedReferrals) : {};
         
@@ -332,26 +349,29 @@ export function useSkemaPlayer() {
           referralsByInvite[usedInviteCode] = [];
         }
         
-        // Adiciona o novo jogador à lista de referrals do código usado (se ainda não existe)
         if (!referralsByInvite[usedInviteCode].includes(newPlayer.id)) {
           referralsByInvite[usedInviteCode].push(newPlayer.id);
           console.log(`[SKEMA] ✅ Convite contabilizado: ${usedInviteCode} convidou ${newPlayer.name} (${newPlayer.id})`);
+          console.log(`[SKEMA] Total referrals para ${usedInviteCode}:`, referralsByInvite[usedInviteCode].length);
         }
         
         localStorage.setItem(REFERRALS_BY_INVITE_KEY, JSON.stringify(referralsByInvite));
         
-        // Atualiza inviter se estiver logado neste navegador
-        const storedInviter = localStorage.getItem(STORAGE_KEY);
-        if (storedInviter) {
-          const inviterPlayer = JSON.parse(storedInviter) as SkemaPlayer;
-          // Verifica se o código usado pertence ao inviter logado
-          if (inviterPlayer.inviteCode === usedInviteCode) {
-            inviterPlayer.referrals = [...new Set([...(inviterPlayer.referrals || []), newPlayer.id])];
-            if (inviterPlayer.referrals.length <= MAX_REFERRAL_REWARDS) {
-              inviterPlayer.energy += REFERRAL_REWARD;
-              console.log(`[SKEMA] ✅ +k$${REFERRAL_REWARD} para ${inviterPlayer.name} (referral #${inviterPlayer.referrals.length})`);
+        // 2. ANTES de sobrescrever, atualiza o inviter se ele estiver logado
+        const currentPlayerData = localStorage.getItem(STORAGE_KEY);
+        if (currentPlayerData) {
+          const currentPlayer = JSON.parse(currentPlayerData) as SkemaPlayer;
+          // Verifica se o jogador atual É o inviter (código bate)
+          if (currentPlayer.inviteCode === usedInviteCode) {
+            currentPlayer.referrals = [...new Set([...(currentPlayer.referrals || []), newPlayer.id])];
+            const rewardCount = currentPlayer.referrals.length;
+            if (rewardCount <= MAX_REFERRAL_REWARDS) {
+              currentPlayer.energy += REFERRAL_REWARD;
+              console.log(`[SKEMA] ✅ +k$${REFERRAL_REWARD} para ${currentPlayer.name} (referral #${rewardCount})`);
             }
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(inviterPlayer));
+            // Salva o inviter atualizado (isso será sobrescrito logo em seguida pelo novo jogador)
+            // MAS o registro global de referrals já foi salvo acima
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(currentPlayer));
           }
         }
       } catch (e) {
@@ -371,6 +391,18 @@ export function useSkemaPlayer() {
       setAllInvites(invites);
     }
     
+    // ========== Agora sim, troca para o novo jogador ==========
+    savePlayer(newPlayer);
+    
+    // Registra o código deste jogador no registro global
+    const storedRegistry = localStorage.getItem(CODE_REGISTRY_KEY);
+    const currentRegistry = storedRegistry ? JSON.parse(storedRegistry) : {};
+    currentRegistry[newInviteCode] = { id: newPlayer.id, name: newPlayer.name };
+    localStorage.setItem(CODE_REGISTRY_KEY, JSON.stringify(currentRegistry));
+    setCodeRegistry(currentRegistry);
+    
+    console.log(`[SKEMA] 🎉 Novo jogador registrado: ${newPlayer.name} (código: ${newInviteCode})`);
+
     return { success: true };
   }, [validateInviteCode, savePlayer, allInvites, codeRegistry]);
 

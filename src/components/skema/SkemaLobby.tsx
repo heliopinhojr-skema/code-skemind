@@ -16,7 +16,7 @@ import {
   Calendar, Crown, AlertCircle, LogOut, Share2, UserCheck
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { SkemaPlayer } from '@/hooks/useSkemaPlayer';
+import { SkemaPlayer, getSkemaHour } from '@/hooks/useSkemaPlayer';
 import { useOfficialRace } from '@/hooks/useOfficialRace';
 import universeBg from '@/assets/universe-bg.jpg';
 
@@ -52,11 +52,13 @@ export function SkemaLobby({
   onLogout,
 }: SkemaLobbyProps) {
   const officialRace = useOfficialRace();
+  const skemaHour = getSkemaHour();
   
   const [selectedMode, setSelectedMode] = useState<GameMode | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Estrelas animadas
@@ -70,8 +72,9 @@ export function SkemaLobby({
     })), []
   );
 
-  const canAffordOfficial = player.energy >= officialRace.constants.entryFee;
-  const isPlayerRegistered = officialRace.race ? officialRace.actions.isPlayerRegistered(player.id) : false;
+  // Espera corrida carregar para mostrar lobby completo
+  const canAffordOfficial = officialRace.isLoaded ? player.energy >= officialRace.constants.entryFee : false;
+  const isPlayerRegisteredInRace = officialRace.race ? officialRace.actions.isPlayerRegistered(player.id) : false;
 
   // Gera link de convite (usa a HOME com query param para evitar 404/login em links profundos)
   // Ex.: https://.../?convite=SEUCODIGO
@@ -104,8 +107,8 @@ export function SkemaLobby({
   const handleCopyInviteLink = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(inviteLink);
-      setCopiedCode(true);
-      setTimeout(() => setCopiedCode(false), 2000);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
     } catch (e) {
       console.error('Erro ao copiar:', e);
     }
@@ -273,7 +276,7 @@ export function SkemaLobby({
                 <h1 className="text-lg font-bold text-white">{player.name}</h1>
                 <div className="flex items-center gap-2 text-xs text-white/60">
                   <Calendar className="w-3 h-3" />
-                  <span>Ano {skemaYear} • Dia {skemaDay}</span>
+                  <span>Ano {skemaYear} • Dia {skemaDay} • {String(skemaHour).padStart(2, '0')}h</span>
                 </div>
                 {player.invitedByName && (
                   <div className="text-xs text-purple-300 mt-0.5">
@@ -365,8 +368,8 @@ export function SkemaLobby({
                   onClick={handleCopyInviteLink}
                   className="shrink-0 gap-1"
                 >
-                  {copiedCode ? <Check className="w-4 h-4 text-green-400" /> : <Share2 className="w-4 h-4" />}
-                  {copiedCode ? 'Copiado!' : 'Copiar'}
+                  {copiedLink ? <Check className="w-4 h-4 text-green-400" /> : <Share2 className="w-4 h-4" />}
+                  {copiedLink ? 'Copiado!' : 'Copiar'}
                 </Button>
               </div>
             </div>
@@ -486,7 +489,7 @@ export function SkemaLobby({
                       <span><Calendar className="w-3 h-3 inline mr-1" />{officialRace.formattedDate}</span>
                       <span><Users className="w-3 h-3 inline mr-1" />{officialRace.race?.registeredPlayers.length || 0} inscritos</span>
                     </div>
-                    {isPlayerRegistered && (
+                    {isPlayerRegisteredInRace && (
                       <div className="mt-2 flex items-center gap-1 text-xs text-green-400">
                         <UserCheck className="w-3 h-3" />
                         Você está inscrito!
@@ -575,7 +578,7 @@ export function SkemaLobby({
                   </div>
                   
                   {/* Botão de inscrição */}
-                  {!isPlayerRegistered ? (
+                  {!isPlayerRegisteredInRace ? (
                     <Button
                       onClick={() => {
                         if (!canAffordOfficial) {
@@ -638,7 +641,7 @@ export function SkemaLobby({
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/90 to-transparent z-20">
           <Button
             onClick={handleStartCountdown}
-            disabled={!selectedMode || isStarting || (selectedMode === 'official' && !isPlayerRegistered)}
+            disabled={!selectedMode || isStarting || (selectedMode === 'official' && !isPlayerRegisteredInRace)}
             className="w-full h-14 text-lg font-bold"
             size="lg"
           >
