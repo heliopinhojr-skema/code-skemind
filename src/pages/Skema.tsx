@@ -151,6 +151,7 @@ export default function Skema() {
         onStartTraining={handleStartTraining}
         onStartBotRace={handleStartBotRace}
         onStartOfficialRace={handleStartOfficialRace}
+        onDeductEnergy={skemaPlayer.actions.deductEnergy}
         onLogout={skemaPlayer.actions.logout}
       />
     );
