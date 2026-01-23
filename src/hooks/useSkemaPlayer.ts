@@ -5,8 +5,8 @@
  * - Nome e emoji do jogador
  * - Código de convite único
  * - Energia (k$)
- * - Missão de convites
- * - Data/hora de registro
+ * - Missão de convites (pending invites)
+ * - Senha para retorno
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -19,11 +19,12 @@ export interface SkemaPlayer {
   emoji: string;
   inviteCode: string;
   invitedBy: string | null;
-  invitedByName?: string | null; // Nome de quem convidou (ancestralidade)
+  invitedByName?: string | null;
   registeredAt: string;
   energy: number;
   lastRefillDate: string;
   referrals: string[]; // IDs de jogadores convidados
+  password?: string; // Senha para retorno
   stats: {
     wins: number;
     races: number;
@@ -37,20 +38,33 @@ export interface InvitedPlayer {
   invitedAt: string;
 }
 
+// Convites pendentes - cada um é único e rastreável
+export interface PendingInvite {
+  code: string;          // SKINVXXXXXX
+  creatorId: string;
+  creatorCode: string;   // Código principal do criador
+  createdAt: string;
+  used: boolean;
+  usedBy?: string;       // Nome de quem usou
+  usedAt?: string;
+}
+
 // ==================== CONSTANTES ====================
 
 const STORAGE_KEY = 'skema_player';
 const INVITES_KEY = 'skema_invites';
-const CODE_REGISTRY_KEY = 'skema_code_registry'; // Mapeia códigos -> jogadores
+const CODE_REGISTRY_KEY = 'skema_code_registry';
+const PENDING_INVITES_KEY = 'skema_pending_invites';
+const REFERRALS_BY_INVITE_KEY = 'skema_referrals_by_invite_code';
 const INITIAL_ENERGY = 10;
 const REFERRAL_REWARD = 10;
 const MAX_REFERRAL_REWARDS = 10;
-const TRANSFER_TAX = 0.0643; // 6.43%
+const TRANSFER_TAX = 0.0643;
 
-// Códigos de convite master (para primeiros jogadores)
+// Códigos master
 const MASTER_INVITE_CODES = ['SKEMA2024', 'PRIMEIROSJOGADORES', 'BETATESTER', 'DEUSPAI'];
 
-// Guardião do Universo - jogador fixo "skema"
+// Guardião do Universo
 const GUARDIAN_PLAYER: SkemaPlayer = {
   id: 'guardian-skema-universe',
   name: 'skema',
@@ -62,6 +76,7 @@ const GUARDIAN_PLAYER: SkemaPlayer = {
   energy: 9999,
   lastRefillDate: '2099-12-31',
   referrals: [],
+  password: 'DEUSPAI',
   stats: { wins: 0, races: 0, bestTime: 0 },
 };
 
@@ -76,15 +91,21 @@ function generateInviteCode(): string {
   return code;
 }
 
+function generatePendingInviteCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = 'SKINV';
+  for (let i = 0; i < 5; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
+}
+
 function generatePlayerId(): string {
   return `player-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
 /**
- * Calendário SKEMA:
- * - Nascimento: 12/07/1970 às 00:18 (epoch)
- * - 1 dia Skema = 2 horas reais (ratio 1:12)
- * - 1 ano Skema = 365 dias Skema = ~30.4 dias reais
+ * Calendário SKEMA
  */
 const SKEMA_EPOCH = new Date('1970-07-12T00:18:00').getTime();
 const REAL_HOURS_PER_SKEMA_DAY = 2;
@@ -93,22 +114,13 @@ const SKEMA_DAYS_PER_YEAR = 365;
 function getSkemaTimeSinceEpoch(): { years: number; days: number; hours: number } {
   const now = Date.now();
   const msElapsed = now - SKEMA_EPOCH;
-  
-  // Converte para horas reais
   const realHours = msElapsed / (1000 * 60 * 60);
-  
-  // Converte para dias Skema (2h real = 1 dia Skema)
   const totalSkemaDays = Math.floor(realHours / REAL_HOURS_PER_SKEMA_DAY);
-  
-  // Calcula anos e dias
   const years = Math.floor(totalSkemaDays / SKEMA_DAYS_PER_YEAR);
-  const days = (totalSkemaDays % SKEMA_DAYS_PER_YEAR) + 1; // 1-indexed
-  
-  // Hora dentro do dia Skema (0-23 equivalente)
+  const days = (totalSkemaDays % SKEMA_DAYS_PER_YEAR) + 1;
   const hoursIntoCurrentSkemaDay = (realHours % REAL_HOURS_PER_SKEMA_DAY);
   const skemaHour = Math.floor((hoursIntoCurrentSkemaDay / REAL_HOURS_PER_SKEMA_DAY) * 24);
-  
-  return { years: years + 1, days, hours: skemaHour }; // year 1-indexed
+  return { years: years + 1, days, hours: skemaHour };
 }
 
 function getSkemaYear(): number {
@@ -129,10 +141,10 @@ function getTodayDateString(): string {
 
 // ==================== HOOK ====================
 
-// Registro global de códigos → { name, id }
 interface CodeRegistryEntry {
   id: string;
   name: string;
+  password?: string;
 }
 
 export function useSkemaPlayer() {
@@ -140,11 +152,11 @@ export function useSkemaPlayer() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [allInvites, setAllInvites] = useState<Record<string, InvitedPlayer>>({});
   const [codeRegistry, setCodeRegistry] = useState<Record<string, CodeRegistryEntry>>({});
+  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
 
   // Carrega do localStorage
   useEffect(() => {
     const syncReferrals = (currentPlayer: SkemaPlayer): SkemaPlayer => {
-      const REFERRALS_BY_INVITE_KEY = 'skema_referrals_by_invite_code';
       const storedReferrals = localStorage.getItem(REFERRALS_BY_INVITE_KEY);
       
       let updatedPlayer = { ...currentPlayer };
@@ -179,7 +191,7 @@ export function useSkemaPlayer() {
         }
       }
       
-      // Migração: verifica também o registro antigo por ID
+      // Migração: verifica registro antigo por ID
       try {
         const OLD_REFERRALS_KEY = 'skema_referrals_by_player';
         const oldReferrals = localStorage.getItem(OLD_REFERRALS_KEY);
@@ -210,14 +222,12 @@ export function useSkemaPlayer() {
       if (stored) {
         let parsed = JSON.parse(stored) as SkemaPlayer;
         
-        // Verifica refill diário
         const today = getTodayDateString();
         if (parsed.lastRefillDate !== today && parsed.energy < INITIAL_ENERGY) {
           parsed.energy = INITIAL_ENERGY;
           parsed.lastRefillDate = today;
         }
         
-        // Sincroniza referrals do registro global
         parsed = syncReferrals(parsed);
         
         localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
@@ -233,20 +243,31 @@ export function useSkemaPlayer() {
       if (storedRegistry) {
         setCodeRegistry(JSON.parse(storedRegistry));
       }
+
+      // Carrega pending invites
+      const storedPending = localStorage.getItem(PENDING_INVITES_KEY);
+      if (storedPending) {
+        setPendingInvites(JSON.parse(storedPending));
+      }
     } catch (e) {
       console.error('Erro ao carregar jogador:', e);
     }
     setIsLoaded(true);
   }, []);
 
-  // Salva no localStorage
   const savePlayer = useCallback((updated: SkemaPlayer) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     setPlayer(updated);
   }, []);
 
-  // Valida código de convite - busca no registro global
-  const validateInviteCode = useCallback((code: string): { valid: boolean; inviterId: string | null; inviterName?: string } => {
+  // Valida código de convite - verifica pending invites também
+  const validateInviteCode = useCallback((code: string): { 
+    valid: boolean; 
+    inviterId: string | null; 
+    inviterName?: string;
+    isPendingInvite?: boolean;
+    pendingInviteCode?: string;
+  } => {
     const upperCode = code.toUpperCase().trim();
     console.log('[SKEMA] Validando código:', upperCode);
     
@@ -256,16 +277,34 @@ export function useSkemaPlayer() {
       return { valid: true, inviterId: null, inviterName: 'SKEMA' };
     }
     
-    // Busca no registro global de códigos
-    const storedRegistry = localStorage.getItem(CODE_REGISTRY_KEY);
-    console.log('[SKEMA] Registry raw:', storedRegistry);
+    // Verifica pending invites primeiro (SKINVXXXXX)
+    const storedPending = localStorage.getItem(PENDING_INVITES_KEY);
+    if (storedPending) {
+      try {
+        const pendingList = JSON.parse(storedPending) as PendingInvite[];
+        const pendingInvite = pendingList.find(p => p.code === upperCode && !p.used);
+        if (pendingInvite) {
+          // Busca info do criador
+          const registry = JSON.parse(localStorage.getItem(CODE_REGISTRY_KEY) || '{}') as Record<string, CodeRegistryEntry>;
+          const creator = registry[pendingInvite.creatorCode];
+          return { 
+            valid: true, 
+            inviterId: pendingInvite.creatorId, 
+            inviterName: creator?.name || 'Desconhecido',
+            isPendingInvite: true,
+            pendingInviteCode: upperCode,
+          };
+        }
+      } catch (e) {
+        console.error('[SKEMA] Erro ao verificar pending invites:', e);
+      }
+    }
     
+    // Busca no registro global de códigos (SK prefix - código principal)
+    const storedRegistry = localStorage.getItem(CODE_REGISTRY_KEY);
     if (storedRegistry) {
       try {
         const registry = JSON.parse(storedRegistry) as Record<string, CodeRegistryEntry>;
-        console.log('[SKEMA] Registry parsed:', registry);
-        console.log('[SKEMA] Buscando código:', upperCode, 'encontrado:', registry[upperCode]);
-        
         if (registry[upperCode]) {
           return { valid: true, inviterId: registry[upperCode].id, inviterName: registry[upperCode].name };
         }
@@ -274,25 +313,106 @@ export function useSkemaPlayer() {
       }
     }
     
-    console.log('[SKEMA] Código não encontrado no registry');
+    console.log('[SKEMA] Código não encontrado');
     return { valid: false, inviterId: null };
   }, []);
 
+  // Login com código + senha
+  const login = useCallback((playerCode: string, password: string): { success: boolean; error?: string } => {
+    const upperCode = playerCode.toUpperCase().trim();
+    
+    // Verifica guardian
+    if (upperCode === 'SKGUARDIAN' && password === 'DEUSPAI') {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      const existing = saved ? JSON.parse(saved) : {};
+      
+      const guardian = { 
+        ...GUARDIAN_PLAYER, 
+        referrals: existing.referrals || [],
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(guardian));
+      setPlayer(guardian);
+      
+      const storedRegistry = localStorage.getItem(CODE_REGISTRY_KEY);
+      const registry = storedRegistry ? JSON.parse(storedRegistry) : {};
+      registry[guardian.inviteCode] = { id: guardian.id, name: guardian.name, password: guardian.password };
+      localStorage.setItem(CODE_REGISTRY_KEY, JSON.stringify(registry));
+      setCodeRegistry(registry);
+      
+      console.log('[SKEMA] 🌌 Guardião logado');
+      return { success: true };
+    }
+    
+    // Busca no registry
+    const storedRegistry = localStorage.getItem(CODE_REGISTRY_KEY);
+    if (!storedRegistry) {
+      return { success: false, error: 'Nenhuma conta encontrada' };
+    }
+    
+    const registry = JSON.parse(storedRegistry) as Record<string, CodeRegistryEntry>;
+    const entry = registry[upperCode];
+    
+    if (!entry) {
+      return { success: false, error: 'Código não encontrado' };
+    }
+    
+    if (entry.password !== password) {
+      return { success: false, error: 'Senha incorreta' };
+    }
+    
+    // Carrega dados do jogador - busca em todos os players salvos ou reconstrói
+    // Como é localStorage local, reconstruímos o player básico
+    const playerData: SkemaPlayer = {
+      id: entry.id,
+      name: entry.name,
+      emoji: '🎮',
+      inviteCode: upperCode,
+      invitedBy: null,
+      invitedByName: null,
+      registeredAt: new Date().toISOString(),
+      energy: INITIAL_ENERGY,
+      lastRefillDate: getTodayDateString(),
+      referrals: [],
+      password: entry.password,
+      stats: { wins: 0, races: 0, bestTime: 0 },
+    };
+    
+    // Tenta carregar dados completos se existirem
+    const storedPlayer = localStorage.getItem(STORAGE_KEY);
+    if (storedPlayer) {
+      const saved = JSON.parse(storedPlayer) as SkemaPlayer;
+      if (saved.id === entry.id) {
+        // Mesmo jogador, apenas restaura
+        setPlayer(saved);
+        return { success: true };
+      }
+    }
+    
+    // Não encontrou dados salvos, cria novo
+    savePlayer(playerData);
+    console.log('[SKEMA] 🔓 Login bem-sucedido:', entry.name);
+    return { success: true };
+  }, [savePlayer]);
+
   // Registra novo jogador
-  const register = useCallback((name: string, inviteCode: string, emoji: string = '🎮'): { success: boolean; error?: string } => {
+  const register = useCallback((name: string, inviteCode: string, emoji: string = '🎮', password?: string): { success: boolean; error?: string } => {
     const upperCode = inviteCode.toUpperCase().trim();
     
     // Login especial do Guardião
     if (upperCode === 'DEUSPAI') {
-      // Cria/atualiza o guardião
-      const guardian = { ...GUARDIAN_PLAYER };
+      const saved = localStorage.getItem(STORAGE_KEY);
+      const existing = saved ? JSON.parse(saved) : {};
+      
+      const guardian = { 
+        ...GUARDIAN_PLAYER, 
+        referrals: existing.referrals || [],
+      };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(guardian));
       setPlayer(guardian);
       
-      // Registra código do guardião no registry global
       const storedRegistry = localStorage.getItem(CODE_REGISTRY_KEY);
       const registry = storedRegistry ? JSON.parse(storedRegistry) : {};
-      registry[guardian.inviteCode] = { id: guardian.id, name: guardian.name };
+      registry[guardian.inviteCode] = { id: guardian.id, name: guardian.name, password: guardian.password };
       localStorage.setItem(CODE_REGISTRY_KEY, JSON.stringify(registry));
       setCodeRegistry(registry);
       
@@ -314,6 +434,10 @@ export function useSkemaPlayer() {
       return { success: false, error: 'Nome deve ter no máximo 15 caracteres' };
     }
 
+    if (!password || password.length < 4) {
+      return { success: false, error: 'Senha deve ter pelo menos 4 caracteres' };
+    }
+
     const newInviteCode = generateInviteCode();
     
     const newPlayer: SkemaPlayer = {
@@ -327,6 +451,7 @@ export function useSkemaPlayer() {
       energy: INITIAL_ENERGY,
       lastRefillDate: getTodayDateString(),
       referrals: [],
+      password,
       stats: {
         wins: 0,
         races: 0,
@@ -334,44 +459,53 @@ export function useSkemaPlayer() {
       },
     };
     
-    // ========== IMPORTANTE: Atualiza referrals ANTES de trocar jogador ==========
-    const usedInviteCode = inviteCode.toUpperCase().trim();
-    const isMasterCode = MASTER_INVITE_CODES.includes(usedInviteCode);
+    // ========== Atualiza referrals e marca pending invite como usado ==========
+    const isMasterCode = MASTER_INVITE_CODES.includes(upperCode);
     
     if (!isMasterCode && validation.inviterId) {
-      const REFERRALS_BY_INVITE_KEY = 'skema_referrals_by_invite_code';
       try {
-        // 1. Salva no registro global de referrals (persistente entre sessões)
+        // 1. Salva no registro global de referrals
         const storedReferrals = localStorage.getItem(REFERRALS_BY_INVITE_KEY);
         const referralsByInvite = storedReferrals ? JSON.parse(storedReferrals) : {};
         
-        if (!referralsByInvite[usedInviteCode]) {
-          referralsByInvite[usedInviteCode] = [];
+        // Usa o código do inviter (não o pending invite code)
+        const storedRegistry = localStorage.getItem(CODE_REGISTRY_KEY);
+        const registry = storedRegistry ? JSON.parse(storedRegistry) : {};
+        
+        // Encontra o código principal do inviter
+        let inviterMainCode: string | null = null;
+        for (const [code, entry] of Object.entries(registry)) {
+          if ((entry as CodeRegistryEntry).id === validation.inviterId) {
+            inviterMainCode = code;
+            break;
+          }
         }
         
-        if (!referralsByInvite[usedInviteCode].includes(newPlayer.id)) {
-          referralsByInvite[usedInviteCode].push(newPlayer.id);
-          console.log(`[SKEMA] ✅ Convite contabilizado: ${usedInviteCode} convidou ${newPlayer.name} (${newPlayer.id})`);
-          console.log(`[SKEMA] Total referrals para ${usedInviteCode}:`, referralsByInvite[usedInviteCode].length);
+        if (inviterMainCode) {
+          if (!referralsByInvite[inviterMainCode]) {
+            referralsByInvite[inviterMainCode] = [];
+          }
+          
+          if (!referralsByInvite[inviterMainCode].includes(newPlayer.id)) {
+            referralsByInvite[inviterMainCode].push(newPlayer.id);
+            console.log(`[SKEMA] ✅ Convite contabilizado para ${inviterMainCode}: ${newPlayer.name}`);
+          }
+          
+          localStorage.setItem(REFERRALS_BY_INVITE_KEY, JSON.stringify(referralsByInvite));
         }
         
-        localStorage.setItem(REFERRALS_BY_INVITE_KEY, JSON.stringify(referralsByInvite));
-        
-        // 2. ANTES de sobrescrever, atualiza o inviter se ele estiver logado
-        const currentPlayerData = localStorage.getItem(STORAGE_KEY);
-        if (currentPlayerData) {
-          const currentPlayer = JSON.parse(currentPlayerData) as SkemaPlayer;
-          // Verifica se o jogador atual É o inviter (código bate)
-          if (currentPlayer.inviteCode === usedInviteCode) {
-            currentPlayer.referrals = [...new Set([...(currentPlayer.referrals || []), newPlayer.id])];
-            const rewardCount = currentPlayer.referrals.length;
-            if (rewardCount <= MAX_REFERRAL_REWARDS) {
-              currentPlayer.energy += REFERRAL_REWARD;
-              console.log(`[SKEMA] ✅ +k$${REFERRAL_REWARD} para ${currentPlayer.name} (referral #${rewardCount})`);
-            }
-            // Salva o inviter atualizado (isso será sobrescrito logo em seguida pelo novo jogador)
-            // MAS o registro global de referrals já foi salvo acima
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(currentPlayer));
+        // 2. Se era pending invite, marca como usado
+        if (validation.isPendingInvite && validation.pendingInviteCode) {
+          const storedPending = localStorage.getItem(PENDING_INVITES_KEY);
+          if (storedPending) {
+            const pendingList = JSON.parse(storedPending) as PendingInvite[];
+            const updated = pendingList.map(p => 
+              p.code === validation.pendingInviteCode 
+                ? { ...p, used: true, usedBy: newPlayer.name, usedAt: new Date().toISOString() }
+                : p
+            );
+            localStorage.setItem(PENDING_INVITES_KEY, JSON.stringify(updated));
+            setPendingInvites(updated);
           }
         }
       } catch (e) {
@@ -379,7 +513,7 @@ export function useSkemaPlayer() {
       }
     }
     
-    // Registro auxiliar de convites (metadata)
+    // Registro auxiliar de convites
     if (validation.inviterId) {
       const invites = { ...allInvites };
       invites[newPlayer.id] = {
@@ -391,20 +525,65 @@ export function useSkemaPlayer() {
       setAllInvites(invites);
     }
     
-    // ========== Agora sim, troca para o novo jogador ==========
+    // Salva o novo jogador
     savePlayer(newPlayer);
     
-    // Registra o código deste jogador no registro global
+    // Registra código no registry global
     const storedRegistry = localStorage.getItem(CODE_REGISTRY_KEY);
     const currentRegistry = storedRegistry ? JSON.parse(storedRegistry) : {};
-    currentRegistry[newInviteCode] = { id: newPlayer.id, name: newPlayer.name };
+    currentRegistry[newInviteCode] = { id: newPlayer.id, name: newPlayer.name, password };
     localStorage.setItem(CODE_REGISTRY_KEY, JSON.stringify(currentRegistry));
     setCodeRegistry(currentRegistry);
     
-    console.log(`[SKEMA] 🎉 Novo jogador registrado: ${newPlayer.name} (código: ${newInviteCode})`);
+    console.log(`[SKEMA] 🎉 Novo jogador: ${newPlayer.name} (código: ${newInviteCode})`);
 
     return { success: true };
-  }, [validateInviteCode, savePlayer, allInvites, codeRegistry]);
+  }, [validateInviteCode, savePlayer, allInvites]);
+
+  // Gera novo convite pendente
+  const generatePendingInvite = useCallback((): { success: boolean; code?: string; error?: string } => {
+    if (!player) return { success: false, error: 'Jogador não encontrado' };
+    
+    // Carrega lista atual
+    const storedPending = localStorage.getItem(PENDING_INVITES_KEY);
+    const pendingList = storedPending ? JSON.parse(storedPending) as PendingInvite[] : [];
+    
+    // Filtra convites deste jogador
+    const myPendingInvites = pendingList.filter(p => p.creatorId === player.id);
+    const usedCount = myPendingInvites.filter(p => p.used).length;
+    
+    // Limite de 10 convites usados
+    if (usedCount >= MAX_REFERRAL_REWARDS) {
+      return { success: false, error: 'Limite de 10 convites atingido' };
+    }
+    
+    // Gera novo código único
+    let newCode = generatePendingInviteCode();
+    while (pendingList.some(p => p.code === newCode)) {
+      newCode = generatePendingInviteCode();
+    }
+    
+    const newPending: PendingInvite = {
+      code: newCode,
+      creatorId: player.id,
+      creatorCode: player.inviteCode,
+      createdAt: new Date().toISOString(),
+      used: false,
+    };
+    
+    const updated = [...pendingList, newPending];
+    localStorage.setItem(PENDING_INVITES_KEY, JSON.stringify(updated));
+    setPendingInvites(updated);
+    
+    console.log(`[SKEMA] 🎟️ Novo convite gerado: ${newCode}`);
+    return { success: true, code: newCode };
+  }, [player]);
+
+  // Lista pending invites do jogador atual
+  const getMyPendingInvites = useCallback((): PendingInvite[] => {
+    if (!player) return [];
+    return pendingInvites.filter(p => p.creatorId === player.id);
+  }, [player, pendingInvites]);
 
   // Atualiza energia
   const updateEnergy = useCallback((amount: number) => {
@@ -417,7 +596,6 @@ export function useSkemaPlayer() {
     savePlayer(updated);
   }, [player, savePlayer]);
 
-  // Deduz energia (para entry fees)
   const deductEnergy = useCallback((amount: number): boolean => {
     if (!player) return false;
     if (player.energy < amount) return false;
@@ -426,12 +604,10 @@ export function useSkemaPlayer() {
     return true;
   }, [player, updateEnergy]);
 
-  // Adiciona energia (prêmios)
   const addEnergy = useCallback((amount: number) => {
     updateEnergy(amount);
   }, [updateEnergy]);
 
-  // Transferência entre jogadores (com taxa)
   const transferEnergy = useCallback((amount: number, toPlayerId: string): { success: boolean; error?: string } => {
     if (!player) return { success: false, error: 'Jogador não encontrado' };
     
@@ -441,12 +617,9 @@ export function useSkemaPlayer() {
     }
     
     updateEnergy(-totalCost);
-    // Em sistema real, adicionaria ao destinatário
-    
     return { success: true };
   }, [player, updateEnergy]);
 
-  // Atualiza estatísticas
   const updateStats = useCallback((result: { won: boolean; time?: number }) => {
     if (!player) return;
     
@@ -464,13 +637,11 @@ export function useSkemaPlayer() {
     savePlayer(updated);
   }, [player, savePlayer]);
 
-  // Atualiza emoji
   const updateEmoji = useCallback((emoji: string) => {
     if (!player) return;
     savePlayer({ ...player, emoji });
   }, [player, savePlayer]);
 
-  // Refill diário manual (para testes)
   const forceRefill = useCallback(() => {
     if (!player) return;
     if (player.energy >= INITIAL_ENERGY) return;
@@ -483,13 +654,11 @@ export function useSkemaPlayer() {
     savePlayer(updated);
   }, [player, savePlayer]);
 
-  // Logout (limpa dados locais)
   const logout = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
     setPlayer(null);
   }, []);
 
-  // Quantidade de convites válidos restantes
   const remainingReferralRewards = player 
     ? Math.max(0, MAX_REFERRAL_REWARDS - player.referrals.length) 
     : 0;
@@ -503,9 +672,13 @@ export function useSkemaPlayer() {
     skemaDay: getSkemaDay(),
     remainingReferralRewards,
     transferTax: TRANSFER_TAX,
+    pendingInvites: player ? pendingInvites.filter(p => p.creatorId === player.id) : [],
     actions: {
       register,
+      login,
       validateInviteCode,
+      generatePendingInvite,
+      getMyPendingInvites,
       updateEnergy,
       deductEnergy,
       addEnergy,

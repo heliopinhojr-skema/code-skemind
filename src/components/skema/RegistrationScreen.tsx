@@ -1,44 +1,50 @@
 /**
- * RegistrationScreen - Tela de registro por convite
+ * RegistrationScreen - Tela de registro/login por convite
  * 
  * Fluxo:
- * 1. Jogador insere código de convite
- * 2. Escolhe nome e emoji
- * 3. Recebe k$10 inicial
+ * 1. Escolher: Novo registro OU Login
+ * 2. Novo: inserir código de convite → nome + emoji + senha
+ * 3. Login: inserir código do jogador + senha
  */
 
 import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Ticket, User, Sparkles, ArrowRight, Check, AlertCircle,
-  Zap, Gift
+  Zap, Gift, Lock, LogIn, UserPlus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import universeBg from '@/assets/universe-bg.jpg';
 
 interface RegistrationScreenProps {
-  onRegister: (name: string, inviteCode: string, emoji: string) => { success: boolean; error?: string };
+  onRegister: (name: string, inviteCode: string, emoji: string, password: string) => { success: boolean; error?: string };
+  onLogin: (playerCode: string, password: string) => { success: boolean; error?: string };
   validateCode: (code: string) => { valid: boolean; inviterId: string | null; inviterName?: string };
   initialInviteCode?: string;
 }
 
 const AVAILABLE_EMOJIS = ['🎮', '🚀', '⚡', '🔥', '💎', '🌟', '🎯', '👾', '🤖', '🧠', '💜', '🎲'];
 
-export function RegistrationScreen({ onRegister, validateCode, initialInviteCode = '' }: RegistrationScreenProps) {
-  const [step, setStep] = useState<'invite' | 'profile'>('invite');
+export function RegistrationScreen({ onRegister, onLogin, validateCode, initialInviteCode = '' }: RegistrationScreenProps) {
+  const [mode, setMode] = useState<'choose' | 'invite' | 'profile' | 'login'>('choose');
   const [inviteCode, setInviteCode] = useState(initialInviteCode);
   const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginCode, setLoginCode] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState('🎮');
   const [error, setError] = useState<string | null>(null);
-  const [isValidCode, setIsValidCode] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [inviterName, setInviterName] = useState<string | null>(null);
 
-  // Sincroniza código da URL quando prop muda
+  // Se veio com código, vai direto pra validação
   useEffect(() => {
     if (initialInviteCode && initialInviteCode !== inviteCode) {
       setInviteCode(initialInviteCode);
+    }
+    if (initialInviteCode) {
+      setMode('invite');
     }
   }, [initialInviteCode]);
 
@@ -55,28 +61,57 @@ export function RegistrationScreen({ onRegister, validateCode, initialInviteCode
     console.log('[SKEMA] Validando código:', trimmedCode, result);
     
     if (result.valid) {
-      setIsValidCode(true);
       setInviterName(result.inviterName || null);
-      setStep('profile');
+      setMode('profile');
     } else {
       setError('Código de convite inválido');
-      setIsValidCode(false);
     }
   }, [inviteCode, validateCode]);
 
   const handleRegister = useCallback(() => {
     setError(null);
+    
+    if (password.length < 4) {
+      setError('Senha deve ter pelo menos 4 caracteres');
+      return;
+    }
+    
     setIsLoading(true);
     
     setTimeout(() => {
-      const result = onRegister(name, inviteCode, selectedEmoji);
+      const result = onRegister(name, inviteCode, selectedEmoji, password);
       
       if (!result.success) {
         setError(result.error || 'Erro ao registrar');
         setIsLoading(false);
       }
     }, 500);
-  }, [name, inviteCode, selectedEmoji, onRegister]);
+  }, [name, inviteCode, selectedEmoji, password, onRegister]);
+
+  const handleLogin = useCallback(() => {
+    setError(null);
+    
+    if (loginCode.length < 4) {
+      setError('Código inválido');
+      return;
+    }
+    
+    if (loginPassword.length < 4) {
+      setError('Senha inválida');
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    setTimeout(() => {
+      const result = onLogin(loginCode, loginPassword);
+      
+      if (!result.success) {
+        setError(result.error || 'Erro ao entrar');
+        setIsLoading(false);
+      }
+    }, 500);
+  }, [loginCode, loginPassword, onLogin]);
 
   return (
     <div className="min-h-screen relative overflow-hidden flex items-center justify-center">
@@ -107,7 +142,132 @@ export function RegistrationScreen({ onRegister, validateCode, initialInviteCode
         </motion.div>
         
         <AnimatePresence mode="wait">
-          {step === 'invite' ? (
+          {/* Escolha: Novo ou Login */}
+          {mode === 'choose' && (
+            <motion.div
+              key="choose"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6 space-y-4"
+            >
+              <div className="text-center mb-6">
+                <h2 className="text-xl font-bold text-white">Bem-vindo!</h2>
+                <p className="text-sm text-white/50 mt-1">Como deseja entrar?</p>
+              </div>
+              
+              <Button
+                onClick={() => setMode('invite')}
+                className="w-full h-14 text-lg gap-3"
+                variant="default"
+              >
+                <UserPlus className="w-5 h-5" />
+                Tenho um Convite
+              </Button>
+              
+              <Button
+                onClick={() => setMode('login')}
+                className="w-full h-14 text-lg gap-3"
+                variant="outline"
+              >
+                <LogIn className="w-5 h-5" />
+                Já Tenho Conta
+              </Button>
+              
+              <p className="text-xs text-white/40 text-center pt-4">
+                Não tem convite? Peça para um amigo que já está no SKEMA!
+              </p>
+            </motion.div>
+          )}
+
+          {/* Login */}
+          {mode === 'login' && (
+            <motion.div
+              key="login"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6"
+            >
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
+                  <LogIn className="w-6 h-6 text-blue-400" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white">Entrar</h2>
+                  <p className="text-sm text-white/50">Use seu código e senha</p>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm text-white/60 mb-1 block">Seu Código</label>
+                  <Input
+                    type="text"
+                    placeholder="Ex: SKXXXXXX"
+                    value={loginCode}
+                    onChange={(e) => setLoginCode(e.target.value.toUpperCase())}
+                    className="bg-white/5 border-white/20 text-white text-center tracking-wider placeholder:text-white/30"
+                    maxLength={15}
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-sm text-white/60 mb-1 block">Senha</label>
+                  <Input
+                    type="password"
+                    placeholder="Sua senha"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    className="bg-white/5 border-white/20 text-white"
+                    maxLength={20}
+                  />
+                </div>
+                
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center gap-2 text-red-400 text-sm"
+                  >
+                    <AlertCircle className="w-4 h-4" />
+                    {error}
+                  </motion.div>
+                )}
+                
+                <Button
+                  onClick={handleLogin}
+                  disabled={loginCode.length < 4 || loginPassword.length < 4 || isLoading}
+                  className="w-full h-12"
+                >
+                  {isLoading ? (
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                    >
+                      <Sparkles className="w-5 h-5" />
+                    </motion.div>
+                  ) : (
+                    <>
+                      Entrar
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </>
+                  )}
+                </Button>
+                
+                <Button
+                  variant="ghost"
+                  onClick={() => { setMode('choose'); setError(null); }}
+                  className="w-full text-white/50"
+                >
+                  Voltar
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Código de Convite */}
+          {mode === 'invite' && (
             <motion.div
               key="invite"
               initial={{ opacity: 0, x: -20 }}
@@ -128,7 +288,7 @@ export function RegistrationScreen({ onRegister, validateCode, initialInviteCode
               <div className="space-y-4">
                 <Input
                   type="text"
-                  placeholder="Ex: SKEMA2024"
+                  placeholder="Ex: SKINVXXXXX"
                   value={inviteCode}
                   onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
                   className="bg-white/5 border-white/20 text-white text-center text-lg tracking-wider placeholder:text-white/30"
@@ -154,16 +314,20 @@ export function RegistrationScreen({ onRegister, validateCode, initialInviteCode
                   Validar Código
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
-              </div>
-              
-              {/* Dicas */}
-              <div className="mt-6 pt-6 border-t border-white/10">
-                <p className="text-xs text-white/40 text-center">
-                  Não tem um código? Peça para um amigo que já está no SKEMA!
-                </p>
+                
+                <Button
+                  variant="ghost"
+                  onClick={() => { setMode('choose'); setError(null); }}
+                  className="w-full text-white/50"
+                >
+                  Voltar
+                </Button>
               </div>
             </motion.div>
-          ) : (
+          )}
+
+          {/* Criar Perfil */}
+          {mode === 'profile' && (
             <motion.div
               key="profile"
               initial={{ opacity: 0, x: 20 }}
@@ -186,7 +350,7 @@ export function RegistrationScreen({ onRegister, validateCode, initialInviteCode
                 </div>
               </div>
               
-              <div className="space-y-6">
+              <div className="space-y-5">
                 {/* Emoji selector */}
                 <div>
                   <label className="text-sm text-white/60 mb-2 block">Escolha seu avatar</label>
@@ -198,7 +362,7 @@ export function RegistrationScreen({ onRegister, validateCode, initialInviteCode
                         whileTap={{ scale: 0.95 }}
                         onClick={() => setSelectedEmoji(emoji)}
                         className={`
-                          w-12 h-12 rounded-full text-2xl flex items-center justify-center transition-all
+                          w-11 h-11 rounded-full text-xl flex items-center justify-center transition-all touch-manipulation
                           ${selectedEmoji === emoji 
                             ? 'bg-primary/30 ring-2 ring-primary' 
                             : 'bg-white/5 hover:bg-white/10'
@@ -215,18 +379,34 @@ export function RegistrationScreen({ onRegister, validateCode, initialInviteCode
                 <div>
                   <label className="text-sm text-white/60 mb-2 block">Seu nome</label>
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-2xl shrink-0">
+                    <div className="w-11 h-11 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-xl shrink-0">
                       {selectedEmoji}
                     </div>
                     <Input
                       type="text"
-                      placeholder="Escolha um nome único"
+                      placeholder="Nome único"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       className="bg-white/5 border-white/20 text-white"
                       maxLength={15}
                     />
                   </div>
+                </div>
+                
+                {/* Senha */}
+                <div>
+                  <label className="text-sm text-white/60 mb-2 block flex items-center gap-2">
+                    <Lock className="w-3 h-3" />
+                    Crie uma senha (para voltar depois)
+                  </label>
+                  <Input
+                    type="password"
+                    placeholder="Mínimo 4 caracteres"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="bg-white/5 border-white/20 text-white"
+                    maxLength={20}
+                  />
                 </div>
                 
                 {error && (
@@ -241,18 +421,18 @@ export function RegistrationScreen({ onRegister, validateCode, initialInviteCode
                 )}
                 
                 {/* Benefícios */}
-                <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Gift className="w-5 h-5 text-yellow-400" />
-                    <span className="font-medium text-yellow-400">Bônus de Boas-vindas</span>
+                <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Gift className="w-4 h-4 text-yellow-400" />
+                    <span className="text-sm font-medium text-yellow-400">Bônus de Boas-vindas</span>
                   </div>
-                  <ul className="space-y-2 text-sm text-white/70">
+                  <ul className="space-y-1 text-xs text-white/70">
                     <li className="flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-yellow-400" />
+                      <Zap className="w-3 h-3 text-yellow-400" />
                       k$10 de energia inicial
                     </li>
                     <li className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-purple-400" />
+                      <Sparkles className="w-3 h-3 text-purple-400" />
                       Refill diário gratuito
                     </li>
                   </ul>
@@ -260,8 +440,8 @@ export function RegistrationScreen({ onRegister, validateCode, initialInviteCode
                 
                 <Button
                   onClick={handleRegister}
-                  disabled={name.length < 2 || isLoading}
-                  className="w-full h-12"
+                  disabled={name.length < 2 || password.length < 4 || isLoading}
+                  className="w-full h-14 text-lg touch-manipulation"
                 >
                   {isLoading ? (
                     <motion.div
@@ -273,7 +453,7 @@ export function RegistrationScreen({ onRegister, validateCode, initialInviteCode
                   ) : (
                     <>
                       Entrar no SKEMA
-                      <ArrowRight className="w-4 h-4 ml-2" />
+                      <ArrowRight className="w-5 h-5 ml-2" />
                     </>
                   )}
                 </Button>
