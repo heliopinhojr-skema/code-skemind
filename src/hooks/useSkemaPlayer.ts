@@ -279,15 +279,20 @@ export function useSkemaPlayer() {
     
     // 1. Verifica pending invites primeiro (SKINVXXXXX) - deve ser NÃO usado
     const storedPending = localStorage.getItem(PENDING_INVITES_KEY);
+    console.log('[SKEMA] 📦 Raw pending invites:', storedPending);
+    
     if (storedPending) {
       try {
         const pendingList = JSON.parse(storedPending) as PendingInvite[];
         console.log('[SKEMA] 📋 Pending invites no sistema:', pendingList.length);
+        console.log('[SKEMA] 📋 Códigos existentes:', pendingList.map(p => `${p.code}(${p.used ? 'usado' : 'livre'})`).join(', '));
         
         // Procura o código - pode estar usado ou não
         const pendingInvite = pendingList.find(p => p.code === upperCode);
         
         if (pendingInvite) {
+          console.log('[SKEMA] 🎯 Código encontrado:', pendingInvite);
+          
           if (pendingInvite.used) {
             console.log('[SKEMA] ❌ Código SKINV já foi usado por:', pendingInvite.usedBy);
             return { valid: false, inviterId: null };
@@ -304,10 +309,14 @@ export function useSkemaPlayer() {
             isPendingInvite: true,
             pendingInviteCode: upperCode,
           };
+        } else {
+          console.log('[SKEMA] ⚠️ Código NÃO encontrado na lista de pending invites');
         }
       } catch (e) {
         console.error('[SKEMA] Erro ao verificar pending invites:', e);
       }
+    } else {
+      console.log('[SKEMA] ⚠️ Nenhum pending invite no localStorage');
     }
     
     // 2. Busca no registro global de códigos (SK prefix - código principal do jogador)
