@@ -173,10 +173,12 @@ export default function Skema() {
   
   // Constantes Arena x Bots (poker NL Hold'em style)
   const ARENA_ENTRY_FEE = 0.55;           // k$0.55 entrada total por jogador
-  const ARENA_HUMAN_RAKE = 0.05;          // k$0.05 do humano vai pro skema box
+  const ARENA_FEE_PER_PLAYER = 0.05;      // k$0.05 fee por jogador
   const ARENA_PLAYERS = 10;
   // Pool = entrada TOTAL de todos (bots pagam virtualmente)
   const ARENA_TOTAL_POOL = ARENA_ENTRY_FEE * ARENA_PLAYERS; // k$5.50
+  // Rake = fee de TODOS os jogadores (incluindo bots virtuais)
+  const ARENA_TOTAL_RAKE = ARENA_FEE_PER_PLAYER * ARENA_PLAYERS; // k$0.50
   
   // Prêmios ITM (top 3 de 10) - distribuição poker
   // 1º: 50% = k$2.75, 2º: 30% = k$1.65, 3º: 20% = k$1.10
@@ -192,11 +194,11 @@ export default function Skema() {
     // Deduz entrada do humano
     skemaPlayer.actions.deductEnergy(total);
     
-    // Rake = só o fee do humano (bots são virtuais, fee deles vai pro pool)
+    // Rake = fee de TODOS os 10 jogadores (bots são virtuais mas contam)
     const SKEMA_BOX_KEY = 'skema_box_balance';
     const currentBox = parseFloat(localStorage.getItem(SKEMA_BOX_KEY) || '0');
-    localStorage.setItem(SKEMA_BOX_KEY, (currentBox + ARENA_HUMAN_RAKE).toFixed(2));
-    console.log(`[SKEMA] 💰 Rake humano: +k$${ARENA_HUMAN_RAKE.toFixed(2)} → Caixa Skema: k$${(currentBox + ARENA_HUMAN_RAKE).toFixed(2)}`);
+    localStorage.setItem(SKEMA_BOX_KEY, (currentBox + ARENA_TOTAL_RAKE).toFixed(2));
+    console.log(`[SKEMA] 💰 Rake (10 × k$${ARENA_FEE_PER_PLAYER.toFixed(2)}): +k$${ARENA_TOTAL_RAKE.toFixed(2)} → Caixa Skema: k$${(currentBox + ARENA_TOTAL_RAKE).toFixed(2)}`);
     console.log(`[SKEMA] 🏆 Pool total (10 × k$0.55): k$${ARENA_TOTAL_POOL.toFixed(2)}`);
     
     setGameMode('bots');
