@@ -121,6 +121,10 @@ export function SkemaLobby({
     setError(null);
   }, []);
 
+  // Constantes do Arena x Bots
+  const ARENA_ENTRY_FEE = 0.55; // Total: 0.50 pool + 0.05 rake
+  const canAffordArena = player.energy >= ARENA_ENTRY_FEE;
+
   const handleStartCountdown = useCallback(() => {
     if (isStarting) return;
     
@@ -128,6 +132,10 @@ export function SkemaLobby({
       setIsStarting(true);
       setCountdown(COUNTDOWN_SECONDS);
     } else if (selectedMode === 'bots') {
+      if (!canAffordArena) {
+        setError('Energia insuficiente (k$0.55)');
+        return;
+      }
       setIsStarting(true);
       setCountdown(COUNTDOWN_SECONDS);
     } else if (selectedMode === 'official') {
@@ -138,7 +146,7 @@ export function SkemaLobby({
       setIsStarting(true);
       setCountdown(COUNTDOWN_SECONDS);
     }
-  }, [selectedMode, isStarting, canAffordOfficial]);
+  }, [selectedMode, isStarting, canAffordOfficial, canAffordArena]);
 
   const handleCancelCountdown = useCallback(() => {
     setIsStarting(false);
@@ -153,7 +161,8 @@ export function SkemaLobby({
       if (selectedMode === 'training') {
         onStartTraining();
       } else if (selectedMode === 'bots') {
-        const result = onStartBotRace(0, 0);
+        // Arena x Bots: k$0.50 pool + k$0.05 rake
+        const result = onStartBotRace(0.50, 0.05);
         if (!result.success) {
           setError(result.error || 'Erro ao iniciar');
           setIsStarting(false);
@@ -431,7 +440,7 @@ export function SkemaLobby({
                 </div>
               </motion.button>
               
-              {/* Treinar x Bots */}
+              {/* Treinar x Bots (Pago) */}
               <motion.button
                 whileHover={{ scale: 1.01 }}
                 onClick={() => handleSelectMode('bots')}
@@ -449,13 +458,17 @@ export function SkemaLobby({
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-bold text-white">Treinar x Bots</h3>
-                      <span className="text-sm font-medium text-green-400">Grátis</span>
+                      <h3 className="font-bold text-white">Arena x Bots</h3>
+                      <span className="text-sm font-medium text-yellow-400">k$0.55</span>
                     </div>
-                    <p className="text-sm text-white/60 mt-1">Enfrente 9 bots IA em mesa de 10</p>
+                    <p className="text-sm text-white/60 mt-1">Enfrente 9 bots IA • Prêmios top 3</p>
                     <div className="flex items-center gap-4 mt-2 text-xs text-white/50">
                       <span><Users className="w-3 h-3 inline mr-1" />10 jogadores</span>
-                      <span><Clock className="w-3 h-3 inline mr-1" />24h disponível</span>
+                      <span><Trophy className="w-3 h-3 inline mr-1" />ITM: 1º 50% • 2º 30% • 3º 20%</span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-2 text-xs">
+                      <span className="text-green-400">Pool: k$5.00</span>
+                      <span className="text-purple-400">Rake: k$0.05</span>
                     </div>
                   </div>
                 </div>
