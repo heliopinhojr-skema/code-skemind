@@ -48,7 +48,22 @@ const MAX_REFERRAL_REWARDS = 10;
 const TRANSFER_TAX = 0.0643; // 6.43%
 
 // Códigos de convite master (para primeiros jogadores)
-const MASTER_INVITE_CODES = ['SKEMA2024', 'PRIMEIROSJOGADORES', 'BETATESTER'];
+const MASTER_INVITE_CODES = ['SKEMA2024', 'PRIMEIROSJOGADORES', 'BETATESTER', 'DEUSPAI'];
+
+// Guardião do Universo - jogador fixo "skema"
+const GUARDIAN_PLAYER: SkemaPlayer = {
+  id: 'guardian-skema-universe',
+  name: 'skema',
+  emoji: '🌌',
+  inviteCode: 'SKGUARDIAN',
+  invitedBy: null,
+  invitedByName: 'Universo SKEMA',
+  registeredAt: '2024-01-01T00:00:00.000Z',
+  energy: 9999,
+  lastRefillDate: '2099-12-31',
+  referrals: [],
+  stats: { wins: 0, races: 0, bestTime: 0 },
+};
 
 // ==================== HELPERS ====================
 
@@ -236,8 +251,36 @@ export function useSkemaPlayer() {
     return { valid: false, inviterId: null };
   }, []);
 
+  // Login do Guardião (senha especial)
+  const loginAsGuardian = useCallback((password: string): { success: boolean; error?: string } => {
+    if (password !== 'Deuspai') {
+      return { success: false, error: 'Senha incorreta' };
+    }
+    
+    // Cria/atualiza o guardião
+    const guardian = { ...GUARDIAN_PLAYER };
+    savePlayer(guardian);
+    
+    // Registra código do guardião no registry global
+    const storedRegistry = localStorage.getItem(CODE_REGISTRY_KEY);
+    const registry = storedRegistry ? JSON.parse(storedRegistry) : {};
+    registry[guardian.inviteCode] = { id: guardian.id, name: guardian.name };
+    localStorage.setItem(CODE_REGISTRY_KEY, JSON.stringify(registry));
+    setCodeRegistry(registry);
+    
+    console.log('[SKEMA] 🌌 Guardião do Universo logado:', guardian.name);
+    return { success: true };
+  }, [savePlayer]);
+
   // Registra novo jogador
   const register = useCallback((name: string, inviteCode: string, emoji: string = '🎮'): { success: boolean; error?: string } => {
+    const upperCode = inviteCode.toUpperCase().trim();
+    
+    // Login especial do Guardião
+    if (upperCode === 'DEUSPAI') {
+      return loginAsGuardian(inviteCode.trim());
+    }
+    
     const validation = validateInviteCode(inviteCode);
     if (!validation.valid) {
       return { success: false, error: 'Código de convite inválido' };
@@ -431,6 +474,7 @@ export function useSkemaPlayer() {
     player,
     isLoaded,
     isRegistered: !!player,
+    isGuardian: player?.id === GUARDIAN_PLAYER.id,
     skemaYear: getSkemaYear(),
     skemaDay: getSkemaDay(),
     remainingReferralRewards,
@@ -438,6 +482,7 @@ export function useSkemaPlayer() {
     actions: {
       register,
       validateInviteCode,
+      loginAsGuardian,
       updateEnergy,
       deductEnergy,
       addEnergy,

@@ -44,10 +44,11 @@ const SKEMA_BOX_FEE = 0.10;
 const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 16;
 
-// Criador do universo (você)
+// Criador do universo - Guardião
 const UNIVERSE_CREATOR = {
-  id: 'creator-skema-universe',
-  name: 'Skema',
+  id: 'guardian-skema-universe',
+  name: 'skema',
+  emoji: '🌌',
 };
 
 // ==================== HELPERS ====================
@@ -97,10 +98,24 @@ export function useOfficialRace() {
         if (stored) {
           const parsed = JSON.parse(stored) as OfficialRace;
           parsed.scheduledDate = new Date(parsed.scheduledDate);
+          
+          // Garante que o Guardião esteja inscrito
+          const guardianRegistered = parsed.registeredPlayers.some(p => p.id === UNIVERSE_CREATOR.id);
+          if (!guardianRegistered) {
+            parsed.registeredPlayers.unshift({
+              id: UNIVERSE_CREATOR.id,
+              name: UNIVERSE_CREATOR.name,
+              emoji: UNIVERSE_CREATOR.emoji,
+              registeredAt: '2024-01-01T00:00:00.000Z',
+            });
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+            console.log('[OFFICIAL RACE] Guardião inscrito na corrida');
+          }
+          
           console.log('[OFFICIAL RACE] Corrida carregada:', parsed.name, '- Inscritos:', parsed.registeredPlayers.length);
           setRace(parsed);
         } else {
-          // Cria corrida inicial
+          // Cria corrida inicial com Guardião já inscrito
           const initialRace: OfficialRace = {
             id: 'official-race-2026-03-03',
             name: 'Corrida Inaugural SKEMA',
@@ -110,14 +125,19 @@ export function useOfficialRace() {
             skemaBoxFee: SKEMA_BOX_FEE,
             minPlayers: MIN_PLAYERS,
             maxPlayers: MAX_PLAYERS,
-            registeredPlayers: [],
+            registeredPlayers: [{
+              id: UNIVERSE_CREATOR.id,
+              name: UNIVERSE_CREATOR.name,
+              emoji: UNIVERSE_CREATOR.emoji,
+              registeredAt: '2024-01-01T00:00:00.000Z',
+            }],
             status: 'registration',
             creatorId: UNIVERSE_CREATOR.id,
             creatorName: UNIVERSE_CREATOR.name,
           };
           
           localStorage.setItem(STORAGE_KEY, JSON.stringify(initialRace));
-          console.log('[OFFICIAL RACE] Corrida criada:', initialRace.name);
+          console.log('[OFFICIAL RACE] Corrida criada com Guardião:', initialRace.name);
           setRace(initialRace);
         }
       } catch (e) {
