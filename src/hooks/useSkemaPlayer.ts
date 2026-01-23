@@ -267,7 +267,7 @@ export function useSkemaPlayer() {
     }
   }, []);
 
-  // Valida código de convite - busca no registro global
+  // Valida código de convite - busca no registro global OU aceita formato válido
   const validateInviteCode = useCallback((code: string): { valid: boolean; inviterId: string | null; inviterName?: string } => {
     const upperCode = code.toUpperCase().trim();
     console.log('[SKEMA] Validando código:', upperCode);
@@ -278,7 +278,7 @@ export function useSkemaPlayer() {
       return { valid: true, inviterId: null, inviterName: 'SKEMA' };
     }
     
-    // Busca no registro global de códigos
+    // Busca no registro global de códigos (se existir no localStorage)
     const storedRegistry = localStorage.getItem(CODE_REGISTRY_KEY);
     console.log('[SKEMA] Registry raw:', storedRegistry);
     
@@ -296,7 +296,15 @@ export function useSkemaPlayer() {
       }
     }
     
-    console.log('[SKEMA] Código não encontrado no registry');
+    // WORKAROUND: Em aba privada/outro navegador, o registry está vazio
+    // Aceita códigos com formato válido: SK + 6 caracteres alfanuméricos
+    const validCodePattern = /^SK[A-Z0-9]{6}$/;
+    if (validCodePattern.test(upperCode)) {
+      console.log('[SKEMA] ✅ Código com formato válido aceito (cross-browser):', upperCode);
+      return { valid: true, inviterId: 'unknown', inviterName: 'Jogador SKEMA' };
+    }
+    
+    console.log('[SKEMA] Código não encontrado no registry e formato inválido');
     return { valid: false, inviterId: null };
   }, []);
 
