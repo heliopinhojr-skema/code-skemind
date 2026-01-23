@@ -66,10 +66,27 @@ export function SkemaLobby({
   const [copiedLink, setCopiedLink] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Saldo do Skema Box (conta mãe)
-  const skemaBoxBalance = useMemo(() => {
+  // Saldo do Skema Box (conta mãe) - usa state para atualizar em tempo real
+  const [skemaBoxBalance, setSkemaBoxBalance] = useState(() => {
     const stored = localStorage.getItem('skema_box_balance');
     return stored ? parseFloat(stored) : 0;
+  });
+  
+  // Atualiza o saldo do Skema Box quando o componente fica visível (volta ao lobby)
+  useEffect(() => {
+    const updateBalance = () => {
+      const stored = localStorage.getItem('skema_box_balance');
+      const newBalance = stored ? parseFloat(stored) : 0;
+      setSkemaBoxBalance(newBalance);
+      console.log('[SKEMA BOX] 📦 Saldo atualizado:', newBalance);
+    };
+    
+    // Atualiza imediatamente
+    updateBalance();
+    
+    // Também atualiza quando a janela ganha foco (volta de outra aba)
+    window.addEventListener('focus', updateBalance);
+    return () => window.removeEventListener('focus', updateBalance);
   }, []);
 
   // Estrelas animadas
