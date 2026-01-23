@@ -80,12 +80,9 @@ export function evaluateGuess(
   const guessRemainder: { symbol: string; originalPos: number }[] = [];
 
   // PASSO 1 — BRANCOS (posição exata)
-  console.log('--- PASSO 1: BRANCOS (posição exata) ---');
   for (let i = 0; i < CODE_LENGTH; i++) {
     const s = secretCopy[i];
     const g = guessCopy[i];
-
-    console.log(`  Pos ${i}: secret="${s}" vs guess="${g}" → ${s === g ? '⚪ BRANCO' : '❌ não'}`);
 
     if (typeof s === 'string' && typeof g === 'string' && g === s) {
       whites++;
@@ -97,13 +94,8 @@ export function evaluateGuess(
     if (typeof s === 'string') secretRemainder.push({ symbol: s, originalPos: i });
     if (typeof g === 'string') guessRemainder.push({ symbol: g, originalPos: i });
   }
-  console.log(`  → Total BRANCOS: ${whites} (posições: ${whitePositions.join(', ')})`);
 
   // PASSO 2 — CINZAS (símbolo certo, posição errada)
-  console.log('--- PASSO 2: PRETOS (símbolo certo, posição errada) ---');
-  console.log(`  Restantes no segredo: ${secretRemainder.map(x => `${x.symbol}@${x.originalPos}`).join(', ')}`);
-  console.log(`  Restantes no palpite: ${guessRemainder.map(x => `${x.symbol}@${x.originalPos}`).join(', ')}`);
-
   let grays = 0;
   const secretBag = [...secretRemainder];
   
@@ -116,14 +108,9 @@ export function evaluateGuess(
         secretPos: secretBag[idx].originalPos, 
         symbol: g.symbol 
       });
-      console.log(`  ⚫ PRETO: "${g.symbol}" (palpite pos ${g.originalPos}) existe no segredo pos ${secretBag[idx].originalPos}`);
       secretBag.splice(idx, 1);
-    } else {
-      console.log(`  ❌ "${g.symbol}" (palpite pos ${g.originalPos}) NÃO existe no segredo restante`);
     }
   }
-  console.log(`  → Total PRETOS: ${grays}`);
-  console.log(`  → RESULTADO FINAL: ⚪${whites} ⚫${grays}`);
 
   return { whites, grays };
 }

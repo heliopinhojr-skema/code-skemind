@@ -262,16 +262,8 @@ export function useGame() {
       const guessIds = guessSnapshot.map(s => (s as GameSymbol).id);
       if (!isValidGuess(guessIds)) return;
 
-      // DEBUG: Log para verificar consistência
-      console.log('=== SUBMIT DEBUG ===');
-      console.log('Segredo FIXO:', secretSnapshot.join(', '));
-      console.log('Palpite:', guessIds.join(', '));
-
       // Feedback - passa cópias para garantir imutabilidade
       const result = evaluateGuess([...secretSnapshot], [...guessIds]);
-      
-      console.log('Feedback:', `⚪${result.whites} ⚫${result.grays}`);
-      console.log('====================');
 
       const entry: AttemptResult = Object.freeze({
         id: crypto.randomUUID(),
