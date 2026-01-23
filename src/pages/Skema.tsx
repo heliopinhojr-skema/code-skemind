@@ -187,27 +187,38 @@ export default function Skema() {
   const handleStartBotRace = (buyIn: number, fee: number): { success: boolean; error?: string } => {
     const total = buyIn + fee; // 0.50 + 0.05 = 0.55 (entrada do humano)
     
+    console.log('[SKEMA ARENA] 🎮 Iniciando Arena x Bots...');
+    console.log('[SKEMA ARENA] Saldo atual:', skemaPlayer.player!.energy);
+    console.log('[SKEMA ARENA] Custo entrada:', total);
+    
     if (skemaPlayer.player!.energy < total) {
+      console.log('[SKEMA ARENA] ❌ Energia insuficiente!');
       return { success: false, error: 'Energia insuficiente (k$0.55)' };
     }
     
     // Deduz entrada do humano
-    skemaPlayer.actions.deductEnergy(total);
+    const deducted = skemaPlayer.actions.deductEnergy(total);
+    console.log('[SKEMA ARENA] ✅ Entrada deduzida:', deducted);
     
     // Rake = fee de TODOS os 10 jogadores (bots são virtuais mas contam)
     const SKEMA_BOX_KEY = 'skema_box_balance';
     const currentBox = parseFloat(localStorage.getItem(SKEMA_BOX_KEY) || '0');
-    localStorage.setItem(SKEMA_BOX_KEY, (currentBox + ARENA_TOTAL_RAKE).toFixed(2));
-    console.log(`[SKEMA] 💰 Rake (10 × k$${ARENA_FEE_PER_PLAYER.toFixed(2)}): +k$${ARENA_TOTAL_RAKE.toFixed(2)} → Caixa Skema: k$${(currentBox + ARENA_TOTAL_RAKE).toFixed(2)}`);
-    console.log(`[SKEMA] 🏆 Pool total (10 × k$0.55): k$${ARENA_TOTAL_POOL.toFixed(2)}`);
+    const newBoxBalance = currentBox + ARENA_TOTAL_RAKE;
+    localStorage.setItem(SKEMA_BOX_KEY, newBoxBalance.toFixed(2));
+    console.log(`[SKEMA ARENA] 💰 Rake: k$${ARENA_TOTAL_RAKE.toFixed(2)} → Skema Box: k$${newBoxBalance.toFixed(2)}`);
+    console.log(`[SKEMA ARENA] 🏆 Pool total: k$${ARENA_TOTAL_POOL.toFixed(2)}`);
     
     setGameMode('bots');
     setCurrentView('bots');
     
     const result = tournament.actions.startTournament();
+    console.log('[SKEMA ARENA] Torneio iniciado:', result);
+    
     if (result.success && result.humanSecretCode) {
       game.actions.startGameWithSecret(result.humanSecretCode);
+      console.log('[SKEMA ARENA] ✅ Jogo iniciado com sucesso!');
     } else {
+      console.log('[SKEMA ARENA] ❌ Falha ao iniciar - devolvendo energia');
       // Se falhou, devolve a energia do humano
       skemaPlayer.actions.addEnergy(total);
       // Remove rake da caixa
