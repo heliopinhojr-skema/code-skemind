@@ -38,7 +38,6 @@ interface SkemaLobbyProps {
 type GameMode = 'training' | 'bots' | 'official';
 
 const COUNTDOWN_SECONDS = 10;
-const PUBLISHED_APP_ORIGIN = 'https://skemind-code-guess.lovable.app';
 
 export function SkemaLobby({
   player,
@@ -85,13 +84,10 @@ export function SkemaLobby({
 
   // Gera link de convite
   const getInviteLink = useCallback((code: string) => {
-    const origin = window.location.origin;
-    const isLovablePreview =
-      origin.includes('lovableproject.com') ||
-      origin.includes('id-preview--') ||
-      origin.includes('lovable.app');
-    const baseUrl = isLovablePreview ? PUBLISHED_APP_ORIGIN : origin;
-    return `${baseUrl}/?convite=${encodeURIComponent(code)}`;
+    // Importante: este app é local-first (convites ficam no localStorage).
+    // Portanto, o link DEVE usar o mesmo origin onde o código foi gerado;
+    // caso contrário, o destinatário cai em outro domínio e o SKINV não existe lá.
+    return `${window.location.origin}/?convite=${encodeURIComponent(code)}`;
   }, []);
 
   const handleCopyInvite = useCallback(async (code: string) => {
