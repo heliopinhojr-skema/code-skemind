@@ -18,6 +18,7 @@ export interface SkemaPlayer {
   name: string;
   emoji: string;
   inviteCode: string;
+  password?: string; // Senha simples para retornar
   invitedBy: string | null;
   invitedByName?: string | null; // Nome de quem convidou (ancestralidade)
   registeredAt: string;
@@ -42,6 +43,7 @@ export interface InvitedPlayer {
 const STORAGE_KEY = 'skema_player';
 const INVITES_KEY = 'skema_invites';
 const CODE_REGISTRY_KEY = 'skema_code_registry'; // Mapeia códigos -> jogadores
+const ACCOUNTS_KEY = 'skema_accounts'; // Registro global de contas (código -> dados completos)
 const INITIAL_ENERGY = 10;
 const REFERRAL_REWARD = 10;
 const MAX_REFERRAL_REWARDS = 10;
@@ -249,10 +251,20 @@ export function useSkemaPlayer() {
     setIsLoaded(true);
   }, []);
 
-  // Salva no localStorage
+  // Salva no localStorage E no registro global de contas
   const savePlayer = useCallback((updated: SkemaPlayer) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     setPlayer(updated);
+    
+    // Atualiza registro global de contas (para login futuro)
+    try {
+      const storedAccounts = localStorage.getItem(ACCOUNTS_KEY);
+      const accounts = storedAccounts ? JSON.parse(storedAccounts) : {};
+      accounts[updated.inviteCode] = updated;
+      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+    } catch (e) {
+      console.error('[SKEMA] Erro ao salvar conta global:', e);
+    }
   }, []);
 
   // Valida código de convite - busca no registro global
@@ -288,16 +300,54 @@ export function useSkemaPlayer() {
     return { valid: false, inviterId: null };
   }, []);
 
-  // Registra novo jogador
-  const register = useCallback((name: string, inviteCode: string, emoji: string = '🎮'): { success: boolean; error?: string } => {
+  // Login com código do jogador + senha
+  const login = useCallback((playerCode: string, password: string): { success: boolean; error?: string } => {
+    const upperCode = playerCode.toUpperCase().trim();
+    console.log('[SKEMA] Tentando login com código:', upperCode);
+    
+    // Login especial do Guardião
+    if (upperCode === 'DEUSPAI') {
+      const guardian = { ...GUARDIAN_PLAYER };
+      savePlayer(guardian);
+      console.log('[SKEMA] 🌌 Guardião do Universo logado');
+      return { success: true };
+    }
+    
+    // Busca conta no registro global
+    try {
+      const storedAccounts = localStorage.getItem(ACCOUNTS_KEY);
+      if (storedAccounts) {
+        const accounts = JSON.parse(storedAccounts) as Record<string, SkemaPlayer>;
+        const account = accounts[upperCode];
+        
+        if (account) {
+          // Verifica senha
+          if (account.password !== password) {
+            console.log('[SKEMA] ❌ Senha incorreta');
+            return { success: false, error: 'Senha incorreta' };
+          }
+          
+          // Login bem-sucedido - restaura dados
+          console.log('[SKEMA] ✅ Login bem-sucedido:', account.name);
+          savePlayer(account);
+          return { success: true };
+        }
+      }
+    } catch (e) {
+      console.error('[SKEMA] Erro ao fazer login:', e);
+    }
+    
+    return { success: false, error: 'Conta não encontrada' };
+  }, [savePlayer]);
+
+  // Registra novo jogador com senha
+  const register = useCallback((name: string, inviteCode: string, emoji: string = '🎮', password?: string): { success: boolean; error?: string; playerCode?: string } => {
     const upperCode = inviteCode.toUpperCase().trim();
     
     // Login especial do Guardião
     if (upperCode === 'DEUSPAI') {
-      // Cria/atualiza o guardião
       const guardian = { ...GUARDIAN_PLAYER };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(guardian));
-      setPlayer(guardian);
+      savePlayer(guardian);
       
       // Registra código do guardião no registry global
       const storedRegistry = localStorage.getItem(CODE_REGISTRY_KEY);
@@ -307,7 +357,7 @@ export function useSkemaPlayer() {
       setCodeRegistry(registry);
       
       console.log('[SKEMA] 🌌 Guardião do Universo logado:', guardian.name);
-      return { success: true };
+      return { success: true, playerCode: guardian.inviteCode };
     }
     
     const validation = validateInviteCode(inviteCode);
@@ -323,6 +373,15 @@ export function useSkemaPlayer() {
     if (trimmedName.length > 15) {
       return { success: false, error: 'Nome deve ter no máximo 15 caracteres' };
     }
+    
+    // Valida senha
+    const trimmedPassword = (password || '').trim();
+    if (trimmedPassword.length < 4) {
+      return { success: false, error: 'Senha deve ter pelo menos 4 caracteres' };
+    }
+    if (trimmedPassword.length > 20) {
+      return { success: false, error: 'Senha deve ter no máximo 20 caracteres' };
+    }
 
     const newInviteCode = generateInviteCode();
     
@@ -331,6 +390,7 @@ export function useSkemaPlayer() {
       name: trimmedName,
       emoji,
       inviteCode: newInviteCode,
+      password: trimmedPassword,
       invitedBy: validation.inviterId,
       invitedByName: validation.inviterName || null,
       registeredAt: new Date().toISOString(),
@@ -424,7 +484,7 @@ export function useSkemaPlayer() {
     
     console.log(`[SKEMA] 🎉 Novo jogador registrado: ${newPlayer.name} (código: ${newInviteCode})`);
 
-    return { success: true };
+    return { success: true, playerCode: newInviteCode };
   }, [validateInviteCode, savePlayer, allInvites, codeRegistry]);
 
   // Atualiza energia
@@ -526,6 +586,7 @@ export function useSkemaPlayer() {
     transferTax: TRANSFER_TAX,
     actions: {
       register,
+      login,
       validateInviteCode,
       updateEnergy,
       deductEnergy,
