@@ -167,26 +167,33 @@ export function useSkemaPlayer() {
   // Valida código de convite - busca no registro global
   const validateInviteCode = useCallback((code: string): { valid: boolean; inviterId: string | null; inviterName?: string } => {
     const upperCode = code.toUpperCase().trim();
+    console.log('[SKEMA] Validando código:', upperCode);
     
     // Master codes
     if (MASTER_INVITE_CODES.includes(upperCode)) {
+      console.log('[SKEMA] Código master válido');
       return { valid: true, inviterId: null, inviterName: 'SKEMA' };
     }
     
     // Busca no registro global de códigos
     const storedRegistry = localStorage.getItem(CODE_REGISTRY_KEY);
+    console.log('[SKEMA] Registry raw:', storedRegistry);
+    
     if (storedRegistry) {
-      const registry = JSON.parse(storedRegistry) as Record<string, CodeRegistryEntry>;
-      if (registry[upperCode]) {
-        return { valid: true, inviterId: registry[upperCode].id, inviterName: registry[upperCode].name };
+      try {
+        const registry = JSON.parse(storedRegistry) as Record<string, CodeRegistryEntry>;
+        console.log('[SKEMA] Registry parsed:', registry);
+        console.log('[SKEMA] Buscando código:', upperCode, 'encontrado:', registry[upperCode]);
+        
+        if (registry[upperCode]) {
+          return { valid: true, inviterId: registry[upperCode].id, inviterName: registry[upperCode].name };
+        }
+      } catch (e) {
+        console.error('[SKEMA] Erro ao parsear registry:', e);
       }
     }
     
-    // Para demo: aceita qualquer código SK (como código "órfão")
-    if (upperCode.startsWith('SK') && upperCode.length >= 6) {
-      return { valid: true, inviterId: null, inviterName: undefined };
-    }
-    
+    console.log('[SKEMA] Código não encontrado no registry');
     return { valid: false, inviterId: null };
   }, []);
 
