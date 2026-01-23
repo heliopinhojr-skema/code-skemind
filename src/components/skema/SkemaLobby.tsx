@@ -12,12 +12,12 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Zap, Trophy, Users, Clock, Brain, Swords, Target,
-  Rocket, Timer, Sparkles, Gift, Copy, Check,
-  Calendar, Crown, Lock, AlertCircle, LogOut, Share2
+  Rocket, Sparkles, Gift, Check,
+  Calendar, Crown, AlertCircle, LogOut, Share2, UserCheck
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SkemaPlayer } from '@/hooks/useSkemaPlayer';
-import { useRaceSchedule, BuyInOption } from '@/hooks/useRaceSchedule';
+import { useOfficialRace } from '@/hooks/useOfficialRace';
 import universeBg from '@/assets/universe-bg.jpg';
 
 interface SkemaLobbyProps {
@@ -49,10 +49,9 @@ export function SkemaLobby({
   onStartOfficialRace,
   onLogout,
 }: SkemaLobbyProps) {
-  const raceSchedule = useRaceSchedule();
+  const officialRace = useOfficialRace();
   
   const [selectedMode, setSelectedMode] = useState<GameMode | null>(null);
-  const [selectedBuyIn, setSelectedBuyIn] = useState<BuyInOption | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
@@ -69,8 +68,8 @@ export function SkemaLobby({
     })), []
   );
 
-  const canAffordBots = player.energy >= 0; // Treinar x Bots é grátis
-  const canAffordOfficial = (buyIn: BuyInOption) => player.energy >= buyIn.total;
+  const canAffordOfficial = player.energy >= officialRace.constants.entryFee;
+  const isPlayerRegistered = officialRace.race ? officialRace.actions.isPlayerRegistered(player.id) : false;
 
   // Gera link de convite (usa a HOME com query param para evitar 404/login em links profundos)
   // Ex.: https://.../?convite=SEUCODIGO
@@ -112,7 +111,6 @@ export function SkemaLobby({
 
   const handleSelectMode = useCallback((mode: GameMode) => {
     setSelectedMode(mode);
-    setSelectedBuyIn(null);
     setError(null);
   }, []);
 
@@ -125,15 +123,15 @@ export function SkemaLobby({
     } else if (selectedMode === 'bots') {
       setIsStarting(true);
       setCountdown(COUNTDOWN_SECONDS);
-    } else if (selectedMode === 'official' && selectedBuyIn) {
-      if (!canAffordOfficial(selectedBuyIn)) {
+    } else if (selectedMode === 'official') {
+      if (!canAffordOfficial) {
         setError('Energia insuficiente');
         return;
       }
       setIsStarting(true);
       setCountdown(COUNTDOWN_SECONDS);
     }
-  }, [selectedMode, selectedBuyIn, isStarting]);
+  }, [selectedMode, isStarting, canAffordOfficial]);
 
   const handleCancelCountdown = useCallback(() => {
     setIsStarting(false);
@@ -154,8 +152,9 @@ export function SkemaLobby({
           setIsStarting(false);
           setCountdown(null);
         }
-      } else if (selectedMode === 'official' && selectedBuyIn) {
-        const result = onStartOfficialRace('race-1', selectedBuyIn.buyIn, selectedBuyIn.fee);
+      } else if (selectedMode === 'official') {
+        const { entryFee, prizePerPlayer, skemaBoxFee } = officialRace.constants;
+        const result = onStartOfficialRace('official-race-2026-03-03', prizePerPlayer, skemaBoxFee);
         if (!result.success) {
           setError(result.error || 'Erro ao iniciar');
           setIsStarting(false);
@@ -170,7 +169,7 @@ export function SkemaLobby({
     }, 1000);
     
     return () => clearTimeout(timer);
-  }, [countdown, selectedMode, selectedBuyIn, onStartTraining, onStartBotRace, onStartOfficialRace]);
+  }, [countdown, selectedMode, onStartTraining, onStartBotRace, onStartOfficialRace, officialRace.constants]);
 
   return (
     <div className="min-h-screen relative overflow-x-hidden">
@@ -353,47 +352,20 @@ export function SkemaLobby({
                 </div>
               )}
               
-              {/* Link para entrar + copiar */}
-              <div className="mb-3">
-                <label className="text-xs text-white/50 mb-1 block">Link para entrar:</label>
-                <div className="flex items-center gap-2">
-                  <a 
-                    href={inviteLink} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="flex-1 bg-black/30 border border-white/20 rounded-lg px-3 py-2 text-xs text-blue-400 hover:text-blue-300 truncate underline"
-                  >
-                    {inviteLink}
-                  </a>
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    onClick={handleCopyInviteLink}
-                    className="shrink-0 h-10 w-10"
-                    title="Copiar link"
-                  >
-                    {copiedCode ? <Check className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5" />}
-                  </Button>
+              {/* Link para convidar */}
+              <div className="flex items-center gap-2">
+                <div className="flex-1 bg-black/30 border border-white/20 rounded-lg px-3 py-2 text-xs text-blue-400 truncate">
+                  {inviteLink}
                 </div>
-              </div>
-              
-              {/* Código para copiar */}
-              <div>
-                <label className="text-xs text-white/50 mb-1 block">Código para copiar:</label>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-black/30 border border-white/20 rounded-lg px-3 py-2 font-mono text-lg text-center text-white tracking-widest">
-                    {player.inviteCode}
-                  </div>
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    onClick={handleCopyInviteCode}
-                    className="shrink-0 h-10 w-10"
-                    title="Copiar código"
-                  >
-                    {copiedCode ? <Check className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5" />}
-                  </Button>
-                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleCopyInviteLink}
+                  className="shrink-0 gap-1"
+                >
+                  {copiedCode ? <Check className="w-4 h-4 text-green-400" /> : <Share2 className="w-4 h-4" />}
+                  {copiedCode ? 'Copiado!' : 'Copiar'}
+                </Button>
               </div>
             </div>
           </motion.section>
@@ -482,106 +454,155 @@ export function SkemaLobby({
                 </div>
               </motion.button>
               
-              {/* Corridas Oficiais */}
+              {/* Corrida Oficial Agendada */}
               <motion.button
-                whileHover={{ scale: raceSchedule.isRaceTime ? 1.01 : 1 }}
-                onClick={() => raceSchedule.isRaceTime && handleSelectMode('official')}
-                disabled={!raceSchedule.isRaceTime}
+                whileHover={{ scale: 1.01 }}
+                onClick={() => handleSelectMode('official')}
                 className={`
                   w-full text-left p-4 rounded-2xl border transition-all
                   ${selectedMode === 'official' 
                     ? 'bg-gradient-to-br from-yellow-500/20 to-orange-500/20 border-primary/50 ring-2 ring-primary/30' 
-                    : 'bg-white/5 border-white/10'
+                    : 'bg-white/5 border-white/10 hover:bg-white/10'
                   }
-                  ${!raceSchedule.isRaceTime ? 'opacity-60' : 'hover:bg-white/10'}
                 `}
               >
                 <div className="flex items-start gap-4">
-                  <div className={`p-3 rounded-xl bg-black/30 ${raceSchedule.isRaceTime ? 'text-yellow-400' : 'text-white/40'}`}>
-                    {raceSchedule.isRaceTime ? <Crown className="w-6 h-6" /> : <Lock className="w-6 h-6" />}
+                  <div className="p-3 rounded-xl bg-black/30 text-yellow-400">
+                    <Crown className="w-6 h-6" />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-bold text-white">Corridas Oficiais</h3>
-                      {raceSchedule.isRaceTime ? (
-                        <span className="text-sm font-medium text-green-400 flex items-center gap-1">
-                          <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                          ABERTO
-                        </span>
-                      ) : (
-                        <span className="text-sm text-white/40">
-                          Abre em {raceSchedule.raceHoursIn}
-                        </span>
-                      )}
+                      <h3 className="font-bold text-white">Corrida Oficial</h3>
+                      <span className="text-sm font-medium text-yellow-400">
+                        k${officialRace.constants.entryFee.toFixed(2)}
+                      </span>
                     </div>
-                    <p className="text-sm text-white/60 mt-1">Competição real com jogadores de verdade</p>
+                    <p className="text-sm text-white/60 mt-1">
+                      {officialRace.race?.name || 'Corrida Inaugural SKEMA'}
+                    </p>
                     <div className="flex items-center gap-4 mt-2 text-xs text-white/50">
-                      <span><Users className="w-3 h-3 inline mr-1" />2-16 jogadores</span>
-                      <span><Clock className="w-3 h-3 inline mr-1" />{raceSchedule.raceScheduleText}</span>
+                      <span><Calendar className="w-3 h-3 inline mr-1" />{officialRace.formattedDate}</span>
+                      <span><Users className="w-3 h-3 inline mr-1" />{officialRace.race?.registeredPlayers.length || 0} inscritos</span>
                     </div>
+                    {isPlayerRegistered && (
+                      <div className="mt-2 flex items-center gap-1 text-xs text-green-400">
+                        <UserCheck className="w-3 h-3" />
+                        Você está inscrito!
+                      </div>
+                    )}
                   </div>
                 </div>
               </motion.button>
             </div>
           </motion.section>
           
-          {/* Opções de Buy-in (Corridas Oficiais) */}
+          {/* Detalhes da Corrida Oficial */}
           <AnimatePresence>
-            {selectedMode === 'official' && raceSchedule.isRaceTime && (
+            {selectedMode === 'official' && officialRace.race && (
               <motion.section
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
                 className="mx-4 mt-4 overflow-hidden"
               >
-                <div className="flex items-center gap-2 mb-3">
-                  <Trophy className="w-4 h-4 text-yellow-400" />
-                  <span className="text-sm font-medium text-white/80">Escolha o Buy-in</span>
-                </div>
-                
-                <div className="space-y-2">
-                  {raceSchedule.buyInOptions.map((option) => {
-                    const canAfford = canAffordOfficial(option);
-                    const isSelected = selectedBuyIn?.total === option.total;
-                    
-                    return (
-                      <motion.button
-                        key={option.total}
-                        whileHover={canAfford ? { scale: 1.01 } : {}}
-                        onClick={() => canAfford && setSelectedBuyIn(option)}
-                        disabled={!canAfford}
-                        className={`
-                          w-full text-left p-3 rounded-xl border transition-all
-                          ${isSelected 
-                            ? 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border-yellow-500/50' 
-                            : 'bg-white/5 border-white/10'
-                          }
-                          ${!canAfford ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/10'}
-                        `}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-white">k${option.buyIn.toFixed(2)}</span>
-                              <span className="text-xs text-white/40">+ k${option.fee.toFixed(2)} fee</span>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-sm text-green-400">Prêmio: {option.prize}</div>
-                            <div className="text-xs text-white/40">Total: k${option.total.toFixed(2)}</div>
-                          </div>
-                        </div>
-                      </motion.button>
-                    );
-                  })}
-                </div>
-                
-                {/* Próximas corridas */}
-                {raceSchedule.upcomingRaces.length > 0 && (
-                  <div className="mt-4">
-                    <div className="text-xs text-white/50 mb-2">Próxima corrida em: {raceSchedule.nextRaceIn}</div>
+                <div className="bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-4">
+                  {/* Info da corrida */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <div className="text-lg font-bold text-white">{officialRace.race.name}</div>
+                      <div className="text-sm text-white/60">{officialRace.formattedDate}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-white/50">Tempo restante</div>
+                      <div className="text-lg font-bold text-yellow-400">{officialRace.timeUntilRace}</div>
+                    </div>
                   </div>
-                )}
+                  
+                  {/* Economia */}
+                  <div className="grid grid-cols-3 gap-2 mb-4">
+                    <div className="bg-black/30 rounded-lg p-2 text-center">
+                      <div className="text-xs text-white/50">Entrada</div>
+                      <div className="font-bold text-white">k${officialRace.constants.entryFee.toFixed(2)}</div>
+                    </div>
+                    <div className="bg-black/30 rounded-lg p-2 text-center">
+                      <div className="text-xs text-white/50">Prêmio/Player</div>
+                      <div className="font-bold text-green-400">k${officialRace.constants.prizePerPlayer.toFixed(2)}</div>
+                    </div>
+                    <div className="bg-black/30 rounded-lg p-2 text-center">
+                      <div className="text-xs text-white/50">Caixa Skema</div>
+                      <div className="font-bold text-purple-400">k${officialRace.constants.skemaBoxFee.toFixed(2)}</div>
+                    </div>
+                  </div>
+                  
+                  {/* Pote atual */}
+                  <div className="bg-black/30 rounded-lg p-3 mb-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Trophy className="w-5 h-5 text-yellow-400" />
+                      <span className="text-white/80">Pote Atual</span>
+                    </div>
+                    <span className="text-xl font-bold text-yellow-400">k${officialRace.prizePool.toFixed(2)}</span>
+                  </div>
+                  
+                  {/* Lista de inscritos */}
+                  <div className="mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Users className="w-4 h-4 text-white/60" />
+                      <span className="text-sm text-white/80">
+                        Jogadores Inscritos ({officialRace.race.registeredPlayers.length}/{officialRace.constants.maxPlayers})
+                      </span>
+                    </div>
+                    
+                    {officialRace.race.registeredPlayers.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {officialRace.race.registeredPlayers.map((p) => (
+                          <div 
+                            key={p.id}
+                            className={`
+                              flex items-center gap-1 px-2 py-1 rounded-full text-xs
+                              ${p.id === player.id ? 'bg-green-500/20 border border-green-500/50 text-green-400' : 'bg-white/10 text-white/80'}
+                            `}
+                          >
+                            <span>{p.emoji}</span>
+                            <span>{p.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-white/40 italic">Nenhum jogador inscrito ainda</div>
+                    )}
+                  </div>
+                  
+                  {/* Botão de inscrição */}
+                  {!isPlayerRegistered ? (
+                    <Button
+                      onClick={() => {
+                        if (!canAffordOfficial) {
+                          setError('Energia insuficiente para inscrição');
+                          return;
+                        }
+                        const result = officialRace.actions.registerPlayer({
+                          id: player.id,
+                          name: player.name,
+                          emoji: player.emoji,
+                        });
+                        if (!result.success) {
+                          setError(result.error || 'Erro ao inscrever');
+                        }
+                      }}
+                      disabled={!canAffordOfficial}
+                      className="w-full"
+                      variant="default"
+                    >
+                      <UserCheck className="w-4 h-4 mr-2" />
+                      Inscrever-se (k${officialRace.constants.entryFee.toFixed(2)})
+                    </Button>
+                  ) : (
+                    <div className="flex items-center justify-center gap-2 p-3 bg-green-500/10 border border-green-500/30 rounded-lg text-green-400">
+                      <UserCheck className="w-5 h-5" />
+                      <span className="font-medium">Você está inscrito!</span>
+                    </div>
+                  )}
+                </div>
               </motion.section>
             )}
           </AnimatePresence>
@@ -606,7 +627,7 @@ export function SkemaLobby({
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/90 to-transparent z-20">
           <Button
             onClick={handleStartCountdown}
-            disabled={!selectedMode || isStarting || (selectedMode === 'official' && !selectedBuyIn)}
+            disabled={!selectedMode || isStarting || (selectedMode === 'official' && !isPlayerRegistered)}
             className="w-full h-14 text-lg font-bold"
             size="lg"
           >
