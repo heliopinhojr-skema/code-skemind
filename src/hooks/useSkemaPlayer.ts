@@ -143,6 +143,21 @@ export function useSkemaPlayer() {
   const [allInvites, setAllInvites] = useState<Record<string, InvitedPlayer>>({});
   const [codeRegistry, setCodeRegistry] = useState<Record<string, CodeRegistryEntry>>({});
 
+  // Persiste no localStorage (sessão atual) e no registro global de contas (login futuro).
+  // IMPORTANTE: manter como helper para evitar divergência entre STORAGE_KEY e ACCOUNTS_KEY.
+  const persistPlayer = useCallback((updated: SkemaPlayer) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+
+    try {
+      const storedAccounts = localStorage.getItem(ACCOUNTS_KEY);
+      const accounts = storedAccounts ? JSON.parse(storedAccounts) : {};
+      accounts[updated.inviteCode] = updated;
+      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+    } catch (e) {
+      console.error('[SKEMA] Erro ao salvar conta global:', e);
+    }
+  }, []);
+
   // Carrega do localStorage
   useEffect(() => {
     const syncReferrals = (currentPlayer: SkemaPlayer): SkemaPlayer => {
@@ -253,19 +268,9 @@ export function useSkemaPlayer() {
 
   // Salva no localStorage E no registro global de contas
   const savePlayer = useCallback((updated: SkemaPlayer) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    persistPlayer(updated);
     setPlayer(updated);
-    
-    // Atualiza registro global de contas (para login futuro)
-    try {
-      const storedAccounts = localStorage.getItem(ACCOUNTS_KEY);
-      const accounts = storedAccounts ? JSON.parse(storedAccounts) : {};
-      accounts[updated.inviteCode] = updated;
-      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
-    } catch (e) {
-      console.error('[SKEMA] Erro ao salvar conta global:', e);
-    }
-  }, []);
+  }, [persistPlayer]);
 
   // Valida código de convite - busca no registro global OU aceita formato válido
   const validateInviteCode = useCallback((code: string): { valid: boolean; inviterId: string | null; inviterName?: string } => {
@@ -496,16 +501,21 @@ export function useSkemaPlayer() {
     return { success: true, playerCode: newInviteCode };
   }, [validateInviteCode, savePlayer, allInvites, codeRegistry]);
 
-  // Atualiza energia
+  // Atualiza energia (ATÔMICO): usa setPlayer(prev) para não perder updates quando
+  // updateStats + addEnergy acontecem no mesmo tick (evita sobrescrever stats/energy).
   const updateEnergy = useCallback((amount: number) => {
-    if (!player) return;
-    
-    const updated = {
-      ...player,
-      energy: Math.max(0, player.energy + amount),
-    };
-    savePlayer(updated);
-  }, [player, savePlayer]);
+    setPlayer((prev) => {
+      if (!prev) return prev;
+
+      const updated = {
+        ...prev,
+        energy: Math.max(0, prev.energy + amount),
+      };
+
+      persistPlayer(updated);
+      return updated;
+    });
+  }, [persistPlayer]);
 
   // Deduz energia (para entry fees)
   const deductEnergy = useCallback((amount: number): boolean => {
@@ -536,42 +546,53 @@ export function useSkemaPlayer() {
     return { success: true };
   }, [player, updateEnergy]);
 
-  // Atualiza estatísticas
+  // Atualiza estatísticas (ATÔMICO): evita perder stats quando updateEnergy roda em seguida.
   const updateStats = useCallback((result: { won: boolean; time?: number }) => {
-    if (!player) return;
-    
-    const updated = {
-      ...player,
-      stats: {
-        ...player.stats,
-        races: player.stats.races + 1,
-        wins: player.stats.wins + (result.won ? 1 : 0),
-        bestTime: result.won && result.time 
-          ? (player.stats.bestTime === 0 ? result.time : Math.min(player.stats.bestTime, result.time))
-          : player.stats.bestTime,
-      },
-    };
-    savePlayer(updated);
-  }, [player, savePlayer]);
+    setPlayer((prev) => {
+      if (!prev) return prev;
 
-  // Atualiza emoji
+      const updated = {
+        ...prev,
+        stats: {
+          ...prev.stats,
+          races: prev.stats.races + 1,
+          wins: prev.stats.wins + (result.won ? 1 : 0),
+          bestTime: result.won && result.time
+            ? (prev.stats.bestTime === 0 ? result.time : Math.min(prev.stats.bestTime, result.time))
+            : prev.stats.bestTime,
+        },
+      };
+
+      persistPlayer(updated);
+      return updated;
+    });
+  }, [persistPlayer]);
+
+  // Atualiza emoji (ATÔMICO)
   const updateEmoji = useCallback((emoji: string) => {
-    if (!player) return;
-    savePlayer({ ...player, emoji });
-  }, [player, savePlayer]);
+    setPlayer((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, emoji };
+      persistPlayer(updated);
+      return updated;
+    });
+  }, [persistPlayer]);
 
   // Refill diário manual (para testes)
   const forceRefill = useCallback(() => {
-    if (!player) return;
-    if (player.energy >= INITIAL_ENERGY) return;
-    
-    const updated = {
-      ...player,
-      energy: INITIAL_ENERGY,
-      lastRefillDate: getTodayDateString(),
-    };
-    savePlayer(updated);
-  }, [player, savePlayer]);
+    setPlayer((prev) => {
+      if (!prev) return prev;
+      if (prev.energy >= INITIAL_ENERGY) return prev;
+
+      const updated = {
+        ...prev,
+        energy: INITIAL_ENERGY,
+        lastRefillDate: getTodayDateString(),
+      };
+      persistPlayer(updated);
+      return updated;
+    });
+  }, [persistPlayer]);
 
   // Logout (limpa dados locais)
   const logout = useCallback(() => {
