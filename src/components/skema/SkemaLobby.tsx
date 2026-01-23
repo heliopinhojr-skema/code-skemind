@@ -13,7 +13,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Zap, Trophy, Users, Clock, Brain, Swords, Target,
   Rocket, Sparkles, Gift, Check,
-  Calendar, Crown, AlertCircle, LogOut, Share2, UserCheck
+  Calendar, Crown, AlertCircle, LogOut, Share2, UserCheck, PartyPopper
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SkemaPlayer, getSkemaHour } from '@/hooks/useSkemaPlayer';
@@ -30,12 +30,13 @@ interface SkemaLobbyProps {
   onStartTraining: () => void;
   onStartBotRace: (buyIn: number, fee: number) => { success: boolean; error?: string };
   onStartOfficialRace: (raceId: string, buyIn: number, fee: number) => { success: boolean; error?: string };
+  onStartParty: () => void;
   onDeductEnergy: (amount: number) => boolean;
   onAddEnergy: (amount: number) => void;
   onLogout: () => void;
 }
 
-type GameMode = 'training' | 'bots' | 'official';
+type GameMode = 'training' | 'bots' | 'official' | 'party';
 
 const COUNTDOWN_SECONDS = 10;
 // URL pública (publicada) do app para convites — evita link de preview/sandbox que pode pedir login.
@@ -50,6 +51,7 @@ export function SkemaLobby({
   onStartTraining,
   onStartBotRace,
   onStartOfficialRace,
+  onStartParty,
   onDeductEnergy,
   onAddEnergy,
   onLogout,
@@ -146,8 +148,12 @@ export function SkemaLobby({
       }
       setIsStarting(true);
       setCountdown(COUNTDOWN_SECONDS);
+    } else if (selectedMode === 'party') {
+      // Modo Festa: vai direto para setup sem countdown
+      onStartParty();
+      return;
     }
-  }, [selectedMode, isStarting, canAffordOfficial, canAffordArena]);
+  }, [selectedMode, isStarting, canAffordOfficial, canAffordArena, onStartParty]);
 
   const handleCancelCountdown = useCallback(() => {
     setIsStarting(false);
@@ -514,6 +520,39 @@ export function SkemaLobby({
                   </div>
                 </div>
               </motion.button>
+              
+              {/* Modo Festa (Party) */}
+              <motion.button
+                whileHover={{ scale: 1.01 }}
+                onClick={() => handleSelectMode('party')}
+                className={`
+                  w-full text-left p-4 rounded-2xl border transition-all
+                  ${selectedMode === 'party' 
+                    ? 'bg-gradient-to-br from-pink-500/20 to-purple-500/20 border-primary/50 ring-2 ring-primary/30' 
+                    : 'bg-white/5 border-white/10 hover:bg-white/10'
+                  }
+                `}
+              >
+                <div className="flex items-start gap-4">
+                  <div className="p-3 rounded-xl bg-black/30 text-pink-400">
+                    <PartyPopper className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-bold text-white">Modo Festa</h3>
+                      <span className="text-sm font-medium text-yellow-400">k$1.10</span>
+                    </div>
+                    <p className="text-sm text-white/60 mt-1">Torneio presencial com amigos!</p>
+                    <div className="flex items-center gap-4 mt-2 text-xs text-white/50">
+                      <span><Users className="w-3 h-3 inline mr-1" />Até 10 jogadores</span>
+                      <span><Trophy className="w-3 h-3 inline mr-1" />Top 4 premiam</span>
+                    </div>
+                    <div className="mt-2 text-xs text-pink-300">
+                      🎯 Cada um joga no seu celular
+                    </div>
+                  </div>
+                </div>
+              </motion.button>
             </div>
           </motion.section>
           
@@ -705,6 +744,12 @@ export function SkemaLobby({
               <>
                 <Crown className="w-5 h-5 mr-2" />
                 Entrar na Corrida
+              </>
+            )}
+            {selectedMode === 'party' && (
+              <>
+                <PartyPopper className="w-5 h-5 mr-2" />
+                Criar Torneio Festa
               </>
             )}
             {!selectedMode && (

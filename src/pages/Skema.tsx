@@ -5,6 +5,7 @@
  * - Sistema de registro/convite
  * - Lobby com modos de jogo
  * - Treino solo e contra bots
+ * - Modo Festa (torneio presencial)
  * - Economia de energia (localStorage)
  */
 
@@ -13,18 +14,22 @@ import { useParams } from 'react-router-dom';
 import { useSkemaPlayer } from '@/hooks/useSkemaPlayer';
 import { useGame } from '@/hooks/useGame';
 import { useTournament } from '@/hooks/useTournament';
+import { usePartyTournament } from '@/hooks/usePartyTournament';
 import { RegistrationScreen } from '@/components/skema/RegistrationScreen';
 import { SkemaLobby } from '@/components/skema/SkemaLobby';
 import { GameBoard } from '@/components/game/GameBoard';
 import { StatsBar } from '@/components/game/StatsBar';
 import { RaceSummary } from '@/components/tournament/RaceSummary';
 import { TournamentLeaderboard } from '@/components/tournament/TournamentLeaderboard';
+import { PartySetup } from '@/components/party/PartySetup';
+import { PartyCollect } from '@/components/party/PartyCollect';
+import { PartyResults } from '@/components/party/PartyResults';
 import { CosmicBackground } from '@/components/CosmicBackground';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trophy } from 'lucide-react';
 import { UI_SYMBOLS } from '@/hooks/useGame';
 
-type SkemaView = 'lobby' | 'training' | 'bots' | 'official';
+type SkemaView = 'lobby' | 'training' | 'bots' | 'official' | 'party-setup' | 'party-playing' | 'party-collect' | 'party-results';
 
 export default function Skema() {
   const { code: codeFromPath } = useParams<{ code?: string }>();
@@ -44,9 +49,10 @@ export default function Skema() {
   const skemaPlayer = useSkemaPlayer();
   const game = useGame();
   const tournament = useTournament();
+  const party = usePartyTournament();
   
   const [currentView, setCurrentView] = useState<SkemaView>('lobby');
-  const [gameMode, setGameMode] = useState<'training' | 'bots' | 'official'>('training');
+  const [gameMode, setGameMode] = useState<'training' | 'bots' | 'official' | 'party'>('training');
   
   // Atualiza resultado do torneio quando jogo termina
   // MUST be before any conditional returns to follow Rules of Hooks
@@ -157,6 +163,51 @@ export default function Skema() {
     return result;
   };
   
+  
+  // Handlers para Modo Festa
+  const handleStartParty = () => {
+    if (!skemaPlayer.player) return;
+    party.actions.createTournament(
+      skemaPlayer.player.id,
+      skemaPlayer.player.name,
+      skemaPlayer.player.emoji,
+      'Festa SKEMA'
+    );
+    setCurrentView('party-setup');
+    setGameMode('party');
+  };
+  
+  const handlePartyStart = (): { success: boolean; error?: string } => {
+    return party.actions.startTournament(skemaPlayer.actions.deductEnergy);
+  };
+  
+  const handlePartyStarted = () => {
+    setCurrentView('party-playing');
+    game.actions.startGame();
+  };
+  
+  const handlePartyGameDone = () => {
+    // Depois que o host termina, vai para coleta
+    party.actions.goToCollecting();
+    setCurrentView('party-collect');
+  };
+  
+  const handlePartyFinish = () => {
+    if (!skemaPlayer.player) return [];
+    const results = party.actions.finishTournament(
+      skemaPlayer.actions.addEnergy,
+      skemaPlayer.player.id
+    );
+    setCurrentView('party-results');
+    return results;
+  };
+  
+  const handlePartyClose = () => {
+    party.actions.closeTournament();
+    game.actions.newGame();
+    setCurrentView('lobby');
+  };
+
   const handleBackToLobby = () => {
     // Atualiza stats do jogador
     if (game.state.status === 'won' || game.state.status === 'lost') {
@@ -197,9 +248,128 @@ export default function Skema() {
         onStartTraining={handleStartTraining}
         onStartBotRace={handleStartBotRace}
         onStartOfficialRace={handleStartOfficialRace}
+        onStartParty={handleStartParty}
         onDeductEnergy={skemaPlayer.actions.deductEnergy}
         onAddEnergy={skemaPlayer.actions.addEnergy}
         onLogout={skemaPlayer.actions.logout}
+      />
+    );
+  }
+  
+  // Modo Festa: Setup
+  if (currentView === 'party-setup' && party.tournament) {
+    return (
+      <PartySetup
+        tournament={party.tournament}
+        hostEnergy={skemaPlayer.player.energy}
+        onAddPlayer={party.actions.addPlayer}
+        onRemovePlayer={party.actions.removePlayer}
+        onStart={() => {
+          const result = handlePartyStart();
+          if (result.success) {
+            handlePartyStarted();
+          }
+          return result;
+        }}
+        onCancel={handlePartyClose}
+      />
+    );
+  }
+  
+  // Modo Festa: Jogando (host joga sua partida)
+  if (currentView === 'party-playing') {
+    const isFinished = game.state.status === 'won' || game.state.status === 'lost';
+    
+    if (isFinished) {
+      // Automaticamente vai para coleta quando termina
+      // Registra resultado do host
+      if (party.tournament && skemaPlayer.player) {
+        party.actions.addResult(
+          skemaPlayer.player.id,
+          game.state.status === 'won',
+          game.state.attempts,
+          game.state.timeRemaining,
+          game.state.score
+        );
+      }
+    }
+    
+    return (
+      <div className="min-h-screen relative">
+        <CosmicBackground />
+        
+        <div className="relative z-10 min-h-screen">
+          <div className="sticky top-0 z-20 bg-black/50 backdrop-blur-md border-b border-white/10 px-4 py-2 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-white">🎉 Modo Festa - Sua vez!</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-white/50">{skemaPlayer.player.emoji}</span>
+              <span className="text-white">{skemaPlayer.player.name}</span>
+            </div>
+          </div>
+          
+          <StatsBar
+            attempts={game.state.attempts}
+            maxAttempts={game.constants.MAX_ATTEMPTS}
+            gameStatus={game.state.status}
+            score={game.state.score}
+            timeRemaining={game.state.timeRemaining}
+          />
+          
+          <main className="p-3 pb-6">
+            {isFinished ? (
+              <div className="max-w-md mx-auto text-center space-y-4">
+                <div className="bg-white/10 border border-white/20 rounded-xl p-6">
+                  <div className="text-4xl mb-3">{game.state.status === 'won' ? '🎉' : '😅'}</div>
+                  <h2 className="text-xl font-bold text-white mb-2">
+                    {game.state.status === 'won' ? 'Você venceu!' : 'Fim de jogo!'}
+                  </h2>
+                  <p className="text-white/60 mb-4">
+                    {game.state.attempts} tentativas • {Math.floor(game.state.timeRemaining / 60)}:{String(game.state.timeRemaining % 60).padStart(2, '0')} restantes
+                  </p>
+                  <Button onClick={handlePartyGameDone} className="w-full">
+                    Coletar Resultados dos Outros
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <GameBoard
+                state={game.state}
+                secretCode={game.secretCode}
+                symbols={game.constants.SYMBOLS}
+                onSelectSymbol={game.actions.selectSymbol}
+                onClearSlot={game.actions.clearSlot}
+                onSubmit={game.actions.submit}
+                onNewGame={handlePartyClose}
+                onStartGame={game.actions.startGame}
+              />
+            )}
+          </main>
+        </div>
+      </div>
+    );
+  }
+  
+  // Modo Festa: Coletando resultados
+  if (currentView === 'party-collect' && party.tournament) {
+    return (
+      <PartyCollect
+        tournament={party.tournament}
+        onAddResult={party.actions.addResult}
+        onFinish={handlePartyFinish}
+        onCancel={handlePartyClose}
+      />
+    );
+  }
+  
+  // Modo Festa: Resultados finais
+  if (currentView === 'party-results' && party.tournament && skemaPlayer.player) {
+    return (
+      <PartyResults
+        tournament={party.tournament}
+        hostPlayerId={skemaPlayer.player.id}
+        onClose={handlePartyClose}
       />
     );
   }
