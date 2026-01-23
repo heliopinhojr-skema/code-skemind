@@ -2,9 +2,10 @@
  * SkemaLobby - Hub principal do jogador SKEMA
  * 
  * Mostra:
- * - Perfil, energia, stats
- * - Convites compactos com links únicos
- * - Modos de jogo
+ * - Emoji, nome, Ano/Dia Skema, energia
+ * - Modos: Treinar, Treinar x Bots, Corridas Oficiais
+ * - Missão de convites
+ * - Taxa de transferência
  */
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
@@ -12,10 +13,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Zap, Trophy, Users, Clock, Brain, Swords, Target,
   Rocket, Sparkles, Gift, Check,
-  Calendar, Crown, AlertCircle, LogOut, Copy, UserCheck, Plus
+  Calendar, Crown, AlertCircle, LogOut, Share2, UserCheck
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { SkemaPlayer, getSkemaHour, PendingInvite } from '@/hooks/useSkemaPlayer';
+import { SkemaPlayer, getSkemaHour } from '@/hooks/useSkemaPlayer';
 import { useOfficialRace } from '@/hooks/useOfficialRace';
 import universeBg from '@/assets/universe-bg.jpg';
 
@@ -25,19 +26,19 @@ interface SkemaLobbyProps {
   skemaDay: number;
   remainingReferralRewards: number;
   transferTax: number;
-  pendingInvites: PendingInvite[];
   onStartTraining: () => void;
   onStartBotRace: (buyIn: number, fee: number) => { success: boolean; error?: string };
   onStartOfficialRace: (raceId: string, buyIn: number, fee: number) => { success: boolean; error?: string };
   onDeductEnergy: (amount: number) => boolean;
   onAddEnergy: (amount: number) => void;
-  onGenerateInvite: () => { success: boolean; code?: string; error?: string };
   onLogout: () => void;
 }
 
 type GameMode = 'training' | 'bots' | 'official';
 
 const COUNTDOWN_SECONDS = 10;
+// URL pública (publicada) do app para convites — evita link de preview/sandbox que pode pedir login.
+const PUBLISHED_APP_ORIGIN = 'https://skemind-code-guess.lovable.app';
 
 export function SkemaLobby({
   player,
@@ -45,13 +46,11 @@ export function SkemaLobby({
   skemaDay,
   remainingReferralRewards,
   transferTax,
-  pendingInvites,
   onStartTraining,
   onStartBotRace,
   onStartOfficialRace,
   onDeductEnergy,
   onAddEnergy,
-  onGenerateInvite,
   onLogout,
 }: SkemaLobbyProps) {
   const officialRace = useOfficialRace();
@@ -60,7 +59,8 @@ export function SkemaLobby({
   const [selectedMode, setSelectedMode] = useState<GameMode | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isStarting, setIsStarting] = useState(false);
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Estrelas animadas
@@ -74,50 +74,52 @@ export function SkemaLobby({
     })), []
   );
 
+  // Espera corrida carregar para mostrar lobby completo
   const canAffordOfficial = officialRace.isLoaded ? player.energy >= officialRace.constants.entryFee : false;
   const isPlayerRegisteredInRace = officialRace.race ? officialRace.actions.isPlayerRegistered(player.id) : false;
 
-  // Stats de convites
-  const usedInvitesCount = pendingInvites.filter(p => p.used).length;
-  const pendingUnused = pendingInvites.filter(p => !p.used);
-  const lastPendingCode = pendingUnused.length > 0 ? pendingUnused[pendingUnused.length - 1].code : null;
+  // Gera link de convite (usa a HOME com query param para evitar 404/login em links profundos)
+  // Ex.: https://.../?convite=SEUCODIGO
+  const inviteLink = useMemo(() => {
+    const origin = window.location.origin;
 
-  // Gera link de convite - SEMPRE usa domínio publicado para evitar login Lovable
-  const PUBLISHED_ORIGIN = 'https://skemind-code-guess.lovable.app';
-  
-  const getInviteLink = useCallback((code: string) => {
-    // IMPORTANTE: Links de convite DEVEM usar o domínio publicado.
-    // Se usar preview, visitantes veem tela de login Google/GitHub do Lovable.
-    // O código SKINV precisa ser gerado no mesmo domínio publicado para funcionar.
-    return `${PUBLISHED_ORIGIN}/?convite=${encodeURIComponent(code)}`;
-  }, []);
+    // Qualquer domínio de preview/sandbox do Lovable pode exigir login. Para convites, sempre use o publicado.
+    const isLovablePreview =
+      origin.includes('lovableproject.com') ||
+      origin.includes('id-preview--') ||
+      origin.includes('lovable.app');
 
-  const handleCopyInvite = useCallback(async (code: string) => {
+    // Se você tiver um domínio próprio no futuro, pode trocar esta regra.
+    const baseUrl = isLovablePreview ? PUBLISHED_APP_ORIGIN : origin;
+
+    const code = encodeURIComponent(player.inviteCode);
+    return `${baseUrl}/?convite=${code}`;
+  }, [player.inviteCode]);
+
+  const handleCopyInviteCode = useCallback(async () => {
     try {
-      const link = getInviteLink(code);
-      await navigator.clipboard.writeText(link);
-      setCopiedCode(code);
-      setTimeout(() => setCopiedCode(null), 2000);
+      await navigator.clipboard.writeText(player.inviteCode);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
     } catch (e) {
       console.error('Erro ao copiar:', e);
     }
-  }, [getInviteLink]);
+  }, [player.inviteCode]);
 
-  const handleGenerateNewInvite = useCallback(() => {
-    const result = onGenerateInvite();
-    if (!result.success) {
-      setError(result.error || 'Erro ao gerar convite');
+  const handleCopyInviteLink = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch (e) {
+      console.error('Erro ao copiar:', e);
     }
-  }, [onGenerateInvite]);
+  }, [inviteLink]);
 
   const handleSelectMode = useCallback((mode: GameMode) => {
     setSelectedMode(mode);
     setError(null);
   }, []);
-
-  // Arena entry fee
-  const ARENA_ENTRY_FEE = 0.55;
-  const canAffordArena = player.energy >= ARENA_ENTRY_FEE;
 
   const handleStartCountdown = useCallback(() => {
     if (isStarting) return;
@@ -126,10 +128,6 @@ export function SkemaLobby({
       setIsStarting(true);
       setCountdown(COUNTDOWN_SECONDS);
     } else if (selectedMode === 'bots') {
-      if (!canAffordArena) {
-        setError('Energia insuficiente (k$0.55)');
-        return;
-      }
       setIsStarting(true);
       setCountdown(COUNTDOWN_SECONDS);
     } else if (selectedMode === 'official') {
@@ -140,7 +138,7 @@ export function SkemaLobby({
       setIsStarting(true);
       setCountdown(COUNTDOWN_SECONDS);
     }
-  }, [selectedMode, isStarting, canAffordOfficial, canAffordArena]);
+  }, [selectedMode, isStarting, canAffordOfficial]);
 
   const handleCancelCountdown = useCallback(() => {
     setIsStarting(false);
@@ -155,23 +153,14 @@ export function SkemaLobby({
       if (selectedMode === 'training') {
         onStartTraining();
       } else if (selectedMode === 'bots') {
-        // Deduz entrada da arena antes de iniciar
-        const deducted = onDeductEnergy(ARENA_ENTRY_FEE);
-        if (!deducted) {
-          setError('Falha ao deduzir energia');
-          setIsStarting(false);
-          setCountdown(null);
-          return;
-        }
-        const result = onStartBotRace(ARENA_ENTRY_FEE, 0);
+        const result = onStartBotRace(0, 0);
         if (!result.success) {
-          onAddEnergy(ARENA_ENTRY_FEE); // Reembolsa
           setError(result.error || 'Erro ao iniciar');
           setIsStarting(false);
           setCountdown(null);
         }
       } else if (selectedMode === 'official') {
-        const { prizePerPlayer, skemaBoxFee } = officialRace.constants;
+        const { entryFee, prizePerPlayer, skemaBoxFee } = officialRace.constants;
         const result = onStartOfficialRace('official-race-2026-03-03', prizePerPlayer, skemaBoxFee);
         if (!result.success) {
           setError(result.error || 'Erro ao iniciar');
@@ -274,143 +263,117 @@ export function SkemaLobby({
       
       {/* Conteúdo */}
       <div className="relative z-10 min-h-screen flex flex-col">
-        {/* Header - Perfil */}
+        {/* Header - Perfil do jogador */}
         <motion.header
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="p-4 border-b border-white/10 backdrop-blur-sm bg-black/30"
         >
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-2xl">
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-3xl">
                 {player.emoji}
               </div>
               <div>
-                <h1 className="text-base font-bold text-white">{player.name}</h1>
-                <div className="flex items-center gap-1 text-xs text-white/60">
+                <h1 className="text-lg font-bold text-white">{player.name}</h1>
+                <div className="flex items-center gap-2 text-xs text-white/60">
                   <Calendar className="w-3 h-3" />
-                  <span>Ano {skemaYear} • Dia {skemaDay} • {skemaHour}h</span>
+                  <span>Ano {skemaYear} • Dia {skemaDay} • {String(skemaHour).padStart(2, '0')}h</span>
                 </div>
+                {player.invitedByName && (
+                  <div className="text-xs text-purple-300 mt-0.5">
+                    🔗 Convidado por <span className="font-medium">{player.invitedByName}</span>
+                  </div>
+                )}
               </div>
             </div>
             
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 bg-gradient-to-r from-yellow-500/30 to-orange-500/30 px-3 py-1.5 rounded-full border border-yellow-500/50">
-                <Zap className="w-4 h-4 text-yellow-400" />
-                <span className="text-sm font-bold text-yellow-400">k${player.energy.toFixed(2)}</span>
-              </div>
+            <div className="flex items-center gap-3">
+              <motion.div 
+                className="flex items-center gap-2 bg-gradient-to-r from-yellow-500/30 to-orange-500/30 px-4 py-2 rounded-full border border-yellow-500/50"
+                whileHover={{ scale: 1.05 }}
+              >
+                <Zap className="w-5 h-5 text-yellow-400" />
+                <span className="font-bold text-yellow-400">k${player.energy.toFixed(2)}</span>
+              </motion.div>
               
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={onLogout}
-                className="text-white/50 hover:text-white h-8 w-8"
+                className="text-white/50 hover:text-white"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-5 h-5" />
               </Button>
             </div>
           </div>
           
-          {/* Stats compactos */}
+          {/* Stats rápidos */}
           <div className="grid grid-cols-3 gap-2">
-            <div className="bg-white/5 rounded-lg px-2 py-1.5 text-center">
-              <div className="text-sm font-bold text-green-400">{player.stats.wins}</div>
-              <div className="text-[10px] text-white/50">Vitórias</div>
+            <div className="bg-white/5 rounded-lg p-2 text-center">
+              <div className="text-lg font-bold text-green-400">{player.stats.wins}</div>
+              <div className="text-xs text-white/50">Vitórias</div>
             </div>
-            <div className="bg-white/5 rounded-lg px-2 py-1.5 text-center">
-              <div className="text-sm font-bold text-blue-400">{player.stats.races}</div>
-              <div className="text-[10px] text-white/50">Corridas</div>
+            <div className="bg-white/5 rounded-lg p-2 text-center">
+              <div className="text-lg font-bold text-blue-400">{player.stats.races}</div>
+              <div className="text-xs text-white/50">Corridas</div>
             </div>
-            <div className="bg-white/5 rounded-lg px-2 py-1.5 text-center">
-              <div className="text-sm font-bold text-purple-400">
+            <div className="bg-white/5 rounded-lg p-2 text-center">
+              <div className="text-lg font-bold text-purple-400">
                 {player.stats.bestTime ? `${Math.floor(player.stats.bestTime / 60)}:${String(player.stats.bestTime % 60).padStart(2, '0')}` : '-'}
               </div>
-              <div className="text-[10px] text-white/50">Melhor</div>
+              <div className="text-xs text-white/50">Melhor</div>
             </div>
           </div>
         </motion.header>
 
         {/* Conteúdo rolável */}
         <div className="flex-1 overflow-y-auto pb-28">
-          {/* Convites - UI Compacta */}
+          {/* Missão de Convites */}
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
             className="mx-4 mt-4"
           >
-            <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl p-3">
-              {/* Header compacto */}
-              <div className="flex items-center justify-between mb-2">
+            <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <Gift className="w-4 h-4 text-purple-400" />
-                  <span className="text-sm font-medium text-white">Convites</span>
+                  <Gift className="w-5 h-5 text-purple-400" />
+                  <span className="font-medium text-white">Missão: Convide Amigos</span>
                 </div>
-                <span className="text-xs text-purple-300 bg-purple-500/20 px-2 py-0.5 rounded-full">
-                  {usedInvitesCount}/10 usados • +k$10 cada
+                <span className="text-sm text-purple-300">
+                  {10 - remainingReferralRewards}/10 convites
                 </span>
               </div>
               
-              {/* Código atual ou gerar novo */}
-              <div className="flex items-center gap-2">
-                {lastPendingCode ? (
-                  <>
-                    <div className="flex-1 bg-black/30 border border-white/20 rounded-lg px-3 py-2 font-mono text-sm text-primary tracking-wider">
-                      {lastPendingCode}
-                    </div>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => handleCopyInvite(lastPendingCode)}
-                      className="shrink-0 h-9 px-3 touch-manipulation"
-                    >
-                      {copiedCode === lastPendingCode ? (
-                        <Check className="w-4 h-4 text-green-400" />
-                      ) : (
-                        <Copy className="w-4 h-4" />
-                      )}
-                    </Button>
-                    {usedInvitesCount < 10 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleGenerateNewInvite}
-                        className="shrink-0 h-9 px-2 text-purple-400 hover:text-purple-300"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </>
-                ) : (
-                  <Button
-                    onClick={handleGenerateNewInvite}
-                    className="w-full h-10"
-                    variant="secondary"
-                    disabled={usedInvitesCount >= 10}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Gerar Primeiro Convite
-                  </Button>
-                )}
-              </div>
+              <p className="text-sm text-white/60 mb-3">
+                Ganhe +k$10 para cada amigo que entrar!
+              </p>
               
-              {/* Histórico compacto */}
-              {pendingInvites.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {pendingInvites.slice(-5).map((inv) => (
-                    <span 
-                      key={inv.code}
-                      className={`text-[10px] px-1.5 py-0.5 rounded ${
-                        inv.used 
-                          ? 'bg-green-500/20 text-green-400' 
-                          : 'bg-white/10 text-white/50'
-                      }`}
-                    >
-                      {inv.used ? `✓${inv.usedBy?.slice(0,6)}` : inv.code.slice(-4)}
-                    </span>
-                  ))}
+              {/* Ancestralidade */}
+              {player.invitedByName && (
+                <div className="bg-black/20 rounded-lg p-2 mb-3 text-center">
+                  <span className="text-xs text-white/50">Sua ancestralidade: </span>
+                  <span className="text-sm text-purple-300 font-medium">🔗 {player.invitedByName}</span>
                 </div>
               )}
+              
+              {/* Link para convidar */}
+              <div className="flex items-center gap-2">
+                <div className="flex-1 bg-black/30 border border-white/20 rounded-lg px-3 py-2 text-xs text-blue-400 truncate">
+                  {inviteLink}
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleCopyInviteLink}
+                  className="shrink-0 gap-1"
+                >
+                  {copiedLink ? <Check className="w-4 h-4 text-green-400" /> : <Share2 className="w-4 h-4" />}
+                  {copiedLink ? 'Copiado!' : 'Copiar'}
+                </Button>
+              </div>
             </div>
           </motion.section>
           
@@ -419,10 +382,10 @@ export function SkemaLobby({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            className="mx-4 mt-2 flex items-center gap-2 text-[10px] text-white/40"
+            className="mx-4 mt-3 flex items-center gap-2 text-xs text-white/40"
           >
             <AlertCircle className="w-3 h-3" />
-            <span>Taxa de transferência: {(transferTax * 100).toFixed(2)}%</span>
+            <span>Taxa de transferência entre jogadores: {(transferTax * 100).toFixed(2)}%</span>
           </motion.div>
           
           {/* Modos de Jogo */}
@@ -430,241 +393,254 @@ export function SkemaLobby({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="mx-4 mt-4"
+            className="mx-4 mt-6"
           >
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex items-center gap-2 mb-4">
               <Sparkles className="w-4 h-4 text-primary" />
               <span className="text-sm font-medium text-white/80">Escolha seu Modo</span>
             </div>
             
-            <div className="space-y-2">
+            <div className="space-y-3">
               {/* Treinar (Solo) */}
               <motion.button
-                whileTap={{ scale: 0.98 }}
+                whileHover={{ scale: 1.01 }}
                 onClick={() => handleSelectMode('training')}
                 className={`
-                  w-full text-left p-3 rounded-xl border transition-all touch-manipulation
+                  w-full text-left p-4 rounded-2xl border transition-all
                   ${selectedMode === 'training' 
                     ? 'bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border-primary/50 ring-2 ring-primary/30' 
-                    : 'bg-white/5 border-white/10 active:bg-white/10'
+                    : 'bg-white/5 border-white/10 hover:bg-white/10'
                   }
                 `}
               >
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-black/30 text-blue-400">
-                    <Brain className="w-5 h-5" />
+                <div className="flex items-start gap-4">
+                  <div className="p-3 rounded-xl bg-black/30 text-blue-400">
+                    <Brain className="w-6 h-6" />
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-bold text-white text-sm">Treinar</h3>
-                      <span className="text-xs font-medium text-green-400">Grátis</span>
+                      <h3 className="font-bold text-white">Treinar</h3>
+                      <span className="text-sm font-medium text-green-400">Grátis</span>
                     </div>
-                    <p className="text-xs text-white/60">Pratique sozinho</p>
+                    <p className="text-sm text-white/60 mt-1">Pratique sozinho, sem gastar energia</p>
+                    <div className="flex items-center gap-4 mt-2 text-xs text-white/50">
+                      <span><Users className="w-3 h-3 inline mr-1" />Solo</span>
+                      <span><Clock className="w-3 h-3 inline mr-1" />24h disponível</span>
+                    </div>
                   </div>
                 </div>
               </motion.button>
               
-              {/* Arena x Bots - k$0.55 entrada */}
+              {/* Treinar x Bots */}
               <motion.button
-                whileTap={{ scale: 0.98 }}
+                whileHover={{ scale: 1.01 }}
                 onClick={() => handleSelectMode('bots')}
                 className={`
-                  w-full text-left p-3 rounded-xl border transition-all touch-manipulation
+                  w-full text-left p-4 rounded-2xl border transition-all
                   ${selectedMode === 'bots' 
                     ? 'bg-gradient-to-br from-orange-500/20 to-red-500/20 border-primary/50 ring-2 ring-primary/30' 
-                    : 'bg-white/5 border-white/10 active:bg-white/10'
+                    : 'bg-white/5 border-white/10 hover:bg-white/10'
                   }
                 `}
               >
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-black/30 text-orange-400">
-                    <Swords className="w-5 h-5" />
+                <div className="flex items-start gap-4">
+                  <div className="p-3 rounded-xl bg-black/30 text-orange-400">
+                    <Swords className="w-6 h-6" />
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-bold text-white text-sm">Arena</h3>
-                      <span className="text-xs font-medium text-yellow-400">k$0.55</span>
+                      <h3 className="font-bold text-white">Treinar x Bots</h3>
+                      <span className="text-sm font-medium text-green-400">Grátis</span>
                     </div>
-                    <p className="text-xs text-white/60">9 bots • Pote k$5 • Top 3 ITM</p>
+                    <p className="text-sm text-white/60 mt-1">Enfrente 9 bots IA em mesa de 10</p>
+                    <div className="flex items-center gap-4 mt-2 text-xs text-white/50">
+                      <span><Users className="w-3 h-3 inline mr-1" />10 jogadores</span>
+                      <span><Clock className="w-3 h-3 inline mr-1" />24h disponível</span>
+                    </div>
                   </div>
                 </div>
-                {/* Info economia poker */}
-                {selectedMode === 'bots' && (
-                  <div className="mt-2 pt-2 border-t border-white/10 grid grid-cols-4 gap-1 text-center text-[10px]">
-                    <div>
-                      <div className="text-white/40">Entrada</div>
-                      <div className="text-white font-medium">k$0.55</div>
-                    </div>
-                    <div>
-                      <div className="text-white/40">1º</div>
-                      <div className="text-green-400 font-medium">k$2.50</div>
-                    </div>
-                    <div>
-                      <div className="text-white/40">2º</div>
-                      <div className="text-blue-400 font-medium">k$1.50</div>
-                    </div>
-                    <div>
-                      <div className="text-white/40">3º</div>
-                      <div className="text-purple-400 font-medium">k$1.00</div>
-                    </div>
-                  </div>
-                )}
               </motion.button>
               
-              {/* Corrida Oficial */}
+              {/* Corrida Oficial Agendada */}
               <motion.button
-                whileTap={{ scale: 0.98 }}
+                whileHover={{ scale: 1.01 }}
                 onClick={() => handleSelectMode('official')}
                 className={`
-                  w-full text-left p-3 rounded-xl border transition-all touch-manipulation
+                  w-full text-left p-4 rounded-2xl border transition-all
                   ${selectedMode === 'official' 
                     ? 'bg-gradient-to-br from-yellow-500/20 to-orange-500/20 border-primary/50 ring-2 ring-primary/30' 
-                    : 'bg-white/5 border-white/10 active:bg-white/10'
+                    : 'bg-white/5 border-white/10 hover:bg-white/10'
                   }
                 `}
               >
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-black/30 text-yellow-400">
-                    <Crown className="w-5 h-5" />
+                <div className="flex items-start gap-4">
+                  <div className="p-3 rounded-xl bg-black/30 text-yellow-400">
+                    <Crown className="w-6 h-6" />
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-bold text-white text-sm">Corrida Oficial</h3>
-                      <span className="text-xs font-medium text-yellow-400">
+                      <h3 className="font-bold text-white">Corrida Oficial</h3>
+                      <span className="text-sm font-medium text-yellow-400">
                         k${officialRace.constants.entryFee.toFixed(2)}
                       </span>
                     </div>
-                    <p className="text-xs text-white/60">{officialRace.formattedDate}</p>
-                  </div>
-                  {isPlayerRegisteredInRace && (
-                    <div className="shrink-0">
-                      <UserCheck className="w-4 h-4 text-green-400" />
+                    <p className="text-sm text-white/60 mt-1">
+                      {officialRace.race?.name || 'Corrida Inaugural SKEMA'}
+                    </p>
+                    <div className="flex items-center gap-4 mt-2 text-xs text-white/50">
+                      <span><Calendar className="w-3 h-3 inline mr-1" />{officialRace.formattedDate}</span>
+                      <span><Users className="w-3 h-3 inline mr-1" />{officialRace.race?.registeredPlayers.length || 0} inscritos</span>
                     </div>
-                  )}
+                    {isPlayerRegisteredInRace && (
+                      <div className="mt-2 flex items-center gap-1 text-xs text-green-400">
+                        <UserCheck className="w-3 h-3" />
+                        Você está inscrito!
+                      </div>
+                    )}
+                  </div>
                 </div>
               </motion.button>
             </div>
           </motion.section>
           
-          {/* Detalhes da Corrida Oficial - FORA do AnimatePresence para fix mobile */}
-          {selectedMode === 'official' && officialRace.race && (
-            <motion.section
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="mx-4 mt-3"
-            >
-              <div className="bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-3">
-                {/* Info compacta */}
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <div className="text-sm font-bold text-white">{officialRace.race.name}</div>
-                    <div className="text-xs text-white/60">{officialRace.formattedDate}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-xs text-white/50">Restante</div>
-                    <div className="text-sm font-bold text-yellow-400">{officialRace.timeUntilRace}</div>
-                  </div>
-                </div>
-                
-                {/* Economia compacta */}
-                <div className="grid grid-cols-3 gap-1.5 mb-3">
-                  <div className="bg-black/30 rounded-lg p-1.5 text-center">
-                    <div className="text-[10px] text-white/50">Entrada</div>
-                    <div className="text-xs font-bold text-white">k${officialRace.constants.entryFee.toFixed(2)}</div>
-                  </div>
-                  <div className="bg-black/30 rounded-lg p-1.5 text-center">
-                    <div className="text-[10px] text-white/50">Prêmio</div>
-                    <div className="text-xs font-bold text-green-400">k${officialRace.constants.prizePerPlayer.toFixed(2)}</div>
-                  </div>
-                  <div className="bg-black/30 rounded-lg p-1.5 text-center">
-                    <div className="text-[10px] text-white/50">Pote</div>
-                    <div className="text-xs font-bold text-yellow-400">k${officialRace.prizePool.toFixed(2)}</div>
-                  </div>
-                </div>
-                
-                {/* Inscritos */}
-                <div className="mb-3">
-                  <div className="flex items-center gap-1 mb-1.5 text-xs text-white/60">
-                    <Users className="w-3 h-3" />
-                    <span>{officialRace.race.registeredPlayers.length} inscritos</span>
+          {/* Detalhes da Corrida Oficial */}
+          <AnimatePresence>
+            {selectedMode === 'official' && officialRace.race && (
+              <motion.section
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mx-4 mt-4 overflow-hidden"
+              >
+                <div className="bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-4">
+                  {/* Info da corrida */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <div className="text-lg font-bold text-white">{officialRace.race.name}</div>
+                      <div className="text-sm text-white/60">{officialRace.formattedDate}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-white/50">Tempo restante</div>
+                      <div className="text-lg font-bold text-yellow-400">{officialRace.timeUntilRace}</div>
+                    </div>
                   </div>
                   
-                  {officialRace.race.registeredPlayers.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {officialRace.race.registeredPlayers.map((p) => (
-                        <div 
-                          key={p.id}
-                          className={`
-                            flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px]
-                            ${p.id === player.id ? 'bg-green-500/20 border border-green-500/50 text-green-400' : 'bg-white/10 text-white/80'}
-                          `}
-                        >
-                          <span>{p.emoji}</span>
-                          <span>{p.name}</span>
-                        </div>
-                      ))}
+                  {/* Economia */}
+                  <div className="grid grid-cols-3 gap-2 mb-4">
+                    <div className="bg-black/30 rounded-lg p-2 text-center">
+                      <div className="text-xs text-white/50">Entrada</div>
+                      <div className="font-bold text-white">k${officialRace.constants.entryFee.toFixed(2)}</div>
+                    </div>
+                    <div className="bg-black/30 rounded-lg p-2 text-center">
+                      <div className="text-xs text-white/50">Prêmio/Player</div>
+                      <div className="font-bold text-green-400">k${officialRace.constants.prizePerPlayer.toFixed(2)}</div>
+                    </div>
+                    <div className="bg-black/30 rounded-lg p-2 text-center">
+                      <div className="text-xs text-white/50">Caixa Skema</div>
+                      <div className="font-bold text-purple-400">k${officialRace.constants.skemaBoxFee.toFixed(2)}</div>
+                    </div>
+                  </div>
+                  
+                  {/* Pote atual */}
+                  <div className="bg-black/30 rounded-lg p-3 mb-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Trophy className="w-5 h-5 text-yellow-400" />
+                      <span className="text-white/80">Pote Atual</span>
+                    </div>
+                    <span className="text-xl font-bold text-yellow-400">k${officialRace.prizePool.toFixed(2)}</span>
+                  </div>
+                  
+                  {/* Lista de inscritos */}
+                  <div className="mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Users className="w-4 h-4 text-white/60" />
+                      <span className="text-sm text-white/80">
+                        Jogadores Inscritos ({officialRace.race.registeredPlayers.length}/{officialRace.constants.maxPlayers})
+                      </span>
+                    </div>
+                    
+                    {officialRace.race.registeredPlayers.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {officialRace.race.registeredPlayers.map((p) => (
+                          <div 
+                            key={p.id}
+                            className={`
+                              flex items-center gap-1 px-2 py-1 rounded-full text-xs
+                              ${p.id === player.id ? 'bg-green-500/20 border border-green-500/50 text-green-400' : 'bg-white/10 text-white/80'}
+                            `}
+                          >
+                            <span>{p.emoji}</span>
+                            <span>{p.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-white/40 italic">Nenhum jogador inscrito ainda</div>
+                    )}
+                  </div>
+                  
+                  {/* Botão de inscrição / cancelamento */}
+                  {!isPlayerRegisteredInRace ? (
+                    <Button
+                      onClick={() => {
+                        if (!canAffordOfficial) {
+                          setError('Energia insuficiente para inscrição');
+                          return;
+                        }
+                        
+                        // Deduz energia PRIMEIRO
+                        const deducted = onDeductEnergy(officialRace.constants.entryFee);
+                        if (!deducted) {
+                          setError('Falha ao deduzir energia');
+                          return;
+                        }
+                        
+                        const result = officialRace.actions.registerPlayer({
+                          id: player.id,
+                          name: player.name,
+                          emoji: player.emoji,
+                        });
+                        if (!result.success) {
+                          // Se falhou inscrição, devolve energia
+                          onAddEnergy(officialRace.constants.entryFee);
+                          setError(result.error || 'Erro ao inscrever');
+                        }
+                      }}
+                      disabled={!canAffordOfficial}
+                      className="w-full"
+                      variant="default"
+                    >
+                      <UserCheck className="w-4 h-4 mr-2" />
+                      Inscrever-se (k${officialRace.constants.entryFee.toFixed(2)})
+                    </Button>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-center gap-2 p-3 bg-green-500/10 border border-green-500/30 rounded-lg text-green-400">
+                        <UserCheck className="w-5 h-5" />
+                        <span className="font-medium">Você está inscrito!</span>
+                      </div>
+                      <Button
+                        onClick={() => {
+                          const result = officialRace.actions.unregisterPlayer(player.id);
+                          if (result.success) {
+                            // Devolve energia ao jogador
+                            onAddEnergy(officialRace.constants.entryFee);
+                            setError(null);
+                          } else {
+                            setError(result.error || 'Erro ao cancelar inscrição');
+                          }
+                        }}
+                        variant="outline"
+                        className="w-full text-red-400 border-red-500/30 hover:bg-red-500/10"
+                      >
+                        Cancelar Inscrição (+k${officialRace.constants.entryFee.toFixed(2)})
+                      </Button>
                     </div>
                   )}
                 </div>
-                
-                {/* Botão de inscrição - GRANDE para mobile */}
-                {!isPlayerRegisteredInRace ? (
-                  <Button
-                    onClick={() => {
-                      if (!canAffordOfficial) {
-                        setError('Energia insuficiente');
-                        return;
-                      }
-                      
-                      const deducted = onDeductEnergy(officialRace.constants.entryFee);
-                      if (!deducted) {
-                        setError('Falha ao deduzir energia');
-                        return;
-                      }
-                      
-                      const result = officialRace.actions.registerPlayer({
-                        id: player.id,
-                        name: player.name,
-                        emoji: player.emoji,
-                      });
-                      if (!result.success) {
-                        onAddEnergy(officialRace.constants.entryFee);
-                        setError(result.error || 'Erro ao inscrever');
-                      }
-                    }}
-                    disabled={!canAffordOfficial}
-                    className="w-full h-12 text-base touch-manipulation"
-                    variant="default"
-                  >
-                    <UserCheck className="w-5 h-5 mr-2" />
-                    Inscrever-se (k${officialRace.constants.entryFee.toFixed(2)})
-                  </Button>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-center gap-2 p-2 bg-green-500/10 border border-green-500/30 rounded-lg text-green-400 text-sm">
-                      <UserCheck className="w-4 h-4" />
-                      <span>Inscrito!</span>
-                    </div>
-                    <Button
-                      onClick={() => {
-                        const result = officialRace.actions.unregisterPlayer(player.id);
-                        if (result.success) {
-                          onAddEnergy(officialRace.constants.entryFee);
-                          setError(null);
-                        } else {
-                          setError(result.error || 'Erro ao cancelar');
-                        }
-                      }}
-                      variant="outline"
-                      className="w-full h-10 text-red-400 border-red-500/30 hover:bg-red-500/10 touch-manipulation"
-                    >
-                      Cancelar (+k${officialRace.constants.entryFee.toFixed(2)})
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </motion.section>
-          )}
+              </motion.section>
+            )}
+          </AnimatePresence>
           
           {/* Erro */}
           <AnimatePresence>
@@ -673,26 +649,21 @@ export function SkemaLobby({
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="mx-4 mt-3 flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg p-2"
+                className="mx-4 mt-4 flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg p-3"
               >
-                <AlertCircle className="w-4 h-4 shrink-0" />
+                <AlertCircle className="w-4 h-4" />
                 {error}
               </motion.div>
             )}
           </AnimatePresence>
         </div>
         
-        {/* Botão fixo - GRANDE para mobile */}
+        {/* Botão fixo */}
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/90 to-transparent z-20">
           <Button
             onClick={handleStartCountdown}
-            disabled={
-              !selectedMode || 
-              isStarting || 
-              (selectedMode === 'bots' && !canAffordArena) ||
-              (selectedMode === 'official' && !isPlayerRegisteredInRace)
-            }
-            className="w-full h-14 text-lg font-bold touch-manipulation"
+            disabled={!selectedMode || isStarting || (selectedMode === 'official' && !isPlayerRegisteredInRace)}
+            className="w-full h-14 text-lg font-bold"
             size="lg"
           >
             {selectedMode === 'training' && (
@@ -704,7 +675,7 @@ export function SkemaLobby({
             {selectedMode === 'bots' && (
               <>
                 <Swords className="w-5 h-5 mr-2" />
-                {canAffordArena ? 'Entrar na Arena (k$0.55)' : 'Saldo insuficiente'}
+                Entrar na Arena
               </>
             )}
             {selectedMode === 'official' && (
