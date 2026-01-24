@@ -20,6 +20,7 @@ import { SkemaPlayer, getSkemaHour } from '@/hooks/useSkemaPlayer';
 import { useOfficialRace } from '@/hooks/useOfficialRace';
 import { RegisteredPlayersPanel } from './RegisteredPlayersPanel';
 import universeBg from '@/assets/universe-bg.jpg';
+import { addToSkemaBox, subtractFromSkemaBox, getSkemaBoxBalance } from '@/lib/currencyUtils';
 
 interface SkemaLobbyProps {
   player: SkemaPlayer;
@@ -69,10 +70,9 @@ export function SkemaLobby({
   // Saldo do Skema Box (conta mãe) - usa state para atualizar em tempo real
   const [skemaBoxBalance, setSkemaBoxBalance] = useState(0);
   
-  // Função para atualizar saldo do Skema Box
+  // Função para atualizar saldo do Skema Box (usa helper seguro)
   const refreshSkemaBoxBalance = useCallback(() => {
-    const stored = localStorage.getItem('skema_box_balance');
-    const newBalance = stored ? parseFloat(stored) : 0;
+    const newBalance = getSkemaBoxBalance();
     setSkemaBoxBalance(newBalance);
     console.log('[SKEMA BOX] 📦 Saldo atualizado:', newBalance);
   }, []);
@@ -368,8 +368,9 @@ export function SkemaLobby({
                 className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-lg p-2 text-center border border-yellow-500/30 cursor-pointer hover:border-yellow-500/50 transition-colors"
                 onClick={() => {
                   if (confirm('Zerar o Skema Box?')) {
-                    localStorage.setItem('skema_box_balance', '0');
-                    window.location.reload();
+                    setSkemaBoxBalance(0);
+                    localStorage.setItem('skema_box_balance', '0.00');
+                    refreshSkemaBoxBalance();
                   }
                 }}
                 title="Clique para zerar"
@@ -699,6 +700,11 @@ export function SkemaLobby({
                           // Se falhou inscrição, devolve energia
                           onAddEnergy(officialRace.constants.entryFee);
                           setError(result.error || 'Erro ao inscrever');
+                        } else {
+                          // INSCRIÇÃO OK: credita rake no Skema Box
+                          const newBox = addToSkemaBox(officialRace.constants.skemaBoxFee);
+                          console.log(`[OFFICIAL] 💰 Rake k$${officialRace.constants.skemaBoxFee.toFixed(2)} → Skema Box: k$${newBox.toFixed(2)}`);
+                          refreshSkemaBoxBalance();
                         }
                       }}
                       disabled={!canAffordOfficial}
@@ -720,6 +726,10 @@ export function SkemaLobby({
                           if (result.success) {
                             // Devolve energia ao jogador
                             onAddEnergy(officialRace.constants.entryFee);
+                            // Remove rake do Skema Box
+                            const newBox = subtractFromSkemaBox(officialRace.constants.skemaBoxFee);
+                            console.log(`[OFFICIAL] ↩️ Rake devolvido → Skema Box: k$${newBox.toFixed(2)}`);
+                            refreshSkemaBoxBalance();
                             setError(null);
                           } else {
                             setError(result.error || 'Erro ao cancelar inscrição');
