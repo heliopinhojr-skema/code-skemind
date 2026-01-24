@@ -6,6 +6,7 @@
  */
 
 import { useState, useCallback } from 'react';
+import { addToSkemaBox, roundCurrency } from '@/lib/currencyUtils';
 
 export interface PartyPlayer {
   id: string;
@@ -135,20 +136,18 @@ export function usePartyTournament() {
     if (tournament.players.length < 2) return { success: false, error: 'Mínimo 2 jogadores' };
     
     // Deduz entrada do host (os outros pagam manualmente ou são "confiança")
-    const totalEntry = ENTRY_FEE * tournament.players.length;
-    const rake = totalEntry * RAKE_PERCENT;
-    const prizePool = totalEntry - rake;
+    const totalEntry = roundCurrency(ENTRY_FEE * tournament.players.length);
+    const rake = roundCurrency(totalEntry * RAKE_PERCENT);
+    const prizePool = roundCurrency(totalEntry - rake);
     
     // Tenta deduzir do host
     if (!deductEnergy(ENTRY_FEE)) {
       return { success: false, error: 'Energia insuficiente' };
     }
     
-    // Salva rake no sistema
-    const SKEMA_BOX_KEY = 'skema_box_balance';
-    const currentBox = parseFloat(localStorage.getItem(SKEMA_BOX_KEY) || '0');
-    localStorage.setItem(SKEMA_BOX_KEY, (currentBox + rake).toFixed(2));
-    console.log(`[FESTA] 💰 Rake: k$${rake.toFixed(2)} → Caixa: k$${(currentBox + rake).toFixed(2)}`);
+    // Salva rake no sistema usando helper seguro
+    const newBox = addToSkemaBox(rake);
+    console.log(`[FESTA] 💰 Rake: k$${rake.toFixed(2)} → Caixa: k$${newBox.toFixed(2)}`);
     
     setTournament(prev => {
       if (!prev) return prev;
@@ -264,7 +263,7 @@ export function usePartyTournament() {
       let prize = 0;
       
       if (rank <= PRIZE_DISTRIBUTION.length) {
-        prize = tournament.prizePool * PRIZE_DISTRIBUTION[rank - 1];
+        prize = roundCurrency(tournament.prizePool * PRIZE_DISTRIBUTION[rank - 1]);
       }
       
       return { ...result, rank, prize };

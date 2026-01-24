@@ -28,6 +28,7 @@ import { CosmicBackground } from '@/components/CosmicBackground';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trophy } from 'lucide-react';
 import { UI_SYMBOLS } from '@/hooks/useGame';
+import { addToSkemaBox, subtractFromSkemaBox, roundCurrency } from '@/lib/currencyUtils';
 
 type SkemaView = 'lobby' | 'training' | 'bots' | 'official' | 'party-setup' | 'party-playing' | 'party-collect' | 'party-results';
 
@@ -216,10 +217,7 @@ export default function Skema() {
     console.log('[SKEMA ARENA] ✅ Entrada deduzida:', deducted);
     
     // Rake = fee de TODOS os 10 jogadores (bots são virtuais mas contam)
-    const SKEMA_BOX_KEY = 'skema_box_balance';
-    const currentBox = parseFloat(localStorage.getItem(SKEMA_BOX_KEY) || '0');
-    const newBoxBalance = currentBox + ARENA_TOTAL_RAKE;
-    localStorage.setItem(SKEMA_BOX_KEY, newBoxBalance.toFixed(2));
+    const newBoxBalance = addToSkemaBox(ARENA_TOTAL_RAKE);
     console.log(`[SKEMA ARENA] 💰 Rake: k$${ARENA_TOTAL_RAKE.toFixed(2)} → Skema Box: k$${newBoxBalance.toFixed(2)}`);
     console.log(`[SKEMA ARENA] 🏆 Pool total: k$${ARENA_TOTAL_POOL.toFixed(2)}`);
     
@@ -237,7 +235,7 @@ export default function Skema() {
       // Se falhou, devolve a energia do humano
       skemaPlayer.actions.addEnergy(total);
       // Remove rake da caixa
-      localStorage.setItem(SKEMA_BOX_KEY, currentBox.toFixed(2));
+      subtractFromSkemaBox(ARENA_TOTAL_RAKE);
     }
     
     return result;
@@ -332,7 +330,7 @@ export default function Skema() {
         if (humanResult && humanResult.rank >= 1 && humanResult.rank <= 3) {
           // ITM: top 3 ganham
           const prizePercent = ARENA_PRIZE_DISTRIBUTION[humanResult.rank - 1];
-          const prize = ARENA_TOTAL_POOL * prizePercent;
+          const prize = roundCurrency(ARENA_TOTAL_POOL * prizePercent);
           console.log(`[SKEMA] 🏆 Rank: ${humanResult.rank}º | ${prizePercent * 100}% de k$${ARENA_TOTAL_POOL.toFixed(2)} = k$${prize.toFixed(2)}`);
           
           // Adiciona prêmio
