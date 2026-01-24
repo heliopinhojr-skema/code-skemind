@@ -347,14 +347,22 @@ export function useSkemaPlayer() {
         };
       };
 
+      console.log('[SKEMA LOGIN] 🌌 ======= LOGIN GUARDIAN =======');
+      console.log('[SKEMA LOGIN] Skema Box ANTES:', localStorage.getItem('skema_box_balance'));
+      
       try {
         const storedAccounts = localStorage.getItem(ACCOUNTS_KEY);
+        console.log('[SKEMA LOGIN] Accounts raw:', storedAccounts?.substring(0, 200));
         if (storedAccounts) {
           const accounts = JSON.parse(storedAccounts) as Record<string, SkemaPlayer>;
           const existing = accounts[GUARDIAN_PLAYER.inviteCode];
+          console.log('[SKEMA LOGIN] Guardian existente:', existing ? `Energy: ${existing.energy}, Wins: ${existing.stats?.wins}` : 'NÃO ENCONTRADO');
           if (existing) {
-            savePlayer(normalizeGuardian(existing));
-            console.log('[SKEMA] 🌌 Guardião do Universo restaurado (persistido)');
+            const restored = normalizeGuardian(existing);
+            console.log('[SKEMA LOGIN] Guardian restaurado:', `Energy: ${restored.energy}, Wins: ${restored.stats.wins}`);
+            savePlayer(restored);
+            console.log('[SKEMA LOGIN] Skema Box DEPOIS:', localStorage.getItem('skema_box_balance'));
+            console.log('[SKEMA LOGIN] ✅ Guardião restaurado');
             return { success: true };
           }
         }
@@ -364,8 +372,9 @@ export function useSkemaPlayer() {
 
       // Fallback: primeira vez (ou sem registro global)
       const guardian = { ...GUARDIAN_PLAYER };
+      console.log('[SKEMA LOGIN] ⚠️ Fallback: criando Guardian novo com Energy:', guardian.energy);
       savePlayer(guardian);
-      console.log('[SKEMA] 🌌 Guardião do Universo logado');
+      console.log('[SKEMA LOGIN] Skema Box DEPOIS:', localStorage.getItem('skema_box_balance'));
       return { success: true };
     }
     
@@ -384,7 +393,8 @@ export function useSkemaPlayer() {
           }
           
           // Login bem-sucedido - restaura dados
-          console.log('[SKEMA] ✅ Login bem-sucedido:', account.name);
+          console.log('[SKEMA LOGIN] ✅ Login bem-sucedido:', account.name, 'Energy:', account.energy, 'Stats:', account.stats);
+          console.log('[SKEMA LOGIN] Skema Box:', localStorage.getItem('skema_box_balance'));
           savePlayer(account);
           return { success: true };
         }
@@ -697,9 +707,18 @@ export function useSkemaPlayer() {
 
   // Logout (limpa dados locais)
   const logout = useCallback(() => {
+    // Diagnóstico: mostra estado ANTES do logout
+    console.log('[SKEMA LOGOUT] 🚪 ======= LOGOUT =======');
+    console.log('[SKEMA LOGOUT] Player atual:', player?.name, 'Code:', player?.inviteCode);
+    console.log('[SKEMA LOGOUT] Saldo antes:', player?.energy);
+    console.log('[SKEMA LOGOUT] Skema Box:', localStorage.getItem('skema_box_balance'));
+    console.log('[SKEMA LOGOUT] Accounts:', localStorage.getItem(ACCOUNTS_KEY));
+    
     localStorage.removeItem(STORAGE_KEY);
     setPlayer(null);
-  }, []);
+    
+    console.log('[SKEMA LOGOUT] ✅ Sessão limpa (accounts preservados)');
+  }, [player]);
 
   // Quantidade de convites válidos restantes
   const remainingReferralRewards = player 
