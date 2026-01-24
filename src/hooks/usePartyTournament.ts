@@ -146,7 +146,7 @@ export function usePartyTournament() {
     }
     
     // Salva rake no sistema usando helper seguro
-    const newBox = addToSkemaBox(rake);
+    const newBox = addToSkemaBox(rake, 'party_rake');
     console.log(`[FESTA] 💰 Rake: k$${rake.toFixed(2)} → Caixa: k$${newBox.toFixed(2)}`);
     
     setTournament(prev => {

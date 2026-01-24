@@ -217,7 +217,7 @@ export default function Skema() {
     console.log('[SKEMA ARENA] ✅ Entrada deduzida:', deducted);
     
     // Rake = fee de TODOS os 10 jogadores (bots são virtuais mas contam)
-    const newBoxBalance = addToSkemaBox(ARENA_TOTAL_RAKE);
+    const newBoxBalance = addToSkemaBox(ARENA_TOTAL_RAKE, 'arena_rake');
     console.log(`[SKEMA ARENA] 💰 Rake: k$${ARENA_TOTAL_RAKE.toFixed(2)} → Skema Box: k$${newBoxBalance.toFixed(2)}`);
     console.log(`[SKEMA ARENA] 🏆 Pool total: k$${ARENA_TOTAL_POOL.toFixed(2)}`);
     
@@ -235,7 +235,7 @@ export default function Skema() {
       // Se falhou, devolve a energia do humano
       skemaPlayer.actions.addEnergy(total);
       // Remove rake da caixa
-      subtractFromSkemaBox(ARENA_TOTAL_RAKE);
+      subtractFromSkemaBox(ARENA_TOTAL_RAKE, 'adjustment', 'Arena x Bots: falha ao iniciar - rake devolvido');
     }
     
     return result;
