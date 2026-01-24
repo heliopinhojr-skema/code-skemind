@@ -355,12 +355,31 @@ export function useSkemaPlayer() {
         console.log('[SKEMA LOGIN] Accounts raw:', storedAccounts?.substring(0, 200));
         if (storedAccounts) {
           const accounts = JSON.parse(storedAccounts) as Record<string, SkemaPlayer>;
-          const existing = accounts[GUARDIAN_PLAYER.inviteCode];
+          
+          // Busca por inviteCode OU por ID do Guardian (fallback robusto)
+          let existing = accounts[GUARDIAN_PLAYER.inviteCode];
+          
+          // Se não encontrou pela chave SKGUARDIAN, busca pelo ID em todas as contas
+          if (!existing) {
+            console.log('[SKEMA LOGIN] Guardian não encontrado por inviteCode, buscando por ID...');
+            for (const key of Object.keys(accounts)) {
+              const acc = accounts[key];
+              if (acc.id === GUARDIAN_PLAYER.id || acc.name?.toLowerCase() === 'skema') {
+                console.log('[SKEMA LOGIN] Guardian encontrado na chave:', key, 'Energy:', acc.energy);
+                existing = acc;
+                break;
+              }
+            }
+          }
+          
           console.log('[SKEMA LOGIN] Guardian existente:', existing ? `Energy: ${existing.energy}, Wins: ${existing.stats?.wins}` : 'NÃO ENCONTRADO');
           if (existing) {
             const restored = normalizeGuardian(existing);
             console.log('[SKEMA LOGIN] Guardian restaurado:', `Energy: ${restored.energy}, Wins: ${restored.stats.wins}`);
+            
+            // Garante que o Guardian seja salvo com a chave correta (SKGUARDIAN)
             savePlayer(restored);
+            
             console.log('[SKEMA LOGIN] Skema Box DEPOIS:', localStorage.getItem('skema_box_balance'));
             console.log('[SKEMA LOGIN] ✅ Guardião restaurado');
             return { success: true };
