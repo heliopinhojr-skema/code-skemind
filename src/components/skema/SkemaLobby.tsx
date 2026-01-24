@@ -20,7 +20,7 @@ import { SkemaPlayer, getSkemaHour } from '@/hooks/useSkemaPlayer';
 import { useOfficialRace } from '@/hooks/useOfficialRace';
 import { RegisteredPlayersPanel } from './RegisteredPlayersPanel';
 import universeBg from '@/assets/universe-bg.jpg';
-import { addToSkemaBox, subtractFromSkemaBox, getSkemaBoxBalance } from '@/lib/currencyUtils';
+import { addToSkemaBox, subtractFromSkemaBox, getSkemaBoxBalance, setSkemaBoxBalance, getSkemaBoxTransactions, clearSkemaBoxTransactions, SkemaBoxTransaction } from '@/lib/currencyUtils';
 
 interface SkemaLobbyProps {
   player: SkemaPlayer;
@@ -67,13 +67,16 @@ export function SkemaLobby({
   const [copiedLink, setCopiedLink] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Saldo do Skema Box (conta mãe) - usa state para atualizar em tempo real
-  const [skemaBoxBalance, setSkemaBoxBalance] = useState(0);
+  // Skema Box state
+  const [skemaBoxBalanceState, setSkemaBoxBalanceState] = useState(0);
+  const [showTransactions, setShowTransactions] = useState(false);
+  const [transactions, setTransactions] = useState<SkemaBoxTransaction[]>([]);
   
   // Função para atualizar saldo do Skema Box (usa helper seguro)
   const refreshSkemaBoxBalance = useCallback(() => {
     const newBalance = getSkemaBoxBalance();
-    setSkemaBoxBalance(newBalance);
+    setSkemaBoxBalanceState(newBalance);
+    setTransactions(getSkemaBoxTransactions());
     console.log('[SKEMA BOX] 📦 Saldo atualizado:', newBalance);
   }, []);
   
@@ -366,21 +369,93 @@ export function SkemaLobby({
             {player.id === 'guardian-skema-universe' && (
               <div 
                 className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-lg p-2 text-center border border-yellow-500/30 cursor-pointer hover:border-yellow-500/50 transition-colors"
-                onClick={() => {
-                  if (confirm('Zerar o Skema Box?')) {
-                    setSkemaBoxBalance(0);
-                    localStorage.setItem('skema_box_balance', '0.00');
-                    refreshSkemaBoxBalance();
-                  }
-                }}
-                title="Clique para zerar"
+                onClick={() => setShowTransactions(!showTransactions)}
+                title="Clique para ver extrato"
               >
-                <div className="text-lg font-bold text-yellow-400">k${skemaBoxBalance.toFixed(2)}</div>
+                <div className="text-lg font-bold text-yellow-400">k${skemaBoxBalanceState.toFixed(2)}</div>
                 <div className="text-xs text-yellow-400/70">Skema Box</div>
               </div>
             )}
           </div>
         </motion.header>
+
+        {/* Painel de Extrato do Skema Box - só Guardian */}
+        <AnimatePresence>
+          {showTransactions && player.id === 'guardian-skema-universe' && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mx-4 mt-2 bg-gradient-to-br from-yellow-900/30 to-orange-900/30 border border-yellow-500/30 rounded-xl overflow-hidden"
+            >
+              <div className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-bold text-yellow-400">📦 Extrato Skema Box</h3>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        if (confirm('Limpar histórico de transações?')) {
+                          clearSkemaBoxTransactions();
+                          refreshSkemaBoxBalance();
+                        }
+                      }}
+                      className="text-xs text-white/50 hover:text-white"
+                    >
+                      Limpar Log
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => {
+                        if (confirm('Zerar o saldo do Skema Box?')) {
+                          setSkemaBoxBalance(0, 'reset');
+                          refreshSkemaBoxBalance();
+                        }
+                      }}
+                      className="text-xs"
+                    >
+                      Zerar Saldo
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="text-2xl font-bold text-yellow-400 mb-4">
+                  Saldo: k${skemaBoxBalanceState.toFixed(2)}
+                </div>
+                
+                {transactions.length === 0 ? (
+                  <div className="text-sm text-white/40 italic text-center py-4">
+                    Nenhuma transação registrada
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {transactions.map((tx) => (
+                      <div 
+                        key={tx.id}
+                        className="flex items-center justify-between p-2 bg-black/30 rounded-lg text-sm"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className={tx.amount >= 0 ? 'text-green-400' : 'text-red-400'}>
+                              {tx.amount >= 0 ? '+' : ''}{tx.amount.toFixed(2)}
+                            </span>
+                            <span className="text-white/40 text-xs">→ k${tx.balanceAfter.toFixed(2)}</span>
+                          </div>
+                          <div className="text-xs text-white/50 truncate">{tx.description}</div>
+                        </div>
+                        <div className="text-xs text-white/30 ml-2">
+                          {new Date(tx.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Conteúdo rolável */}
         <div className="flex-1 overflow-y-auto pb-28">
@@ -702,7 +777,7 @@ export function SkemaLobby({
                           setError(result.error || 'Erro ao inscrever');
                         } else {
                           // INSCRIÇÃO OK: credita rake no Skema Box
-                          const newBox = addToSkemaBox(officialRace.constants.skemaBoxFee);
+                          const newBox = addToSkemaBox(officialRace.constants.skemaBoxFee, 'official_rake');
                           console.log(`[OFFICIAL] 💰 Rake k$${officialRace.constants.skemaBoxFee.toFixed(2)} → Skema Box: k$${newBox.toFixed(2)}`);
                           refreshSkemaBoxBalance();
                         }
@@ -727,7 +802,7 @@ export function SkemaLobby({
                             // Devolve energia ao jogador
                             onAddEnergy(officialRace.constants.entryFee);
                             // Remove rake do Skema Box
-                            const newBox = subtractFromSkemaBox(officialRace.constants.skemaBoxFee);
+                            const newBox = subtractFromSkemaBox(officialRace.constants.skemaBoxFee, 'official_refund');
                             console.log(`[OFFICIAL] ↩️ Rake devolvido → Skema Box: k$${newBox.toFixed(2)}`);
                             refreshSkemaBoxBalance();
                             setError(null);

@@ -6,6 +6,66 @@
  */
 
 const SKEMA_BOX_KEY = 'skema_box_balance';
+const SKEMA_BOX_LOG_KEY = 'skema_box_transactions';
+
+// ==================== TRANSACTION LOG ====================
+
+export interface SkemaBoxTransaction {
+  id: string;
+  timestamp: string;
+  type: 'arena_rake' | 'official_rake' | 'official_refund' | 'party_rake' | 'reset' | 'adjustment';
+  amount: number;       // Positive = credit, Negative = debit
+  balanceAfter: number; // Saldo após transação
+  description: string;
+}
+
+/**
+ * Reads all Skema Box transactions from localStorage.
+ */
+export function getSkemaBoxTransactions(): SkemaBoxTransaction[] {
+  try {
+    const raw = localStorage.getItem(SKEMA_BOX_LOG_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as SkemaBoxTransaction[];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Logs a transaction to the Skema Box history.
+ */
+function logTransaction(
+  type: SkemaBoxTransaction['type'],
+  amount: number,
+  balanceAfter: number,
+  description: string
+): void {
+  const transaction: SkemaBoxTransaction = {
+    id: `tx-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    timestamp: new Date().toISOString(),
+    type,
+    amount,
+    balanceAfter,
+    description,
+  };
+
+  const transactions = getSkemaBoxTransactions();
+  // Mantém últimas 100 transações
+  const updated = [transaction, ...transactions].slice(0, 100);
+  localStorage.setItem(SKEMA_BOX_LOG_KEY, JSON.stringify(updated));
+  
+  console.log(`[SKEMA BOX TX] ${type}: ${amount >= 0 ? '+' : ''}${amount.toFixed(2)} → Saldo: ${balanceAfter.toFixed(2)}`);
+}
+
+/**
+ * Clears the transaction log.
+ */
+export function clearSkemaBoxTransactions(): void {
+  localStorage.removeItem(SKEMA_BOX_LOG_KEY);
+}
+
+// ==================== SKEMA BOX BALANCE ====================
 
 /**
  * Reads the current Skema Box balance from localStorage.
@@ -19,22 +79,49 @@ export function getSkemaBoxBalance(): number {
 }
 
 /**
- * Sets the Skema Box balance in localStorage.
+ * Sets the Skema Box balance in localStorage (internal use).
  * Ensures the value is stored with 2 decimal places.
  */
-export function setSkemaBoxBalance(value: number): void {
+function setSkemaBoxBalanceInternal(value: number): void {
   const safe = roundCurrency(value);
   localStorage.setItem(SKEMA_BOX_KEY, safe.toFixed(2));
+}
+
+/**
+ * Sets the Skema Box balance (with logging for reset/adjustment).
+ */
+export function setSkemaBoxBalance(value: number, reason: string = 'manual'): void {
+  const oldBalance = getSkemaBoxBalance();
+  const safe = roundCurrency(value);
+  setSkemaBoxBalanceInternal(safe);
+  
+  if (reason !== 'silent') {
+    const diff = subtractCurrency(safe, oldBalance);
+    logTransaction(
+      reason === 'reset' ? 'reset' : 'adjustment',
+      diff,
+      safe,
+      reason === 'reset' ? 'Skema Box zerado pelo Guardian' : `Ajuste: ${reason}`
+    );
+  }
 }
 
 /**
  * Adds an amount to the Skema Box balance and persists.
  * Returns the new balance.
  */
-export function addToSkemaBox(amount: number): number {
+export function addToSkemaBox(
+  amount: number,
+  type: 'arena_rake' | 'official_rake' | 'party_rake' = 'arena_rake',
+  description?: string
+): number {
   const current = getSkemaBoxBalance();
   const next = addCurrency(current, amount);
-  setSkemaBoxBalance(next);
+  setSkemaBoxBalanceInternal(next);
+  
+  const desc = description || getDefaultDescription(type, amount);
+  logTransaction(type, amount, next, desc);
+  
   return next;
 }
 
@@ -43,11 +130,34 @@ export function addToSkemaBox(amount: number): number {
  * Will not go below zero.
  * Returns the new balance.
  */
-export function subtractFromSkemaBox(amount: number): number {
+export function subtractFromSkemaBox(
+  amount: number,
+  type: 'official_refund' | 'adjustment' = 'official_refund',
+  description?: string
+): number {
   const current = getSkemaBoxBalance();
   const next = Math.max(0, subtractCurrency(current, amount));
-  setSkemaBoxBalance(next);
+  setSkemaBoxBalanceInternal(next);
+  
+  const desc = description || getDefaultDescription(type, -amount);
+  logTransaction(type, -amount, next, desc);
+  
   return next;
+}
+
+function getDefaultDescription(type: SkemaBoxTransaction['type'], amount: number): string {
+  switch (type) {
+    case 'arena_rake':
+      return `Arena x Bots: rake de 10 jogadores (k$${Math.abs(amount).toFixed(2)})`;
+    case 'official_rake':
+      return `Corrida Oficial: taxa de inscrição (k$${Math.abs(amount).toFixed(2)})`;
+    case 'official_refund':
+      return `Corrida Oficial: devolução de taxa (k$${Math.abs(amount).toFixed(2)})`;
+    case 'party_rake':
+      return `Modo Festa: rake do torneio (k$${Math.abs(amount).toFixed(2)})`;
+    default:
+      return `Transação: k$${amount.toFixed(2)}`;
+  }
 }
 
 // ===================== Safe currency math =====================
