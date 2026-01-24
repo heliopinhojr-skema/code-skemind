@@ -317,29 +317,48 @@ export default function Skema() {
       // Distribui prêmios para Arena x Bots
       if (gameMode === 'bots') {
         const humanResult = tournament.state.results.get(tournament.state.humanPlayerId);
-        console.log('[SKEMA] 💰 Verificando prêmio Arena...');
-        console.log('[SKEMA] humanResult:', humanResult);
-        console.log('[SKEMA] Saldo ANTES:', skemaPlayer.player?.energy);
+        console.log('[SKEMA PREMIO] 💰 ======= VERIFICANDO PRÊMIO ARENA =======');
+        console.log('[SKEMA PREMIO] humanResult:', humanResult);
+        console.log('[SKEMA PREMIO] Saldo ANTES (state):', skemaPlayer.player?.energy);
+        
+        // Lê direto do storage para comparação
+        const storageBefore = localStorage.getItem('skema_player');
+        if (storageBefore) {
+          console.log('[SKEMA PREMIO] Saldo ANTES (storage):', JSON.parse(storageBefore).energy);
+        }
         
         if (humanResult && humanResult.rank >= 1 && humanResult.rank <= 3) {
           // ITM: top 3 ganham
           const prizePercent = ARENA_PRIZE_DISTRIBUTION[humanResult.rank - 1];
           const prize = roundCurrency(ARENA_TOTAL_POOL * prizePercent);
-          console.log(`[SKEMA] 🏆 Rank: ${humanResult.rank}º | ${prizePercent * 100}% de k$${ARENA_TOTAL_POOL.toFixed(2)} = k$${prize.toFixed(2)}`);
+          console.log(`[SKEMA PREMIO] 🏆 Rank: ${humanResult.rank}º | ${prizePercent * 100}% de k$${ARENA_TOTAL_POOL.toFixed(2)} = k$${prize.toFixed(2)}`);
           
           // Adiciona prêmio
           skemaPlayer.actions.addEnergy(prize);
+          console.log('[SKEMA PREMIO] ✅ addEnergy chamado com:', prize);
           
-          // Verifica localStorage diretamente
+          // Verifica localStorage diretamente após um tick
           setTimeout(() => {
             const stored = localStorage.getItem('skema_player');
+            const accounts = localStorage.getItem('skema_accounts');
+            const skemaBox = localStorage.getItem('skema_box_balance');
             if (stored) {
               const parsed = JSON.parse(stored);
-              console.log('[SKEMA] ✅ Saldo NO STORAGE após prêmio:', parsed.energy);
+              console.log('[SKEMA PREMIO] 📦 Saldo DEPOIS (storage):', parsed.energy);
+              console.log('[SKEMA PREMIO] 📦 Stats DEPOIS:', parsed.stats);
             }
-          }, 100);
+            if (accounts) {
+              const acc = JSON.parse(accounts);
+              const playerCode = skemaPlayer.player?.inviteCode;
+              if (playerCode && acc[playerCode]) {
+                console.log('[SKEMA PREMIO] 📦 Saldo em ACCOUNTS:', acc[playerCode].energy);
+              }
+            }
+            console.log('[SKEMA PREMIO] 📦 Skema Box:', skemaBox);
+            console.log('[SKEMA PREMIO] ======= FIM VERIFICAÇÃO =======');
+          }, 200);
         } else {
-          console.log(`[SKEMA] ❌ Fora do ITM (${humanResult?.rank || '?'}º lugar) - sem prêmio`);
+          console.log(`[SKEMA PREMIO] ❌ Fora do ITM (${humanResult?.rank || '?'}º lugar) - sem prêmio`);
         }
       }
     }
