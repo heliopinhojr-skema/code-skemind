@@ -579,17 +579,20 @@ export function useSkemaPlayer() {
   }, [validateInviteCode, savePlayer, allInvites, codeRegistry]);
 
   // Helper para persistir player no localStorage e accounts
-  const persistToStorage = (updated: SkemaPlayer) => {
+  // IMPORTANTE: Esta função DEVE ser estável (sem deps) pois é usada dentro de setPlayer callbacks
+  const persistToStorage = useCallback((updated: SkemaPlayer) => {
+    console.log('[SKEMA PERSIST] 💾 Salvando:', updated.name, 'Energy:', updated.energy, 'Wins:', updated.stats.wins, 'Races:', updated.stats.races);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     try {
       const storedAccounts = localStorage.getItem(ACCOUNTS_KEY);
       const accounts = storedAccounts ? JSON.parse(storedAccounts) : {};
       accounts[updated.inviteCode] = updated;
       localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+      console.log('[SKEMA PERSIST] ✅ Salvo no localStorage e accounts');
     } catch (e) {
       console.error('[SKEMA] Erro ao salvar conta global:', e);
     }
-  };
+  }, []);
 
   // Atualiza energia (ATÔMICO): usa setPlayer(prev) para não perder updates quando
   // updateStats + addEnergy acontecem no mesmo tick (evita sobrescrever stats/energy).
