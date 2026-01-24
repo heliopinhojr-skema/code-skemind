@@ -10,6 +10,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { addCurrency, roundCurrency } from '@/lib/currencyUtils';
 
 // ==================== TIPOS ====================
 
@@ -129,6 +130,10 @@ function getTodayDateString(): string {
   return new Date().toISOString().split('T')[0];
 }
 
+function toCents(value: number): number {
+  return Math.round(value * 100);
+}
+
 // ==================== HOOK ====================
 
 // Registro global de códigos → { name, id }
@@ -163,7 +168,7 @@ export function useSkemaPlayer() {
           const energyCredits = JSON.parse(storedCredits);
           if (energyCredits[currentPlayer.id]?.pending > 0) {
             const pending = energyCredits[currentPlayer.id].pending;
-            updatedPlayer.energy += pending;
+            updatedPlayer.energy = addCurrency(updatedPlayer.energy, pending);
             console.log(`[SKEMA] ✅ +k$${pending} sincronizado de convites realizados!`);
             
             // Zera os créditos pendentes
@@ -594,7 +599,8 @@ export function useSkemaPlayer() {
 
       const updated = {
         ...prev,
-        energy: Math.max(0, prev.energy + amount),
+        // Evita drift (ex.: 9.449999) usando math em centavos.
+        energy: Math.max(0, addCurrency(prev.energy, amount)),
       };
 
       persistToStorage(updated);
@@ -606,7 +612,10 @@ export function useSkemaPlayer() {
   const deductEnergy = useCallback((amount: number): boolean => {
     const current = playerRef.current;
     if (!current) return false;
-    if (current.energy < amount) return false;
+
+    const currentCents = toCents(roundCurrency(current.energy));
+    const amountCents = toCents(roundCurrency(amount));
+    if (currentCents < amountCents) return false;
     
     updateEnergy(-amount);
     return true;
@@ -622,8 +631,10 @@ export function useSkemaPlayer() {
     const current = playerRef.current;
     if (!current) return { success: false, error: 'Jogador não encontrado' };
     
-    const totalCost = amount * (1 + TRANSFER_TAX);
-    if (current.energy < totalCost) {
+    const totalCost = roundCurrency(amount * (1 + TRANSFER_TAX));
+    const currentCents = toCents(roundCurrency(current.energy));
+    const totalCostCents = toCents(totalCost);
+    if (currentCents < totalCostCents) {
       return { success: false, error: 'Energia insuficiente (inclua a taxa de 6.43%)' };
     }
     

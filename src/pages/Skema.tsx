@@ -201,7 +201,7 @@ export default function Skema() {
   const ARENA_PRIZE_DISTRIBUTION = [0.50, 0.30, 0.20];
   
   const handleStartBotRace = (buyIn: number, fee: number): { success: boolean; error?: string } => {
-    const total = buyIn + fee; // 0.50 + 0.05 = 0.55 (entrada do humano)
+    const total = roundCurrency(buyIn + fee); // 0.50 + 0.05 = 0.55 (entrada do humano)
     
     console.log('[SKEMA ARENA] 🎮 Iniciando Arena x Bots...');
     console.log('[SKEMA ARENA] Saldo atual:', skemaPlayer.player!.energy);
@@ -242,14 +242,8 @@ export default function Skema() {
   };
   
   const handleStartOfficialRace = (raceId: string, buyIn: number, fee: number): { success: boolean; error?: string } => {
-    const total = buyIn + fee;
-    
-    if (skemaPlayer.player!.energy < total) {
-      return { success: false, error: 'Energia insuficiente' };
-    }
-    
-    // Deduz energia
-    skemaPlayer.actions.deductEnergy(total);
+    // IMPORTANTE: a Corrida Oficial já cobra a entrada (k$1.10) no ato da INSCRIÇÃO no Lobby.
+    // Aqui (iniciar a corrida) NÃO deve debitar novamente, senão o saldo fica errado.
     
     setGameMode('official');
     setCurrentView('official');
