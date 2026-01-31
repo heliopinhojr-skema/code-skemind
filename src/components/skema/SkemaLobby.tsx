@@ -12,15 +12,25 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Zap, Trophy, Users, Clock, Brain, Swords, Target,
-  Rocket, Sparkles, Gift, Check,
-  Calendar, Crown, AlertCircle, LogOut, Share2, UserCheck, PartyPopper
+  Rocket, Sparkles, Calendar, Crown, AlertCircle, LogOut, UserCheck, PartyPopper
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { SkemaPlayer, getSkemaHour } from '@/hooks/useSkemaPlayer';
+import { SkemaPlayer, getSkemaHour, PlayerTier } from '@/hooks/useSupabasePlayer';
 import { useOfficialRace } from '@/hooks/useOfficialRace';
+import { OnlinePlayer } from '@/hooks/useOnlinePlayers';
 import { RegisteredPlayersPanel } from './RegisteredPlayersPanel';
+import { ReferralHistoryPanel } from './ReferralHistoryPanel';
+import { OnlinePlayersPanel } from './OnlinePlayersPanel';
 import universeBg from '@/assets/universe-bg.jpg';
 import { addToSkemaBox, subtractFromSkemaBox, getSkemaBoxBalance, setSkemaBoxBalance, getSkemaBoxTransactions, clearSkemaBoxTransactions, SkemaBoxTransaction } from '@/lib/currencyUtils';
+
+// Type for online presence passed from parent
+interface OnlinePresenceData {
+  onlinePlayers: OnlinePlayer[];
+  isConnected: boolean;
+  updateStatus: (status: 'online' | 'playing' | 'away') => void;
+  onlineCount: number;
+}
 
 interface SkemaLobbyProps {
   player: SkemaPlayer;
@@ -35,13 +45,54 @@ interface SkemaLobbyProps {
   onDeductEnergy: (amount: number) => boolean;
   onAddEnergy: (amount: number) => void;
   onLogout: () => void;
+  onlinePresence: OnlinePresenceData;
+  onProcessReferralRewards: () => Promise<{ processed: number; total_reward: number }>;
+  onRefreshProfile: () => void;
 }
 
 type GameMode = 'training' | 'bots' | 'official' | 'party';
 
 const COUNTDOWN_SECONDS = 10;
-// URL pública (publicada) do app para convites — evita link de preview/sandbox que pode pedir login.
-const PUBLISHED_APP_ORIGIN = 'https://skemind-code-guess.lovable.app';
+
+// Helper component to display player tier badge
+function TierBadge({ tier }: { tier: PlayerTier }) {
+  const config: Record<PlayerTier, { emoji: string; label: string; className: string }> = {
+    master_admin: { 
+      emoji: '🔴', 
+      label: 'Master Admin', 
+      className: 'bg-gradient-to-r from-red-500/30 to-rose-500/30 border-red-500/50 text-red-300' 
+    },
+    guardiao: { 
+      emoji: '🛡️', 
+      label: 'Guardião', 
+      className: 'bg-gradient-to-r from-amber-500/30 to-yellow-500/30 border-amber-500/50 text-amber-300' 
+    },
+    grao_mestre: { 
+      emoji: '👑', 
+      label: 'Grão Mestre', 
+      className: 'bg-gradient-to-r from-purple-500/30 to-pink-500/30 border-purple-500/50 text-purple-300' 
+    },
+    mestre: { 
+      emoji: '⚔️', 
+      label: 'Mestre', 
+      className: 'bg-gradient-to-r from-blue-500/30 to-cyan-500/30 border-blue-500/50 text-blue-300' 
+    },
+    jogador: { 
+      emoji: '🎮', 
+      label: 'Jogador', 
+      className: 'bg-gradient-to-r from-green-500/30 to-emerald-500/30 border-green-500/50 text-green-300' 
+    },
+  };
+  
+  const { emoji, label, className } = config[tier] || config.jogador;
+  
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-medium ${className}`}>
+      <span>{emoji}</span>
+      <span>{label}</span>
+    </span>
+  );
+}
 
 export function SkemaLobby({
   player,
@@ -56,15 +107,17 @@ export function SkemaLobby({
   onDeductEnergy,
   onAddEnergy,
   onLogout,
+  onlinePresence,
+  onProcessReferralRewards,
+  onRefreshProfile,
 }: SkemaLobbyProps) {
   const officialRace = useOfficialRace();
+  const { onlinePlayers, isConnected, updateStatus, onlineCount } = onlinePresence;
   const skemaHour = getSkemaHour();
   
   const [selectedMode, setSelectedMode] = useState<GameMode | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isStarting, setIsStarting] = useState(false);
-  const [copiedCode, setCopiedCode] = useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   // Skema Box state
@@ -105,44 +158,6 @@ export function SkemaLobby({
   // Espera corrida carregar para mostrar lobby completo
   const canAffordOfficial = officialRace.isLoaded ? player.energy >= officialRace.constants.entryFee : false;
   const isPlayerRegisteredInRace = officialRace.race ? officialRace.actions.isPlayerRegistered(player.id) : false;
-
-  // Gera link de convite (usa a HOME com query param para evitar 404/login em links profundos)
-  // Ex.: https://.../?convite=SEUCODIGO
-  const inviteLink = useMemo(() => {
-    const origin = window.location.origin;
-
-    // Qualquer domínio de preview/sandbox do Lovable pode exigir login. Para convites, sempre use o publicado.
-    const isLovablePreview =
-      origin.includes('lovableproject.com') ||
-      origin.includes('id-preview--') ||
-      origin.includes('lovable.app');
-
-    // Se você tiver um domínio próprio no futuro, pode trocar esta regra.
-    const baseUrl = isLovablePreview ? PUBLISHED_APP_ORIGIN : origin;
-
-    const code = encodeURIComponent(player.inviteCode);
-    return `${baseUrl}/?convite=${code}`;
-  }, [player.inviteCode]);
-
-  const handleCopyInviteCode = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(player.inviteCode);
-      setCopiedCode(true);
-      setTimeout(() => setCopiedCode(false), 2000);
-    } catch (e) {
-      console.error('Erro ao copiar:', e);
-    }
-  }, [player.inviteCode]);
-
-  const handleCopyInviteLink = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(inviteLink);
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2000);
-    } catch (e) {
-      console.error('Erro ao copiar:', e);
-    }
-  }, [inviteLink]);
 
   const handleSelectMode = useCallback((mode: GameMode) => {
     setSelectedMode(mode);
@@ -190,6 +205,9 @@ export function SkemaLobby({
     if (countdown === null || countdown < 0) return;
     
     if (countdown === 0) {
+      // Update presence status to 'playing' when game starts
+      updateStatus('playing');
+      
       if (selectedMode === 'training') {
         onStartTraining();
       } else if (selectedMode === 'bots') {
@@ -199,6 +217,7 @@ export function SkemaLobby({
           setError(result.error || 'Erro ao iniciar');
           setIsStarting(false);
           setCountdown(null);
+          updateStatus('online'); // Revert status on error
         }
       } else if (selectedMode === 'official') {
         const { entryFee, prizePerPlayer, skemaBoxFee } = officialRace.constants;
@@ -207,6 +226,7 @@ export function SkemaLobby({
           setError(result.error || 'Erro ao iniciar');
           setIsStarting(false);
           setCountdown(null);
+          updateStatus('online'); // Revert status on error
         }
       }
       return;
@@ -217,7 +237,7 @@ export function SkemaLobby({
     }, 1000);
     
     return () => clearTimeout(timer);
-  }, [countdown, selectedMode, onStartTraining, onStartBotRace, onStartOfficialRace, officialRace.constants]);
+  }, [countdown, selectedMode, onStartTraining, onStartBotRace, onStartOfficialRace, officialRace.constants, updateStatus]);
 
   return (
     <div className="min-h-screen relative overflow-x-hidden">
@@ -316,7 +336,10 @@ export function SkemaLobby({
                 {player.emoji}
               </div>
               <div>
-                <h1 className="text-lg font-bold text-white">{player.name}</h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-lg font-bold text-white">{player.name}</h1>
+                  <TierBadge tier={player.playerTier} />
+                </div>
                 <div className="flex items-center gap-2 text-xs text-white/60">
                   <Calendar className="w-3 h-3" />
                   <span>Ano {skemaYear} • Dia {skemaDay} • {String(skemaHour).padStart(2, '0')}h</span>
@@ -335,7 +358,9 @@ export function SkemaLobby({
                 whileHover={{ scale: 1.05 }}
               >
                 <Zap className="w-5 h-5 text-yellow-400" />
-                <span className="font-bold text-yellow-400">k${player.energy.toFixed(2)}</span>
+                <span className="font-bold text-yellow-400">
+                  {(player.isKeeper || player.playerTier === 'guardiao') ? '∞' : `k$${player.energy.toFixed(2)}`}
+                </span>
               </motion.div>
               
               <Button
@@ -459,47 +484,19 @@ export function SkemaLobby({
 
         {/* Conteúdo rolável */}
         <div className="flex-1 overflow-y-auto pb-28">
-          {/* Convite Geral SKEMA */}
+          {/* Painel de Convites */}
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
             className="mx-4 mt-4"
           >
-            <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Gift className="w-5 h-5 text-purple-400" />
-                <span className="font-medium text-white">Convide para o SKEMA</span>
-              </div>
-              
-              {/* Ancestralidade */}
-              {player.invitedByName && (
-                <div className="bg-black/20 rounded-lg p-2 mb-3 text-center">
-                  <span className="text-xs text-white/50">Sua ancestralidade: </span>
-                  <span className="text-sm text-purple-300 font-medium">🔗 {player.invitedByName}</span>
-                </div>
-              )}
-              
-              {/* Link geral com código SKEMA1 */}
-              <div className="flex items-center gap-2">
-                <div className="flex-1 bg-black/30 border border-white/20 rounded-lg px-3 py-2 text-xs text-blue-400 truncate">
-                  {`${PUBLISHED_APP_ORIGIN}/?convite=SKEMA1`}
-                </div>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(`${PUBLISHED_APP_ORIGIN}/?convite=SKEMA1`);
-                    setCopiedLink(true);
-                    setTimeout(() => setCopiedLink(false), 2000);
-                  }}
-                  className="shrink-0 gap-1"
-                >
-                  {copiedLink ? <Check className="w-4 h-4 text-green-400" /> : <Share2 className="w-4 h-4" />}
-                  {copiedLink ? 'Copiado!' : 'Copiar'}
-                </Button>
-              </div>
-            </div>
+            <ReferralHistoryPanel
+              playerId={player.id}
+              inviteCode={player.inviteCode}
+              onProcessRewards={onProcessReferralRewards}
+              onRefreshProfile={onRefreshProfile}
+            />
           </motion.section>
           
           {/* Taxa de transferência */}
@@ -512,6 +509,20 @@ export function SkemaLobby({
             <AlertCircle className="w-3 h-3" />
             <span>Taxa de transferência entre jogadores: {(transferTax * 100).toFixed(2)}%</span>
           </motion.div>
+          
+          {/* Jogadores Online */}
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.17 }}
+            className="mx-4 mt-4"
+          >
+            <OnlinePlayersPanel 
+              players={onlinePlayers} 
+              currentPlayerId={player.id}
+              isConnected={isConnected}
+            />
+          </motion.section>
           
           {/* Modos de Jogo */}
           <motion.section

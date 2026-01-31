@@ -1,0 +1,11 @@
+Gmail
+e-mail: skemasupabase@gmail.com
+senha: skemind2026
+
+Supabase
+e-mail: skemasupabase@gmail.com
+Senha @Skemind2026
+
+postgresql
+Banco de dados: skema
+Senha root: ahHYx2mOLwzCVqr4

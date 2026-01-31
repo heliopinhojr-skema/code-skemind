@@ -11,11 +11,12 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useSkemaPlayer } from '@/hooks/useSkemaPlayer';
+import { useSupabasePlayer } from '@/hooks/useSupabasePlayer';
 import { useGame } from '@/hooks/useGame';
 import { useTournament } from '@/hooks/useTournament';
 import { usePartyTournament } from '@/hooks/usePartyTournament';
-import { RegistrationScreen } from '@/components/skema/RegistrationScreen';
+import { useOnlinePlayers } from '@/hooks/useOnlinePlayers';
+// RegistrationScreen removed - now using /auth page
 import { SkemaLobby } from '@/components/skema/SkemaLobby';
 import { GameBoard } from '@/components/game/GameBoard';
 import { StatsBar } from '@/components/game/StatsBar';
@@ -56,10 +57,19 @@ export default function Skema() {
     }
   }, [codeFromPath]);
   
-  const skemaPlayer = useSkemaPlayer();
+  const skemaPlayer = useSupabasePlayer();
   const game = useGame();
   const tournament = useTournament();
   const party = usePartyTournament();
+  
+  // Online presence - must be called before conditional returns (Rules of Hooks)
+  const onlinePresence = useOnlinePlayers(
+    skemaPlayer.player ? {
+      id: skemaPlayer.player.id,
+      name: skemaPlayer.player.name,
+      emoji: skemaPlayer.player.emoji,
+    } : null
+  );
   
   const [currentView, setCurrentView] = useState<SkemaView>('lobby');
   const [gameMode, setGameMode] = useState<'training' | 'bots' | 'official' | 'party'>('training');
@@ -107,15 +117,30 @@ export default function Skema() {
     );
   }
   
-  // Tela de registro se não estiver registrado
+  // Redireciona para auth se não estiver registrado (depois de carregar completamente)
+  // IMPORTANTE: Esperar isLoading terminar para evitar redirecionamento prematuro
   if (!skemaPlayer.isRegistered || !skemaPlayer.player) {
+    // Se ainda está carregando o perfil, mostra loading
+    if (skemaPlayer.isLoading) {
+      return (
+        <div className="min-h-screen bg-black flex items-center justify-center">
+          <div className="text-white/50 animate-pulse">Carregando perfil...</div>
+        </div>
+      );
+    }
+    
+    // Build the redirect URL with invite code if present
+    const authUrl = inviteCodeFromUrl 
+      ? `/auth?convite=${inviteCodeFromUrl}` 
+      : '/auth';
+    
+    // Use useEffect to navigate (can't call navigate during render)
+    navigate(authUrl, { replace: true });
+    
     return (
-      <RegistrationScreen
-        onRegister={skemaPlayer.actions.register}
-        onLogin={skemaPlayer.actions.login}
-        validateCode={skemaPlayer.actions.validateInviteCode}
-        initialInviteCode={inviteCodeFromUrl}
-      />
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-white/50">Redirecionando para login...</div>
+      </div>
     );
   }
   
@@ -367,6 +392,9 @@ export default function Skema() {
     const boxBalance = localStorage.getItem('skema_box_balance');
     console.log('[SKEMA] 📦 Skema Box atual:', boxBalance);
     
+    // Update presence status back to online
+    onlinePresence.updateStatus('online');
+    
     setCurrentView('lobby');
     game.actions.newGame();
     tournament.actions.returnToLobby();
@@ -388,6 +416,9 @@ export default function Skema() {
         onDeductEnergy={skemaPlayer.actions.deductEnergy}
         onAddEnergy={skemaPlayer.actions.addEnergy}
         onLogout={skemaPlayer.actions.logout}
+        onlinePresence={onlinePresence}
+        onProcessReferralRewards={skemaPlayer.actions.processReferralRewards}
+        onRefreshProfile={skemaPlayer.actions.refreshProfile}
       />
     );
   }
