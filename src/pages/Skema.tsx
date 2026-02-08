@@ -29,7 +29,8 @@ import { CosmicBackground } from '@/components/CosmicBackground';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trophy } from 'lucide-react';
 import { UI_SYMBOLS } from '@/hooks/useGame';
-import { addToSkemaBox, subtractFromSkemaBox, roundCurrency } from '@/lib/currencyUtils';
+import { roundCurrency } from '@/lib/currencyUtils';
+import { useSkemaBox } from '@/hooks/useSkemaBox';
 
 type SkemaView = 'lobby' | 'training' | 'bots' | 'official' | 'party-setup' | 'party-playing' | 'party-collect' | 'party-results';
 
@@ -61,6 +62,7 @@ export default function Skema() {
   const game = useGame();
   const tournament = useTournament();
   const party = usePartyTournament();
+  const skemaBox = useSkemaBox();
   
   // Online presence - must be called before conditional returns (Rules of Hooks)
   const onlinePresence = useOnlinePlayers(
@@ -241,9 +243,10 @@ export default function Skema() {
     const deducted = skemaPlayer.actions.deductEnergy(total);
     console.log('[SKEMA ARENA] ✅ Entrada deduzida:', deducted);
     
-    // Rake = fee de TODOS os 10 jogadores (bots são virtuais mas contam)
-    const newBoxBalance = addToSkemaBox(ARENA_TOTAL_RAKE, 'arena_rake');
-    console.log(`[SKEMA ARENA] 💰 Rake: k$${ARENA_TOTAL_RAKE.toFixed(2)} → Skema Box: k$${newBoxBalance.toFixed(2)}`);
+    // Rake = fee de TODOS os 10 jogadores (bots são virtuais mas contam) → Cloud
+    skemaBox.addToBox(ARENA_TOTAL_RAKE, 'arena_rake').then(newBal => {
+      console.log(`[SKEMA ARENA] 💰 Rake Cloud: k$${ARENA_TOTAL_RAKE.toFixed(2)} → Skema Box: k$${(newBal ?? 0).toFixed(2)}`);
+    });
     console.log(`[SKEMA ARENA] 🏆 Pool total: k$${ARENA_TOTAL_POOL.toFixed(2)}`);
     
     setGameMode('bots');
@@ -259,8 +262,8 @@ export default function Skema() {
       console.log('[SKEMA ARENA] ❌ Falha ao iniciar - devolvendo energia');
       // Se falhou, devolve a energia do humano
       skemaPlayer.actions.addEnergy(total);
-      // Remove rake da caixa
-      subtractFromSkemaBox(ARENA_TOTAL_RAKE, 'adjustment', 'Arena x Bots: falha ao iniciar - rake devolvido');
+      // Remove rake da caixa → Cloud
+      skemaBox.subtractFromBox(ARENA_TOTAL_RAKE, 'adjustment', 'Arena x Bots: falha ao iniciar - rake devolvido');
     }
     
     return result;
@@ -296,7 +299,7 @@ export default function Skema() {
   };
   
   const handlePartyStart = (): { success: boolean; error?: string } => {
-    return party.actions.startTournament(skemaPlayer.actions.deductEnergy);
+    return party.actions.startTournament(skemaPlayer.actions.deductEnergy, skemaBox.addToBox);
   };
   
   const handlePartyStarted = () => {
@@ -388,9 +391,8 @@ export default function Skema() {
       }
     }
     
-    // Verifica Skema Box
-    const boxBalance = localStorage.getItem('skema_box_balance');
-    console.log('[SKEMA] 📦 Skema Box atual:', boxBalance);
+    // Skema Box é gerenciado pelo Cloud agora
+    console.log('[SKEMA] 📦 Skema Box Cloud, saldo:', skemaBox.balance);
     
     // Update presence status back to online
     onlinePresence.updateStatus('online');
@@ -419,6 +421,7 @@ export default function Skema() {
         onlinePresence={onlinePresence}
         onProcessReferralRewards={skemaPlayer.actions.processReferralRewards}
         onRefreshProfile={skemaPlayer.actions.refreshProfile}
+        skemaBox={skemaBox}
       />
     );
   }

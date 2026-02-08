@@ -6,7 +6,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { addToSkemaBox, roundCurrency } from '@/lib/currencyUtils';
+import { roundCurrency } from '@/lib/currencyUtils';
 
 export interface PartyPlayer {
   id: string;
@@ -130,7 +130,8 @@ export function usePartyTournament() {
 
   // Iniciar torneio (coleta entrada de todos)
   const startTournament = useCallback((
-    deductEnergy: (amount: number) => boolean
+    deductEnergy: (amount: number) => boolean,
+    addToBox?: (amount: number, type: 'arena_rake' | 'official_rake' | 'party_rake', description?: string) => Promise<number | null>
   ): { success: boolean; error?: string } => {
     if (!tournament) return { success: false, error: 'Nenhum torneio ativo' };
     if (tournament.players.length < 2) return { success: false, error: 'Mínimo 2 jogadores' };
@@ -145,9 +146,14 @@ export function usePartyTournament() {
       return { success: false, error: 'Energia insuficiente' };
     }
     
-    // Salva rake no sistema usando helper seguro
-    const newBox = addToSkemaBox(rake, 'party_rake');
-    console.log(`[FESTA] 💰 Rake: k$${rake.toFixed(2)} → Caixa: k$${newBox.toFixed(2)}`);
+    // Salva rake no Cloud via callback
+    if (addToBox) {
+      addToBox(rake, 'party_rake').then(newBal => {
+        console.log(`[FESTA] 💰 Rake Cloud: k$${rake.toFixed(2)} → Caixa: k$${(newBal ?? 0).toFixed(2)}`);
+      });
+    } else {
+      console.log(`[FESTA] ⚠️ addToBox não disponível, rake não registrado no Cloud`);
+    }
     
     setTournament(prev => {
       if (!prev) return prev;
