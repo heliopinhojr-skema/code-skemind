@@ -1,6 +1,7 @@
 /**
  * GuardianUsersTable - Lista de usuários agrupados por tier com filtros e busca
  * Mostra saldo total, bloqueado e disponível por jogador
+ * Click em qualquer jogador abre o PlayerDetailDrawer
  */
 
 import { useState, useMemo } from 'react';
@@ -13,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { usePlayersList, useReferralTree } from '@/hooks/useGuardianData';
+import { PlayerDetailDrawer } from './PlayerDetailDrawer';
 import { Search, Users, Shield, Crown, Swords, Gamepad2, Zap, Rocket, Star, Lock, Unlock } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -75,6 +77,8 @@ export function GuardianUsersTable() {
   const { data: referralNodes } = useReferralTree();
   const [search, setSearch] = useState('');
   const [tierFilter, setTierFilter] = useState('all');
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Build a map of player_id → invites_sent count from referral data
   const invitesSentMap = useMemo(() => {
@@ -133,6 +137,7 @@ export function GuardianUsersTable() {
   }
 
   return (
+    <>
     <Card className="bg-card/90 backdrop-blur-sm border-border/60">
       <CardHeader>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -211,7 +216,14 @@ export function GuardianUsersTable() {
                   const balance = calculateBalanceBreakdown(Number(player.energy), player.player_tier, invitesSent);
                   
                   return (
-                    <TableRow key={player.id}>
+                    <TableRow
+                      key={player.id}
+                      className="cursor-pointer hover:bg-primary/5"
+                      onClick={() => {
+                        setSelectedPlayerId(player.id);
+                        setDrawerOpen(true);
+                      }}
+                    >
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <span className="text-xl">{player.emoji}</span>
@@ -290,5 +302,14 @@ export function GuardianUsersTable() {
         </div>
       </CardContent>
     </Card>
+
+    {/* Player Detail Drawer */}
+    <PlayerDetailDrawer
+      playerId={selectedPlayerId}
+      open={drawerOpen}
+      onOpenChange={setDrawerOpen}
+      allNodes={referralNodes || []}
+    />
+    </>
   );
 }
