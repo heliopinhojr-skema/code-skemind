@@ -234,66 +234,41 @@ export default function Skema() {
   // Tabela completa em src/lib/arenaPayouts.ts
   // 1º: k$13.50, 2º: k$8.00, 3º: k$5.00, ..., 25º: k$0.55 (min-cash)
   
-  const handleStartBotRace = (buyIn: number, fee: number): { success: boolean; error?: string } => {
-    // Aritmética em centavos para evitar floating-point
-    const buyInCents = Math.round(buyIn * 100);
-    const feeCents = Math.round(fee * 100);
-    const totalCents = buyInCents + feeCents;
-    const total = totalCents / 100; // k$ sem drift
-    
+  const handleStartBotRace = async (buyIn: number, fee: number): Promise<{ success: boolean; error?: string }> => {
     console.log('[SKEMA ARENA] 🎮 Iniciando Arena x Bots...');
     console.log('[SKEMA ARENA] Saldo atual:', skemaPlayer.player!.energy);
-    console.log('[SKEMA ARENA] Custo entrada:', total, `(${totalCents} cents)`);
-    
-    const energyCents = Math.round(skemaPlayer.player!.energy * 100);
-    if (energyCents < totalCents) {
-      console.log('[SKEMA ARENA] ❌ Energia insuficiente!');
-      return { success: false, error: `Energia insuficiente (k$${total.toFixed(2)})` };
-    }
-    
-    // Deduz entrada do humano
-    const deducted = skemaPlayer.actions.deductEnergy(total);
-    console.log('[SKEMA ARENA] ✅ Entrada deduzida:', deducted);
-    
-    // Rake = fee de TODOS os 100 jogadores (bots são virtuais mas contam) → Cloud
-    skemaBox.addToBox(ARENA_TOTAL_RAKE, 'arena_rake').then(newBal => {
-      console.log(`[SKEMA ARENA] 💰 Rake Cloud: k$${ARENA_TOTAL_RAKE.toFixed(2)} → Skema Box: k$${(newBal ?? 0).toFixed(2)}`);
-    });
-    console.log(`[SKEMA ARENA] 🏆 Pool total: k$${ARENA_TOTAL_POOL.toFixed(2)}`);
+    console.log('[SKEMA ARENA] Buy-in:', buyIn, 'Fee:', fee);
     
     setGameMode('bots');
     setCurrentView('bots');
     
-    const result = tournament.actions.startTournament();
+    // Edge Function handles ALL economy: player debit, bot treasury debit, skema box rake
+    const result = await tournament.actions.startTournament();
     console.log('[SKEMA ARENA] Torneio iniciado:', result);
     
     if (result.success && result.humanSecretCode) {
       game.actions.startGameWithSecret(result.humanSecretCode);
       console.log('[SKEMA ARENA] ✅ Jogo iniciado com sucesso!');
+      // Refresh player energy from backend
+      skemaPlayer.actions.refreshProfile?.();
     } else {
-      console.log('[SKEMA ARENA] ❌ Falha ao iniciar - devolvendo energia');
-      // Se falhou, devolve a energia do humano
-      skemaPlayer.actions.addEnergy(total);
-      // Remove rake da caixa → Cloud
-      skemaBox.subtractFromBox(ARENA_TOTAL_RAKE, 'adjustment', 'Arena x Bots: falha ao iniciar - rake devolvido');
+      console.log('[SKEMA ARENA] ❌ Falha ao iniciar:', result.error);
+      setCurrentView('lobby');
     }
     
-    return result;
+    return { success: result.success, error: result.error };
   };
   
-  const handleStartOfficialRace = (raceId: string, buyIn: number, fee: number): { success: boolean; error?: string } => {
-    // IMPORTANTE: a Corrida Oficial já cobra a entrada (k$1.10) no ato da INSCRIÇÃO no Lobby.
-    // Aqui (iniciar a corrida) NÃO deve debitar novamente, senão o saldo fica errado.
-    
+  const handleStartOfficialRace = async (raceId: string, buyIn: number, fee: number): Promise<{ success: boolean; error?: string }> => {
     setGameMode('official');
     setCurrentView('official');
     
-    const result = tournament.actions.startTournament();
+    const result = await tournament.actions.startTournament();
     if (result.success && result.humanSecretCode) {
       game.actions.startGameWithSecret(result.humanSecretCode);
     }
     
-    return result;
+    return { success: result.success, error: result.error };
   };
   
   
@@ -349,45 +324,20 @@ export default function Skema() {
     
     // Atualiza stats do jogador
     if (game.state.status === 'won' || game.state.status === 'lost') {
-      skemaPlayer.actions.updateStats({
-        won: game.state.status === 'won',
-        time: game.state.status === 'won' ? game.state.timeRemaining : undefined,
-      });
-      
-      // Distribui prêmios para Arena x Bots
+      // Stats e prêmios da arena são processados pela Edge Function (process-arena-economy)
+      // Aqui apenas logamos o resultado
       if (gameMode === 'bots') {
         const humanResult = tournament.state.results.get(tournament.state.humanPlayerId);
-        console.log('[SKEMA PREMIO] 💰 ======= VERIFICANDO PRÊMIO ARENA =======');
-        console.log('[SKEMA PREMIO] humanResult:', humanResult);
-        console.log('[SKEMA PREMIO] Saldo ANTES (state):', skemaPlayer.player?.energy);
-        
-        // Lê direto do storage para comparação
-        const storageBefore = localStorage.getItem('skema_player');
-        if (storageBefore) {
-          console.log('[SKEMA PREMIO] Saldo ANTES (storage):', JSON.parse(storageBefore).energy);
-        }
-        
-        if (humanResult && isITM(humanResult.rank)) {
-          // ITM: posição 1-25 ganham prêmio (tabela poker)
-          const prize = getArenaPrize(humanResult.rank);
-          console.log(`[SKEMA PREMIO] 🏆 Rank: ${humanResult.rank}º | ITM! Prêmio: k$${prize.toFixed(2)}`);
-          
-          // Adiciona prêmio
-          skemaPlayer.actions.addEnergy(prize);
-          console.log('[SKEMA PREMIO] ✅ addEnergy chamado com:', prize);
-          
-          // Verifica localStorage diretamente após um tick
-          setTimeout(() => {
-            const stored = localStorage.getItem('skema_player');
-            if (stored) {
-              const parsed = JSON.parse(stored);
-              console.log('[SKEMA PREMIO] 📦 Saldo DEPOIS (storage):', parsed.energy);
-            }
-            console.log('[SKEMA PREMIO] ======= FIM VERIFICAÇÃO =======');
-          }, 200);
-        } else {
-          console.log(`[SKEMA PREMIO] ❌ Fora do ITM (${humanResult?.rank || '?'}º lugar, ITM até ${ITM_POSITIONS}º) - sem prêmio`);
-        }
+        console.log('[SKEMA ARENA] Resultado final:', humanResult?.rank, 'º lugar');
+        console.log('[SKEMA ARENA] Prêmios processados via Edge Function');
+        // Refresh player profile to get updated energy from backend
+        skemaPlayer.actions.refreshProfile?.();
+      } else {
+        // Training / outros modos: atualiza stats localmente
+        skemaPlayer.actions.updateStats({
+          won: game.state.status === 'won',
+          time: game.state.status === 'won' ? game.state.timeRemaining : undefined,
+        });
       }
     }
     

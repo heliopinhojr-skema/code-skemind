@@ -52,8 +52,8 @@ interface SkemaLobbyProps {
   remainingReferralRewards: number;
   transferTax: number;
   onStartTraining: () => void;
-  onStartBotRace: (buyIn: number, fee: number) => { success: boolean; error?: string };
-  onStartOfficialRace: (raceId: string, buyIn: number, fee: number) => { success: boolean; error?: string };
+  onStartBotRace: (buyIn: number, fee: number) => Promise<{ success: boolean; error?: string }>;
+  onStartOfficialRace: (raceId: string, buyIn: number, fee: number) => Promise<{ success: boolean; error?: string }>;
   onStartParty: () => void;
   onDeductEnergy: (amount: number) => boolean;
   onAddEnergy: (amount: number) => void;
@@ -230,22 +230,24 @@ export function SkemaLobby({
         onStartTraining();
       } else if (selectedMode === 'bots') {
         // Arena x Bots: 50 cents pool + 5 cents rake (derivado de inteiros)
-        const result = onStartBotRace(50 / 100, 5 / 100);
-        if (!result.success) {
-          setError(result.error || 'Erro ao iniciar');
-          setIsStarting(false);
-          setCountdown(null);
-          updateStatus('online'); // Revert status on error
-        }
+        onStartBotRace(50 / 100, 5 / 100).then(result => {
+          if (!result.success) {
+            setError(result.error || 'Erro ao iniciar');
+            setIsStarting(false);
+            setCountdown(null);
+            updateStatus('online');
+          }
+        });
       } else if (selectedMode === 'official') {
         const { entryFee, prizePerPlayer, skemaBoxFee } = officialRace.constants;
-        const result = onStartOfficialRace('official-race-2026-03-03', prizePerPlayer, skemaBoxFee);
-        if (!result.success) {
-          setError(result.error || 'Erro ao iniciar');
-          setIsStarting(false);
-          setCountdown(null);
-          updateStatus('online'); // Revert status on error
-        }
+        onStartOfficialRace('official-race-2026-03-03', prizePerPlayer, skemaBoxFee).then(result => {
+          if (!result.success) {
+            setError(result.error || 'Erro ao iniciar');
+            setIsStarting(false);
+            setCountdown(null);
+            updateStatus('online');
+          }
+        });
       }
       return;
     }
