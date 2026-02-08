@@ -10,11 +10,14 @@ import { supabase } from '@/integrations/supabase/client';
 export interface DashboardStats {
   totalPlayers: number;
   totalEnergy: number;
+  hxEnergy: number;
+  playersEnergy: number;
   skemaBoxBalance: number;
   totalReferrals: number;
   creditedReferrals: number;
   totalDistributed: number;
   totalRaces: number;
+  systemTotal: number;
 }
 
 export interface PlayerProfile {
@@ -128,7 +131,7 @@ export function useDashboardStats() {
   return useQuery({
     queryKey: ['guardian-dashboard-stats'],
     queryFn: async () => {
-      // Buscar total de jogadores e energia (excluindo keepers/guardians com energia infinita)
+      // Buscar total de jogadores e energia
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('energy, player_tier');
@@ -136,10 +139,18 @@ export function useDashboardStats() {
       if (profilesError) throw profilesError;
       
       const totalPlayers = profiles?.length || 0;
-      // Only exclude master_admin from circulating energy (they have the root treasury)
-      const totalEnergy = profiles
+      
+      // HX (master_admin) energy - the root treasury
+      const hxEnergy = profiles
+        ?.filter(p => p.player_tier === 'master_admin')
+        .reduce((sum, p) => sum + Number(p.energy), 0) || 0;
+      
+      // Players energy (everyone except master_admin)
+      const playersEnergy = profiles
         ?.filter(p => p.player_tier !== 'master_admin')
         .reduce((sum, p) => sum + Number(p.energy), 0) || 0;
+      
+      const totalEnergy = playersEnergy;
       
       // Buscar saldo do Skema Box
       const { data: skemaBox, error: skemaBoxError } = await supabase
@@ -151,6 +162,11 @@ export function useDashboardStats() {
       if (skemaBoxError && skemaBoxError.code !== 'PGRST116') {
         console.error('Skema box error:', skemaBoxError);
       }
+      
+      const skemaBoxBalance = Number(skemaBox?.balance) || 0;
+      
+      // System total = HX + players + skema box (should always equal initial 10M)
+      const systemTotal = hxEnergy + playersEnergy + skemaBoxBalance;
       
       // Buscar referrals com amounts
       const { data: referrals, error: referralsError } = await supabase
@@ -173,11 +189,14 @@ export function useDashboardStats() {
       return {
         totalPlayers,
         totalEnergy,
-        skemaBoxBalance: Number(skemaBox?.balance) || 0,
+        hxEnergy,
+        playersEnergy,
+        skemaBoxBalance,
         totalReferrals,
         creditedReferrals,
         totalDistributed,
         totalRaces: races?.length || 0,
+        systemTotal,
       } as DashboardStats;
     },
     staleTime: 30 * 1000, // 30 seconds
