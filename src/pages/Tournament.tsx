@@ -114,6 +114,7 @@ export default function Tournament() {
                   symbolsById={symbolsById}
                   prizeAmount={prizeAmount}
                   totalPlayers={tournament.state.players.length}
+                  arenaPool={tournament.state.prizePool}
                 />
                 
                 <Button 

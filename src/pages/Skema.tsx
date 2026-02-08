@@ -569,6 +569,7 @@ export default function Skema() {
                     totalPlayers={tournament.state.players.length}
                     prizeAmount={prizeAmount}
                     symbolsById={symbolsById}
+                    arenaPool={tournament.state.prizePool}
                   />
                   
                   <Button
