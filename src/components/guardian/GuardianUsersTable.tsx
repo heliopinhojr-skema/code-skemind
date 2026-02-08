@@ -1,115 +1,117 @@
 /**
- * GuardianUsersTable - Lista de usuários com filtros, busca e gestão de roles
+ * GuardianUsersTable - Lista de usuários agrupados por tier com filtros e busca
  */
 
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { usePlayersList } from '@/hooks/useGuardianData';
-import { supabase } from '@/integrations/supabase/client';
-import { Search, Users, Shield, Crown, Swords, Gamepad2 } from 'lucide-react';
+import { Search, Users, Shield, Crown, Swords, Gamepad2, Zap, Rocket, Star } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { toast } from 'sonner';
-import { useQueryClient } from '@tanstack/react-query';
 
-type PlayerTier = 'master_admin' | 'guardiao' | 'grao_mestre' | 'mestre' | 'jogador';
-
-const TIER_CONFIG: Record<PlayerTier, { label: string; icon: React.ReactNode; color: string }> = {
-  master_admin: { 
-    label: 'Master Admin', 
+// Tier labels match the player_tier values set by register_player
+const TIER_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+  'master_admin': { 
+    label: 'CD HX', 
     icon: <Shield className="h-3 w-3" />, 
     color: 'text-red-400 bg-red-400/10 border-red-400/30' 
   },
-  guardiao: { 
-    label: 'Guardião', 
-    icon: <Shield className="h-3 w-3" />, 
+  'Criador': { 
+    label: 'Criador', 
+    icon: <Star className="h-3 w-3" />, 
     color: 'text-amber-400 bg-amber-400/10 border-amber-400/30' 
   },
-  grao_mestre: { 
+  'Grão Mestre': { 
     label: 'Grão Mestre', 
     icon: <Crown className="h-3 w-3" />, 
     color: 'text-purple-400 bg-purple-400/10 border-purple-400/30' 
   },
-  mestre: { 
+  'Mestre': { 
     label: 'Mestre', 
     icon: <Swords className="h-3 w-3" />, 
     color: 'text-blue-400 bg-blue-400/10 border-blue-400/30' 
   },
-  jogador: { 
+  'Boom': { 
+    label: 'Boom', 
+    icon: <Rocket className="h-3 w-3" />, 
+    color: 'text-green-400 bg-green-400/10 border-green-400/30' 
+  },
+  'Ploft': { 
+    label: 'Ploft', 
+    icon: <Gamepad2 className="h-3 w-3" />, 
+    color: 'text-muted-foreground bg-muted/30 border-border' 
+  },
+  'jogador': { 
     label: 'Jogador', 
     icon: <Gamepad2 className="h-3 w-3" />, 
     color: 'text-muted-foreground bg-muted/30 border-border' 
   },
 };
 
+const TIER_TABS = [
+  { id: 'all', label: 'Todos' },
+  { id: 'Criador', label: 'Criadores' },
+  { id: 'Grão Mestre', label: 'GMs' },
+  { id: 'Mestre', label: 'Mestres' },
+  { id: 'Boom', label: 'Booms' },
+  { id: 'Ploft', label: 'Plofts' },
+];
+
+function getTierConfig(tier: string | null) {
+  return TIER_CONFIG[tier || 'jogador'] || TIER_CONFIG['jogador'];
+}
+
+function formatEnergy(energy: number): string {
+  if (energy >= 1000000) return `k$${(energy / 1000000).toFixed(2)}M`;
+  if (energy >= 1000) return `k$${(energy / 1000).toFixed(1)}k`;
+  return `k$${energy.toFixed(2)}`;
+}
+
 export function GuardianUsersTable() {
   const { data: players, isLoading, error } = usePlayersList();
   const [search, setSearch] = useState('');
-  const [updatingUser, setUpdatingUser] = useState<string | null>(null);
-  const queryClient = useQueryClient();
+  const [tierFilter, setTierFilter] = useState('all');
 
   const filteredPlayers = useMemo(() => {
     if (!players) return [];
-    if (!search.trim()) return players;
     
-    const searchLower = search.toLowerCase();
-    return players.filter(p => 
-      p.name.toLowerCase().includes(searchLower) ||
-      p.invite_code.toLowerCase().includes(searchLower) ||
-      p.invited_by_name?.toLowerCase().includes(searchLower)
-    );
-  }, [players, search]);
-
-  const handleTierChange = async (userId: string, newTier: PlayerTier) => {
-    setUpdatingUser(userId);
+    let filtered = players;
     
-    try {
-      // Map tier to role (they're the same in our system)
-      const newRole = newTier;
-      
-      // Use RPC call to update role and tier
-      const { data, error } = await supabase.rpc('set_user_role_and_tier', {
-        p_target_user_id: userId,
-        p_new_role: newRole,
-        p_new_tier: newTier,
-      });
-
-      if (error) {
-        console.error('Error updating tier:', error);
-        toast.error(`Erro ao atualizar: ${error.message}`);
-        return;
-      }
-
-      toast.success(`Tier alterado para ${TIER_CONFIG[newTier].label}`);
-      
-      // Refresh the players list
-      queryClient.invalidateQueries({ queryKey: ['guardian', 'players'] });
-      
-    } catch (e) {
-      console.error('Unexpected error:', e);
-      toast.error('Erro inesperado ao atualizar tier');
-    } finally {
-      setUpdatingUser(null);
+    // Filter by tier
+    if (tierFilter !== 'all') {
+      filtered = filtered.filter(p => p.player_tier === tierFilter);
     }
-  };
+    
+    // Filter by search
+    if (search.trim()) {
+      const searchLower = search.toLowerCase();
+      filtered = filtered.filter(p => 
+        p.name.toLowerCase().includes(searchLower) ||
+        p.invite_code.toLowerCase().includes(searchLower) ||
+        p.invited_by_name?.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    return filtered;
+  }, [players, search, tierFilter]);
+
+  // Count per tier
+  const tierCounts = useMemo(() => {
+    if (!players) return {};
+    const counts: Record<string, number> = {};
+    players.forEach(p => {
+      const tier = p.player_tier || 'jogador';
+      counts[tier] = (counts[tier] || 0) + 1;
+    });
+    return counts;
+  }, [players]);
 
   if (error) {
     return (
@@ -138,14 +140,35 @@ export function GuardianUsersTable() {
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        {/* Tier filter tabs */}
+        <Tabs value={tierFilter} onValueChange={setTierFilter}>
+          <TabsList className="flex flex-wrap h-auto gap-1 bg-card/80 border border-border/50 p-1">
+            {TIER_TABS.map((tab) => (
+              <TabsTrigger
+                key={tab.id}
+                value={tab.id}
+                className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary"
+              >
+                {tab.label}
+                {tab.id !== 'all' && tierCounts[tab.id] ? (
+                  <span className="ml-1 text-[10px] opacity-70">({tierCounts[tab.id]})</span>
+                ) : tab.id === 'all' ? (
+                  <span className="ml-1 text-[10px] opacity-70">({players?.length || 0})</span>
+                ) : null}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+
+        {/* Table */}
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Jogador</TableHead>
                 <TableHead>Tier</TableHead>
-                <TableHead>Energia</TableHead>
+                <TableHead>Saldo</TableHead>
                 <TableHead>Código</TableHead>
                 <TableHead>Convidado por</TableHead>
                 <TableHead>Stats</TableHead>
@@ -166,14 +189,12 @@ export function GuardianUsersTable() {
               ) : filteredPlayers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                    {search ? 'Nenhum usuário encontrado' : 'Nenhum usuário registrado'}
+                    {search || tierFilter !== 'all' ? 'Nenhum usuário encontrado' : 'Nenhum usuário registrado'}
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredPlayers.map((player) => {
-                  const currentTier = (player.player_tier as PlayerTier) || 'jogador';
-                  const tierConfig = TIER_CONFIG[currentTier];
-                  const isUpdating = updatingUser === player.user_id;
+                  const tierConfig = getTierConfig(player.player_tier);
                   
                   return (
                     <TableRow key={player.id}>
@@ -184,34 +205,17 @@ export function GuardianUsersTable() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Select
-                          value={currentTier}
-                          onValueChange={(value) => handleTierChange(player.user_id, value as PlayerTier)}
-                          disabled={isUpdating}
-                        >
-                          <SelectTrigger className={`w-[140px] h-8 text-xs border ${tierConfig.color}`}>
-                            <SelectValue>
-                              <div className="flex items-center gap-1.5">
-                                {tierConfig.icon}
-                                <span>{tierConfig.label}</span>
-                              </div>
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Object.entries(TIER_CONFIG).map(([tier, config]) => (
-                              <SelectItem key={tier} value={tier}>
-                                <div className="flex items-center gap-2">
-                                  {config.icon}
-                                  <span>{config.label}</span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Badge variant="outline" className={`text-xs border ${tierConfig.color}`}>
+                          <span className="flex items-center gap-1">
+                            {tierConfig.icon}
+                            {tierConfig.label}
+                          </span>
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="font-mono">
-                          {currentTier === 'guardiao' ? '∞' : `k$${Number(player.energy).toFixed(2)}`}
+                          <Zap className="h-3 w-3 mr-1" />
+                          {formatEnergy(Number(player.energy))}
                         </Badge>
                       </TableCell>
                       <TableCell>

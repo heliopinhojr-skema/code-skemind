@@ -86,10 +86,10 @@ export function GuardianDashboard() {
         <CardHeader className="pb-3">
           <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
             <Share2 className="h-5 w-5 text-primary" />
-            Seu Código de Convite (Guardian)
+            Seu Código de Convite
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Compartilhe este código para convidar novos <strong>Keepers</strong> com energia infinita
+            Compartilhe para convidar novos jogadores à sua árvore
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -135,7 +135,7 @@ export function GuardianDashboard() {
               </div>
 
               <p className="text-xs text-muted-foreground bg-muted/50 rounded-md p-2">
-                🛡️ Usuários convidados por você receberão o tier <strong>Guardião</strong> com energia infinita e poderão convidar Grão Mestres.
+                🌌 Convidados recebem tier e saldo automaticamente baseado no seu nível na hierarquia SKEMA.
               </p>
             </>
           ) : (
