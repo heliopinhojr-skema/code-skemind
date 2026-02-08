@@ -7,18 +7,26 @@
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { 
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { usePlayersList, useReferralTree, useIsMasterAdmin } from '@/hooks/useGuardianData';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { PlayerDetailDrawer } from './PlayerDetailDrawer';
-import { Search, Users, Shield, Crown, Swords, Gamepad2, Zap, Rocket, Star, Lock, Unlock } from 'lucide-react';
+import { Search, Users, Shield, Crown, Swords, Gamepad2, Zap, Rocket, Star, Lock, Unlock, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { calculateBalanceBreakdown, formatEnergy } from '@/lib/tierEconomy';
+import { toast } from 'sonner';
 
 // Tier labels match the player_tier values set by register_player
 const TIER_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
@@ -80,6 +88,9 @@ export function GuardianUsersTable() {
   const [tierFilter, setTierFilter] = useState('all');
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const queryClient = useQueryClient();
 
   // Build a map of player_id → invites_sent count from referral data
   const invitesSentMap = useMemo(() => {
@@ -89,6 +100,26 @@ export function GuardianUsersTable() {
     });
     return map;
   }, [referralNodes]);
+
+  const handleQuickDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase.rpc('admin_delete_player', {
+        p_player_id: deleteTarget.id,
+      });
+      if (error) throw error;
+      toast.success(`${deleteTarget.name} apagado — energia devolvida à ascendência`);
+      queryClient.invalidateQueries({ queryKey: ['guardian-players-list'] });
+      queryClient.invalidateQueries({ queryKey: ['guardian-referral-tree'] });
+      queryClient.invalidateQueries({ queryKey: ['guardian-dashboard-stats'] });
+    } catch (err: any) {
+      toast.error(`Erro: ${err.message}`);
+    } finally {
+      setIsDeleting(false);
+      setDeleteTarget(null);
+    }
+  };
 
   const filteredPlayers = useMemo(() => {
     if (!players) return [];
@@ -191,13 +222,14 @@ export function GuardianUsersTable() {
                 <TableHead>Convites</TableHead>
                 <TableHead>Convidado por</TableHead>
                 <TableHead>Registro</TableHead>
+                {isMasterAdmin && <TableHead className="w-10"></TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 8 }).map((_, j) => (
+                    {Array.from({ length: isMasterAdmin ? 9 : 8 }).map((_, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-6 w-20" />
                       </TableCell>
@@ -206,7 +238,7 @@ export function GuardianUsersTable() {
                 ))
               ) : filteredPlayers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={isMasterAdmin ? 9 : 8} className="text-center text-muted-foreground py-8">
                     {search || tierFilter !== 'all' ? 'Nenhum usuário encontrado' : 'Nenhum usuário registrado'}
                   </TableCell>
                 </TableRow>
@@ -294,6 +326,24 @@ export function GuardianUsersTable() {
                           {format(new Date(player.created_at), "dd/MM/yy", { locale: ptBR })}
                         </span>
                       </TableCell>
+                      {isMasterAdmin && player.player_tier !== 'master_admin' && (
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive/60 hover:text-destructive hover:bg-destructive/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteTarget({ id: player.id, name: player.name });
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      )}
+                      {isMasterAdmin && player.player_tier === 'master_admin' && (
+                        <TableCell />
+                      )}
                     </TableRow>
                   );
                 })
@@ -312,6 +362,32 @@ export function GuardianUsersTable() {
       allNodes={referralNodes || []}
       isMasterAdmin={isMasterAdmin === true}
     />
+
+    {/* Quick Delete Confirmation */}
+    <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="text-destructive flex items-center gap-2">
+            <Trash2 className="h-5 w-5" />
+            Apagar {deleteTarget?.name}?
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            A conta será removida permanentemente. Toda a energia será devolvida à ascendência 
+            e todos os descendentes também serão apagados recursivamente.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleQuickDelete}
+            disabled={isDeleting}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {isDeleting ? 'Apagando...' : 'Confirmar exclusão'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     </>
   );
 }
