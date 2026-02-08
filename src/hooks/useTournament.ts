@@ -106,19 +106,39 @@ export function useTournament() {
     return Math.round(total * 100) / 100; // round to 2 decimals
   }, [humanPlayerId]);
 
+  // Configura arena customizada (chamado pelo lobby antes de iniciar)
+  const configureArena = useCallback((config: { buyIn: number; rakeFee: number; botCount: number }) => {
+    setBuyIn(config.buyIn);
+    setRakeFee(config.rakeFee);
+    setBotCount(config.botCount);
+  }, []);
+
   // Inicia torneio - chama Edge Function para economia
-  const startTournament = useCallback(async () => {
+  // Accepts optional override config for arena params
+  const startTournament = useCallback(async (arenaConfig?: { buyIn: number; rakeFee: number; botCount: number }) => {
     if (isProcessing) return { success: false, error: 'Processando...' };
     setIsProcessing(true);
+    
+    // Use override config if provided
+    const effectiveBuyIn = arenaConfig?.buyIn ?? buyIn;
+    const effectiveRakeFee = arenaConfig?.rakeFee ?? rakeFee;
+    const effectiveBotCount = arenaConfig?.botCount ?? botCount;
+
+    // Update state to match
+    if (arenaConfig) {
+      setBuyIn(effectiveBuyIn);
+      setRakeFee(effectiveRakeFee);
+      setBotCount(effectiveBotCount);
+    }
     
     try {
       // Chama Edge Function para debitar player + bot treasury + creditar rake
       const { data, error } = await supabase.functions.invoke('process-arena-economy', {
         body: {
           action: 'enter',
-          buy_in: buyIn,
-          rake_fee: rakeFee,
-          bot_count: botCount,
+          buy_in: effectiveBuyIn,
+          rake_fee: effectiveRakeFee,
+          bot_count: effectiveBotCount,
         },
       });
 
@@ -137,7 +157,7 @@ export function useTournament() {
       console.log('[TOURNAMENT] ✅ Arena entry processed:', data);
     
       const symbolIds = UI_SYMBOLS.map(s => s.id);
-      const pool = calculateArenaPool(buyIn, rakeFee, botCount);
+      const pool = calculateArenaPool(effectiveBuyIn, effectiveRakeFee, effectiveBotCount);
       setArenaPool(pool);
       
       // Gera código secreto ÚNICO para o humano
@@ -156,8 +176,25 @@ export function useTournament() {
         secretCode: humanSecret,
       });
       
-      // Simula CADA bot com seu próprio código secreto
-      const botPlayers = players.filter(p => p.isBot);
+      // Re-generate bot players inline if count changed
+      const actualBotCount = effectiveBotCount;
+      let botPlayers = players.filter(p => p.isBot);
+      
+      // If bot count doesn't match (arena config changed), regenerate
+      if (botPlayers.length !== actualBotCount) {
+        const { createBot: createBotFn } = await import('@/lib/botAI');
+        botPlayers = Array.from({ length: actualBotCount }, (_, i) => {
+          const bot = createBotFn(i);
+          return {
+            id: bot.id,
+            name: bot.name,
+            avatar: bot.avatar,
+            isBot: true,
+            iq: bot.iq,
+          };
+        });
+        setPlayers([{ id: humanPlayerId, name: 'Você', avatar: '👤', isBot: false }, ...botPlayers]);
+      }
       const botResults: TournamentResult[] = botPlayers.map(bot => {
         const botSecret = generateSecret(symbolIds);
         const gameResult = simulateBotGame(botSecret, UI_SYMBOLS, MAX_ATTEMPTS, GAME_DURATION);
@@ -351,6 +388,7 @@ export function useTournament() {
     },
     actions: {
       startTournament,
+      configureArena,
       updateHumanResult,
       finishTournament,
       returnToLobby,

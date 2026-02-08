@@ -3,7 +3,7 @@
  * 
  * Mostra:
  * - Status e saldo do jogador (K$ 1000 inicial)
- * - Corridas em andamento
+ * - Arenas abertas (do banco de dados)
  * - Modos de jogo disponíveis
  */
 
@@ -12,18 +12,27 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Trophy, Coins, Play, Zap, Target, 
   Rocket, Timer, Swords, Brain, Sparkles,
-  TrendingUp, Medal, Clock
+  TrendingUp, Medal, Clock, Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TournamentPlayer } from '@/hooks/useTournament';
+import { useOpenArenas, ArenaListing } from '@/hooks/useArenaListings';
+import { calculateArenaPool } from '@/lib/arenaPayouts';
+import { formatEnergy } from '@/lib/tierEconomy';
 import universeBg from '@/assets/universe-bg.jpg';
+
+export interface ArenaConfig {
+  buyIn: number;
+  rakeFee: number;
+  botCount: number;
+}
 
 interface TournamentLobbyProps {
   players: TournamentPlayer[];
   credits: number;
   entryFee: number;
   prizePool: number;
-  onStart: () => Promise<{ success: boolean; error?: string; humanSecretCode?: string[] }>;
+  onStart: (arenaConfig?: ArenaConfig) => Promise<{ success: boolean; error?: string; humanSecretCode?: string[] }>;
 }
 
 type GameMode = 'training' | 'solo' | 'arena';
@@ -77,17 +86,10 @@ const GAME_MODES: GameModeConfig[] = [
   },
 ];
 
-// Corridas simuladas em andamento
+// Corridas simuladas em andamento (placeholder visual)
 const ONGOING_RACES = [
   { id: 1, name: '9 Bots #42', players: 8, status: 'Em andamento', timeLeft: '2:34' },
   { id: 2, name: '9 Bots #43', players: 10, status: 'Iniciando', timeLeft: '0:10' },
-];
-
-// Inscrições abertas
-const OPEN_REGISTRATIONS = [
-  { id: 1, name: '9 Bots #44', entryFee: 100, prize: 1000, spotsLeft: 7, startsIn: '5:00' },
-  { id: 2, name: '9 Bots #45', entryFee: 100, prize: 1000, spotsLeft: 10, startsIn: '8:30' },
-  { id: 3, name: 'Torneio VIP', entryFee: 500, prize: 5000, spotsLeft: 4, startsIn: '15:00' },
 ];
 
 // Nomes dos bots para Arena
@@ -114,8 +116,12 @@ export function TournamentLobby({
 }: TournamentLobbyProps) {
   const [selectedMode, setSelectedMode] = useState<GameMode | null>(null);
   const [enrollLabel, setEnrollLabel] = useState<string | null>(null);
+  const [selectedArenaConfig, setSelectedArenaConfig] = useState<ArenaConfig | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isStarting, setIsStarting] = useState(false);
+  
+  // Fetch real open arenas from database
+  const { data: openArenas, isLoading: arenasLoading } = useOpenArenas();
   
   // Efeito de estrelas animadas
   const stars = useMemo(() => 
@@ -134,16 +140,19 @@ export function TournamentLobby({
   const handleSelectMode = useCallback((mode: GameMode) => {
     setSelectedMode(mode);
     setEnrollLabel(null);
+    setSelectedArenaConfig(null);
   }, []);
 
-  const handleEnrollRegistration = useCallback((reg: (typeof OPEN_REGISTRATIONS)[number]) => {
-    // Só suportamos inscrição em 9 Bots (fee 100) por enquanto (mesma mecânica do torneio atual)
-    if (reg.entryFee !== 100) return;
-
-    if (credits < reg.entryFee || isStarting) return;
+  const handleEnrollArena = useCallback((arena: ArenaListing) => {
+    if (credits < arena.buy_in || isStarting) return;
 
     setSelectedMode('arena');
-    setEnrollLabel(reg.name);
+    setEnrollLabel(arena.name);
+    setSelectedArenaConfig({
+      buyIn: arena.buy_in,
+      rakeFee: arena.rake_fee,
+      botCount: arena.bot_count,
+    });
     setIsStarting(true);
     setCountdown(COUNTDOWN_SECONDS);
   }, [credits, isStarting]);
@@ -158,17 +167,20 @@ export function TournamentLobby({
     setIsStarting(false);
     setCountdown(null);
     setEnrollLabel(null);
+    setSelectedArenaConfig(null);
   }, []);
   
   useEffect(() => {
     if (countdown === null || countdown < 0) return;
     
     if (countdown === 0) {
-      onStart().then(result => {
+      // Pass arena config if enrolling in a custom arena
+      onStart(selectedArenaConfig || undefined).then(result => {
         if (!result.success && result.error) {
           console.error(result.error);
           setIsStarting(false);
           setCountdown(null);
+          setSelectedArenaConfig(null);
         }
       });
       return;
@@ -179,7 +191,7 @@ export function TournamentLobby({
     }, 1000);
     
     return () => clearTimeout(timer);
-  }, [countdown, onStart]);
+  }, [countdown, onStart, selectedArenaConfig]);
   
   // Estatísticas do jogador
   const playerStats = {
@@ -367,51 +379,62 @@ export function TournamentLobby({
         >
           <div className="flex items-center gap-2 mb-3">
             <Trophy className="w-4 h-4 text-yellow-400" />
-            <span className="text-sm font-medium text-white/80">Inscrições Abertas</span>
+            <span className="text-sm font-medium text-white/80">Arenas Abertas</span>
           </div>
           
           <div className="space-y-2">
-            {OPEN_REGISTRATIONS.map((reg) => (
-              <motion.div
-                key={reg.id}
-                whileHover={{ scale: 1.01 }}
-                className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-3"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-medium text-white">{reg.name}</div>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-white/50">
-                      <span><Users className="w-3 h-3 inline mr-1" />{reg.spotsLeft} vagas</span>
-                      <span><Timer className="w-3 h-3 inline mr-1" />Inicia em {reg.startsIn}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <div className="flex items-center justify-end gap-1 text-yellow-400">
-                        <Coins className="w-4 h-4" />
-                        <span className="font-bold">{reg.entryFee} K$</span>
+            {arenasLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="w-5 h-5 animate-spin text-white/50" />
+              </div>
+            ) : !openArenas || openArenas.length === 0 ? (
+              <div className="text-center py-4 text-sm text-white/40">
+                Nenhuma arena aberta no momento
+              </div>
+            ) : (
+              openArenas.map((arena) => {
+                const pool = calculateArenaPool(arena.buy_in, arena.rake_fee, arena.bot_count);
+                const canAffordArena = credits >= arena.buy_in;
+                
+                return (
+                  <motion.div
+                    key={arena.id}
+                    whileHover={{ scale: 1.01 }}
+                    className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-3"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium text-white flex items-center gap-2">
+                          {arena.creator_emoji} {arena.name}
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-white/50">
+                          <span><Users className="w-3 h-3 inline mr-1" />{arena.bot_count + 1} jogadores</span>
+                          <span>por {arena.creator_name}</span>
+                        </div>
                       </div>
-                      <div className="text-xs text-green-400 mt-1">Prêmio: {reg.prize} K$</div>
-                    </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <div className="flex items-center justify-end gap-1 text-yellow-400">
+                            <Coins className="w-4 h-4" />
+                            <span className="font-bold">{formatEnergy(arena.buy_in)}</span>
+                          </div>
+                          <div className="text-xs text-green-400 mt-1">Pool: {formatEnergy(pool)}</div>
+                        </div>
 
-                    {reg.entryFee === 100 ? (
-                      <Button
-                        size="sm"
-                        onClick={() => handleEnrollRegistration(reg)}
-                        disabled={credits < reg.entryFee || isStarting}
-                        className="h-9"
-                      >
-                        Inscrever
-                      </Button>
-                    ) : (
-                      <Button size="sm" variant="secondary" disabled className="h-9">
-                        Em breve
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            ))}
+                        <Button
+                          size="sm"
+                          onClick={() => handleEnrollArena(arena)}
+                          disabled={!canAffordArena || isStarting}
+                          className="h-9"
+                        >
+                          Jogar
+                        </Button>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })
+            )}
           </div>
         </motion.section>
         

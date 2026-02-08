@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect } from 'react';
 import { useTournament } from '@/hooks/useTournament';
+import type { ArenaConfig } from '@/components/tournament/TournamentLobby';
 import { useGame, UI_SYMBOLS } from '@/hooks/useGame';
 import { TournamentLobby } from '@/components/tournament/TournamentLobby';
 import { TournamentLeaderboard } from '@/components/tournament/TournamentLeaderboard';
@@ -36,8 +37,8 @@ export default function Tournament() {
   }, [game.state.status, game.state.attempts, game.state.score, game.state.timeRemaining, tournament.state.status, tournament.actions]);
   
   // Inicia torneio - passa código secreto do humano para o jogo
-  const handleStartTournament = useCallback(async () => {
-    const result = await tournament.actions.startTournament();
+  const handleStartTournament = useCallback(async (arenaConfig?: ArenaConfig) => {
+    const result = await tournament.actions.startTournament(arenaConfig);
     if (result.success && result.humanSecretCode) {
       game.actions.startGameWithSecret(result.humanSecretCode);
     }
