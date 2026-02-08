@@ -359,7 +359,11 @@ export function SkemaLobby({
               >
                 <Zap className="w-5 h-5 text-yellow-400" />
                 <span className="font-bold text-yellow-400">
-                  {(player.isKeeper || player.playerTier === 'guardiao') ? '∞' : `k$${player.energy.toFixed(2)}`}
+                  {player.energy >= 1000000 
+                    ? `k$${(player.energy / 1000000).toFixed(2)}M` 
+                    : player.energy >= 1000 
+                      ? `k$${(player.energy / 1000).toFixed(1)}k`
+                      : `k$${player.energy.toFixed(2)}`}
                 </span>
               </motion.div>
               
