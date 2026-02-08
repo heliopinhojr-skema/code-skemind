@@ -15,7 +15,7 @@ import { addCurrency, roundCurrency } from '@/lib/currencyUtils';
 
 // ==================== TIPOS ====================
 
-export type PlayerTier = 'master_admin' | 'guardiao' | 'grao_mestre' | 'mestre' | 'jogador';
+export type PlayerTier = 'master_admin' | 'Criador' | 'Grão Mestre' | 'Mestre' | 'Boom' | 'Ploft' | 'jogador' | 'guardiao' | 'grao_mestre' | 'mestre';
 
 export interface SkemaPlayer {
   id: string;
