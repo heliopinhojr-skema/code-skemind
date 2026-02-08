@@ -26,7 +26,7 @@ const TIER_CONFIG: Record<string, { label: string; icon: React.ReactNode; color:
   'Mestre': { label: 'Mestre', short: 'M', icon: <Swords className="h-3 w-3" />, color: 'text-blue-400 bg-blue-400/10 border-blue-400/30' },
   'Boom': { label: 'Boom', short: 'B', icon: <Rocket className="h-3 w-3" />, color: 'text-green-400 bg-green-400/10 border-green-400/30' },
   'Ploft': { label: 'Ploft', short: 'P', icon: <Gamepad2 className="h-3 w-3" />, color: 'text-muted-foreground bg-muted/30 border-border' },
-  'jogador': { label: 'Jogador', short: 'J', icon: <Gamepad2 className="h-3 w-3" />, color: 'text-muted-foreground bg-muted/30 border-border' },
+  'jogador': { label: 'Ploft', short: 'P', icon: <Gamepad2 className="h-3 w-3" />, color: 'text-muted-foreground bg-muted/30 border-border' },
 };
 
 function getTierConfig(tier: string | null) {
@@ -81,7 +81,8 @@ function TreeNode({ node, childrenMap, level, expandedNodes, toggleExpand }: Tre
   const tierBreakdown = useMemo(() => {
     const counts: Record<string, number> = {};
     allDescendants.forEach(d => {
-      const tier = d.player_tier || 'jogador';
+      // Normalize 'jogador' → 'Ploft' for display grouping
+      const tier = (d.player_tier === 'jogador' || !d.player_tier) ? 'Ploft' : d.player_tier;
       counts[tier] = (counts[tier] || 0) + 1;
     });
     return counts;
@@ -203,7 +204,8 @@ function TierSummary({ nodes }: { nodes: ReferralNode[] }) {
   const tierCounts = useMemo(() => {
     const counts: Record<string, { count: number; totalEnergy: number; totalLocked: number; totalAvailable: number; totalTransferred: number }> = {};
     nodes.forEach(n => {
-      const tier = n.player_tier || 'jogador';
+      // Normalize 'jogador' → 'Ploft' for display grouping
+      const tier = (n.player_tier === 'jogador' || !n.player_tier) ? 'Ploft' : n.player_tier;
       if (!counts[tier]) counts[tier] = { count: 0, totalEnergy: 0, totalLocked: 0, totalAvailable: 0, totalTransferred: 0 };
       const bal = calculateBalanceBreakdown(n.energy, n.player_tier, n.invites_sent);
       counts[tier].count++;
@@ -215,7 +217,8 @@ function TierSummary({ nodes }: { nodes: ReferralNode[] }) {
     return counts;
   }, [nodes]);
 
-  const tierOrder = ['master_admin', 'Criador', 'Grão Mestre', 'Mestre', 'Boom', 'Ploft', 'jogador'];
+  // 'jogador' is already merged into 'Ploft' above, so no separate entry needed
+  const tierOrder = ['master_admin', 'Criador', 'Grão Mestre', 'Mestre', 'Boom', 'Ploft'];
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2 mb-4">
