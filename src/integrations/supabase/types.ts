@@ -274,6 +274,7 @@ export type Database = {
         Args: { p_amount: number; p_player_id: string }
         Returns: undefined
       }
+      validate_invite_code: { Args: { p_code: string }; Returns: Json }
     }
     Enums: {
       app_role:

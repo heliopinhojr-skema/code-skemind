@@ -422,7 +422,7 @@ export default function Auth() {
       return;
     }
     
-    const result = data as {
+    const result = data as unknown as {
       valid: boolean;
       inviter_id: string | null;
       inviter_name: string | null;
@@ -510,10 +510,9 @@ export default function Auth() {
       }
       
       // 3. Save PIN in profile for reference
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await supabase
         .from('profiles')
-        .update({ pin } as any)
+        .update({ pin })
         .eq('user_id', authData.user.id);
       
       // 4. Save nickname for auto-fill on next login
