@@ -234,16 +234,21 @@ export default function Skema() {
   // Tabela completa em src/lib/arenaPayouts.ts
   // 1º: k$13.50, 2º: k$8.00, 3º: k$5.00, ..., 25º: k$0.55 (min-cash)
   
-  const handleStartBotRace = async (buyIn: number, fee: number): Promise<{ success: boolean; error?: string }> => {
+  const handleStartBotRace = async (buyIn: number, fee: number, botCount?: number): Promise<{ success: boolean; error?: string }> => {
     console.log('[SKEMA ARENA] 🎮 Iniciando Arena x Bots...');
     console.log('[SKEMA ARENA] Saldo atual:', skemaPlayer.player!.energy);
-    console.log('[SKEMA ARENA] Buy-in:', buyIn, 'Fee:', fee);
+    console.log('[SKEMA ARENA] Buy-in:', buyIn, 'Fee:', fee, 'Bots:', botCount ?? 99);
     
     setGameMode('bots');
     setCurrentView('bots');
     
+    // Build arena config for custom arenas
+    const arenaConfig = botCount !== undefined
+      ? { buyIn, rakeFee: fee, botCount }
+      : undefined;
+    
     // Edge Function handles ALL economy: player debit, bot treasury debit, skema box rake
-    const result = await tournament.actions.startTournament();
+    const result = await tournament.actions.startTournament(arenaConfig);
     console.log('[SKEMA ARENA] Torneio iniciado:', result);
     
     if (result.success && result.humanSecretCode) {
