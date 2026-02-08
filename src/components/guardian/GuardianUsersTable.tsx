@@ -13,7 +13,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { usePlayersList, useReferralTree } from '@/hooks/useGuardianData';
+import { usePlayersList, useReferralTree, useIsMasterAdmin } from '@/hooks/useGuardianData';
 import { PlayerDetailDrawer } from './PlayerDetailDrawer';
 import { Search, Users, Shield, Crown, Swords, Gamepad2, Zap, Rocket, Star, Lock, Unlock } from 'lucide-react';
 import { format } from 'date-fns';
@@ -75,6 +75,7 @@ function getTierConfig(tier: string | null) {
 export function GuardianUsersTable() {
   const { data: players, isLoading, error } = usePlayersList();
   const { data: referralNodes } = useReferralTree();
+  const { data: isMasterAdmin } = useIsMasterAdmin();
   const [search, setSearch] = useState('');
   const [tierFilter, setTierFilter] = useState('all');
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
@@ -309,6 +310,7 @@ export function GuardianUsersTable() {
       open={drawerOpen}
       onOpenChange={setDrawerOpen}
       allNodes={referralNodes || []}
+      isMasterAdmin={isMasterAdmin === true}
     />
     </>
   );
