@@ -154,16 +154,18 @@ export function useSkemaBox() {
 }
 
 function getDefaultDescription(type: string, amount: number): string {
+  // Format amount safely from cents
+  const formatted = (Math.round(Math.abs(amount) * 100) / 100).toFixed(2);
   switch (type) {
     case 'arena_rake':
-      return `Arena x Bots: rake de 10 jogadores (k$${Math.abs(amount).toFixed(2)})`;
+      return `Arena x Bots: rake de 100 jogadores (k$${formatted})`;
     case 'official_rake':
-      return `Corrida Oficial: taxa de inscrição (k$${Math.abs(amount).toFixed(2)})`;
+      return `Corrida Oficial: taxa de inscrição (k$${formatted})`;
     case 'official_refund':
-      return `Corrida Oficial: devolução de taxa (k$${Math.abs(amount).toFixed(2)})`;
+      return `Corrida Oficial: devolução de taxa (k$${formatted})`;
     case 'party_rake':
-      return `Modo Festa: rake do torneio (k$${Math.abs(amount).toFixed(2)})`;
+      return `Modo Festa: rake do torneio (k$${formatted})`;
     default:
-      return `Transação: k$${amount.toFixed(2)}`;
+      return `Transação: k$${formatted}`;
   }
 }

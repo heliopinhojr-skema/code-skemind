@@ -169,7 +169,7 @@ export function SkemaLobby({
   );
 
   // Espera corrida carregar para mostrar lobby completo
-  const canAffordOfficial = officialRace.isLoaded ? player.energy >= officialRace.constants.entryFee : false;
+  const canAffordOfficial = officialRace.isLoaded ? Math.round(player.energy * 100) >= Math.round(officialRace.constants.entryFee * 100) : false;
   const isPlayerRegisteredInRace = officialRace.race ? officialRace.actions.isPlayerRegistered(player.id) : false;
 
   const handleSelectMode = useCallback((mode: GameMode) => {
@@ -177,9 +177,10 @@ export function SkemaLobby({
     setError(null);
   }, []);
 
-  // Constantes do Arena x Bots
-  const ARENA_ENTRY_FEE = 0.55; // Total: 0.50 pool + 0.05 rake
-  const canAffordArena = player.energy >= ARENA_ENTRY_FEE;
+  // Constantes do Arena x Bots (centavos → k$)
+  const ARENA_ENTRY_FEE_CENTS = 55; // 50 pool + 5 rake
+  const ARENA_ENTRY_FEE = ARENA_ENTRY_FEE_CENTS / 100; // 0.55
+  const canAffordArena = Math.round(player.energy * 100) >= ARENA_ENTRY_FEE_CENTS;
 
   const handleStartCountdown = useCallback(() => {
     if (isStarting) return;
@@ -224,8 +225,8 @@ export function SkemaLobby({
       if (selectedMode === 'training') {
         onStartTraining();
       } else if (selectedMode === 'bots') {
-        // Arena x Bots: k$0.50 pool + k$0.05 rake
-        const result = onStartBotRace(0.50, 0.05);
+        // Arena x Bots: 50 cents pool + 5 cents rake (derivado de inteiros)
+        const result = onStartBotRace(50 / 100, 5 / 100);
         if (!result.success) {
           setError(result.error || 'Erro ao iniciar');
           setIsStarting(false);
@@ -708,14 +709,20 @@ export function SkemaLobby({
                   {/* Botão de inscrição / cancelamento */}
                   {!isPlayerRegisteredInRace ? (
                     <Button
-                      onClick={() => {
+                      onClick={async () => {
                         if (!canAffordOfficial) {
                           setError('Energia insuficiente para inscrição');
                           return;
                         }
                         
+                        // Converte para centavos para aritmética segura
+                        const entryFeeCents = Math.round(officialRace.constants.entryFee * 100);
+                        const skemaBoxFeeCents = Math.round(officialRace.constants.skemaBoxFee * 100);
+                        const entryFee = entryFeeCents / 100;
+                        const skemaBoxFee = skemaBoxFeeCents / 100;
+                        
                         // Deduz energia PRIMEIRO
-                        const deducted = onDeductEnergy(officialRace.constants.entryFee);
+                        const deducted = onDeductEnergy(entryFee);
                         if (!deducted) {
                           setError('Falha ao deduzir energia');
                           return;
@@ -728,13 +735,15 @@ export function SkemaLobby({
                         });
                         if (!result.success) {
                           // Se falhou inscrição, devolve energia
-                          onAddEnergy(officialRace.constants.entryFee);
+                          onAddEnergy(entryFee);
                           setError(result.error || 'Erro ao inscrever');
                         } else {
                           // INSCRIÇÃO OK: credita rake no Skema Box (Cloud)
-                          skemaBox.addToBox(officialRace.constants.skemaBoxFee, 'official_rake').then(newBal => {
-                            console.log(`[OFFICIAL] 💰 Rake Cloud k$${officialRace.constants.skemaBoxFee.toFixed(2)} → Skema Box: k$${(newBal ?? 0).toFixed(2)}`);
-                          });
+                          const newBal = await skemaBox.addToBox(skemaBoxFee, 'official_rake');
+                          console.log(`[OFFICIAL] 💰 Rake Cloud k$${skemaBoxFee.toFixed(2)} → Skema Box: k$${(newBal ?? 0).toFixed(2)}`);
+                          if (newBal === null) {
+                            console.error('[OFFICIAL] ❌ Falha ao creditar rake no Skema Box!');
+                          }
                         }
                       }}
                       disabled={!canAffordOfficial}
@@ -742,7 +751,7 @@ export function SkemaLobby({
                       variant="default"
                     >
                       <UserCheck className="w-4 h-4 mr-2" />
-                      Inscrever-se (k${officialRace.constants.entryFee.toFixed(2)})
+                      Inscrever-se (k${(Math.round(officialRace.constants.entryFee * 100) / 100).toFixed(2)})
                     </Button>
                   ) : (
                     <div className="space-y-2">
@@ -751,15 +760,18 @@ export function SkemaLobby({
                         <span className="font-medium">Você está inscrito!</span>
                       </div>
                       <Button
-                        onClick={() => {
+                        onClick={async () => {
+                          // Centavos para aritmética segura
+                          const entryFee = Math.round(officialRace.constants.entryFee * 100) / 100;
+                          const skemaBoxFee = Math.round(officialRace.constants.skemaBoxFee * 100) / 100;
+                          
                           const result = officialRace.actions.unregisterPlayer(player.id);
                           if (result.success) {
                             // Devolve energia ao jogador
-                            onAddEnergy(officialRace.constants.entryFee);
+                            onAddEnergy(entryFee);
                             // Remove rake do Skema Box (Cloud)
-                            skemaBox.subtractFromBox(officialRace.constants.skemaBoxFee, 'official_refund').then(newBal => {
-                              console.log(`[OFFICIAL] ↩️ Rake Cloud devolvido → Skema Box: k$${(newBal ?? 0).toFixed(2)}`);
-                            });
+                            const newBal = await skemaBox.subtractFromBox(skemaBoxFee, 'official_refund');
+                            console.log(`[OFFICIAL] ↩️ Rake Cloud devolvido k$${skemaBoxFee.toFixed(2)} → Skema Box: k$${(newBal ?? 0).toFixed(2)}`);
                             setError(null);
                           } else {
                             setError(result.error || 'Erro ao cancelar inscrição');
@@ -768,7 +780,7 @@ export function SkemaLobby({
                         variant="outline"
                         className="w-full text-red-400 border-red-500/30 hover:bg-red-500/10"
                       >
-                        Cancelar Inscrição (+k${officialRace.constants.entryFee.toFixed(2)})
+                        Cancelar Inscrição (+k${(Math.round(officialRace.constants.entryFee * 100) / 100).toFixed(2)})
                       </Button>
                     </div>
                   )}

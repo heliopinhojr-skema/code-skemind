@@ -3,6 +3,9 @@
  * 
  * Corrida fixa: 03/03/2026 às 12:00 (horário local)
  * Entry: k$1.10 (k$1 prêmio + k$0.10 caixa skema)
+ * 
+ * IMPORTANTE: Todos os valores monetários usam aritmética em centavos
+ * para evitar erros de floating-point.
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -38,9 +41,17 @@ const REGISTRATIONS_KEY = 'skema_race_registrations';
 
 // Corrida fixa - 03/03/2026 às 12:00
 const FIXED_RACE_DATE = new Date('2026-03-03T12:00:00');
-const ENTRY_FEE = 1.10;
-const PRIZE_PER_PLAYER = 1.00;
-const SKEMA_BOX_FEE = 0.10;
+
+// Valores em CENTAVOS para evitar floating-point
+const ENTRY_FEE_CENTS = 110;        // k$1.10
+const PRIZE_PER_PLAYER_CENTS = 100; // k$1.00
+const SKEMA_BOX_FEE_CENTS = 10;     // k$0.10
+
+// Valores em k$ derivados de centavos (sem float drift)
+const ENTRY_FEE = ENTRY_FEE_CENTS / 100;               // 1.1
+const PRIZE_PER_PLAYER = PRIZE_PER_PLAYER_CENTS / 100;  // 1
+const SKEMA_BOX_FEE = SKEMA_BOX_FEE_CENTS / 100;       // 0.1
+
 const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 16;
 
