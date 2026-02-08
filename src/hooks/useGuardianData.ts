@@ -13,6 +13,7 @@ export interface DashboardStats {
   skemaBoxBalance: number;
   totalReferrals: number;
   creditedReferrals: number;
+  totalDistributed: number;
   totalRaces: number;
 }
 
@@ -150,15 +151,16 @@ export function useDashboardStats() {
         console.error('Skema box error:', skemaBoxError);
       }
       
-      // Buscar referrals
+      // Buscar referrals com amounts
       const { data: referrals, error: referralsError } = await supabase
         .from('referrals')
-        .select('reward_credited');
+        .select('reward_credited, reward_amount');
       
       if (referralsError) throw referralsError;
       
       const totalReferrals = referrals?.length || 0;
       const creditedReferrals = referrals?.filter(r => r.reward_credited).length || 0;
+      const totalDistributed = referrals?.reduce((sum, r) => sum + (Number(r.reward_amount) || 0), 0) || 0;
       
       // Buscar corridas
       const { data: races, error: racesError } = await supabase
@@ -173,6 +175,7 @@ export function useDashboardStats() {
         skemaBoxBalance: Number(skemaBox?.balance) || 0,
         totalReferrals,
         creditedReferrals,
+        totalDistributed,
         totalRaces: races?.length || 0,
       } as DashboardStats;
     },
