@@ -1,5 +1,6 @@
 /**
  * GuardianDashboard - Dashboard com métricas gerais da plataforma
+ * Cards clicáveis para navegar entre tabs
  */
 
 import { useState } from 'react';
@@ -8,10 +9,15 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDashboardStats } from '@/hooks/useGuardianData';
 import { useSupabasePlayer } from '@/hooks/useSupabasePlayer';
-import { Users, Zap, Box, Gift, Trophy, TrendingUp, Copy, Check, Share2, Link } from 'lucide-react';
+import { Users, Zap, Box, Gift, Trophy, TrendingUp, Copy, Check, Share2, Link, ArrowDownRight } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
-export function GuardianDashboard() {
+interface GuardianDashboardProps {
+  onNavigateTab?: (tab: string) => void;
+}
+
+export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
   const { data: stats, isLoading, error } = useDashboardStats();
   const { player } = useSupabasePlayer();
   const [copied, setCopied] = useState<'code' | 'link' | null>(null);
@@ -45,37 +51,60 @@ export function GuardianDashboard() {
       value: stats?.totalPlayers || 0,
       icon: Users,
       format: (v: number) => v.toString(),
+      tab: 'users',
+      clickable: true,
     },
     {
       title: 'Energia Circulando',
       value: stats?.totalEnergy || 0,
       icon: Zap,
-      format: (v: number) => `k$${v.toFixed(2)}`,
+      format: (v: number) => {
+        if (v >= 1000000) return `k$${(v / 1000000).toFixed(2)}M`;
+        if (v >= 1000) return `k$${(v / 1000).toFixed(1)}k`;
+        return `k$${v.toFixed(2)}`;
+      },
+      subtitle: 'Soma de todos jogadores (excl. HX)',
+      tab: 'users',
+      clickable: true,
     },
     {
       title: 'Skema Box',
       value: stats?.skemaBoxBalance || 0,
       icon: Box,
       format: (v: number) => `k$${v.toFixed(2)}`,
+      subtitle: 'Rake acumulado de corridas',
+      tab: 'skemabox',
+      clickable: true,
     },
     {
       title: 'Convites',
       value: stats?.totalReferrals || 0,
-      subtitle: `${stats?.creditedReferrals || 0} creditados`,
+      subtitle: `${stats?.creditedReferrals || 0} aceitos`,
       icon: Gift,
       format: (v: number) => v.toString(),
+      tab: 'referrals',
+      clickable: true,
+    },
+    {
+      title: 'Distribuído',
+      value: stats?.totalDistributed || 0,
+      icon: ArrowDownRight,
+      format: (v: number) => {
+        if (v >= 1000000) return `k$${(v / 1000000).toFixed(2)}M`;
+        if (v >= 1000) return `k$${(v / 1000).toFixed(1)}k`;
+        return `k$${v.toFixed(2)}`;
+      },
+      subtitle: 'k$ transferido via convites',
+      tab: 'referrals',
+      clickable: true,
     },
     {
       title: 'Corridas',
       value: stats?.totalRaces || 0,
       icon: Trophy,
       format: (v: number) => v.toString(),
-    },
-    {
-      title: 'Taxa de Conversão',
-      value: stats?.totalReferrals ? ((stats?.creditedReferrals || 0) / stats.totalReferrals * 100) : 0,
-      icon: TrendingUp,
-      format: (v: number) => `${v.toFixed(1)}%`,
+      tab: 'races',
+      clickable: true,
     },
   ];
 
@@ -148,7 +177,14 @@ export function GuardianDashboard() {
       
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {metrics.map((metric) => (
-          <Card key={metric.title} className="bg-card/90 backdrop-blur-sm border-border/60">
+          <Card 
+            key={metric.title} 
+            className={cn(
+              "bg-card/90 backdrop-blur-sm border-border/60 transition-all",
+              metric.clickable && onNavigateTab && "cursor-pointer hover:border-primary/40 hover:bg-card/95 hover:scale-[1.02]"
+            )}
+            onClick={() => metric.clickable && onNavigateTab?.(metric.tab)}
+          >
             <CardHeader className="pb-2">
               <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-2">
                 <metric.icon className="h-4 w-4" />

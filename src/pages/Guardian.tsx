@@ -132,7 +132,7 @@ export default function Guardian() {
             </TabsList>
 
             <TabsContent value="dashboard" className="space-y-6">
-              <GuardianDashboard />
+              <GuardianDashboard onNavigateTab={setActiveTab} />
             </TabsContent>
 
             <TabsContent value="users" className="space-y-6">
