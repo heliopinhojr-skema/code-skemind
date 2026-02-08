@@ -390,6 +390,10 @@ export type Database = {
         Args: { p_amount: number; p_player_id: string }
         Returns: undefined
       }
+      update_skema_box: {
+        Args: { p_amount: number; p_description?: string; p_type: string }
+        Returns: number
+      }
       validate_invite_code: { Args: { p_code: string }; Returns: Json }
     }
     Enums: {

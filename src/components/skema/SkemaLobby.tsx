@@ -23,7 +23,6 @@ import { RegisteredPlayersPanel } from './RegisteredPlayersPanel';
 import { ReferralHistoryPanel } from './ReferralHistoryPanel';
 import { OnlinePlayersPanel } from './OnlinePlayersPanel';
 import universeBg from '@/assets/universe-bg.jpg';
-import { addToSkemaBox, subtractFromSkemaBox, getSkemaBoxBalance, setSkemaBoxBalance, getSkemaBoxTransactions, clearSkemaBoxTransactions, SkemaBoxTransaction } from '@/lib/currencyUtils';
 
 // Type for online presence passed from parent
 interface OnlinePresenceData {
@@ -31,6 +30,16 @@ interface OnlinePresenceData {
   isConnected: boolean;
   updateStatus: (status: 'online' | 'playing' | 'away') => void;
   onlineCount: number;
+}
+
+// Type for Skema Box Cloud hook
+interface SkemaBoxData {
+  balance: number;
+  isLoading: boolean;
+  addToBox: (amount: number, type: 'arena_rake' | 'official_rake' | 'party_rake', description?: string) => Promise<number | null>;
+  subtractFromBox: (amount: number, type: 'official_refund' | 'adjustment', description?: string) => Promise<number | null>;
+  resetBalance: () => Promise<boolean>;
+  refreshBalance: () => Promise<void>;
 }
 
 interface SkemaLobbyProps {
@@ -49,6 +58,7 @@ interface SkemaLobbyProps {
   onlinePresence: OnlinePresenceData;
   onProcessReferralRewards: () => Promise<{ processed: number; total_reward: number }>;
   onRefreshProfile: () => void;
+  skemaBox: SkemaBoxData;
 }
 
 type GameMode = 'training' | 'bots' | 'official' | 'party';
@@ -136,6 +146,7 @@ export function SkemaLobby({
   onlinePresence,
   onProcessReferralRewards,
   onRefreshProfile,
+  skemaBox,
 }: SkemaLobbyProps) {
   const officialRace = useOfficialRace();
   const { onlinePlayers, isConnected, updateStatus, onlineCount } = onlinePresence;
@@ -145,30 +156,6 @@ export function SkemaLobby({
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  // Skema Box state
-  const [skemaBoxBalanceState, setSkemaBoxBalanceState] = useState(0);
-  const [showTransactions, setShowTransactions] = useState(false);
-  const [transactions, setTransactions] = useState<SkemaBoxTransaction[]>([]);
-  
-  // Função para atualizar saldo do Skema Box (usa helper seguro)
-  const refreshSkemaBoxBalance = useCallback(() => {
-    const newBalance = getSkemaBoxBalance();
-    setSkemaBoxBalanceState(newBalance);
-    setTransactions(getSkemaBoxTransactions());
-    console.log('[SKEMA BOX] 📦 Saldo atualizado:', newBalance);
-  }, []);
-  
-  // Atualiza o saldo do Skema Box:
-  // 1. Quando o componente monta (lobby carrega)
-  // 2. Quando a janela ganha foco (volta de outra aba)
-  // 3. Quando player muda (re-render após voltar de corrida)
-  useEffect(() => {
-    refreshSkemaBoxBalance();
-    
-    window.addEventListener('focus', refreshSkemaBoxBalance);
-    return () => window.removeEventListener('focus', refreshSkemaBoxBalance);
-  }, [refreshSkemaBoxBalance, player]);
 
   // Estrelas animadas
   const stars = useMemo(() => 
@@ -425,97 +412,18 @@ export function SkemaLobby({
               </div>
               <div className="text-xs text-white/50">Melhor</div>
             </div>
-            {/* Skema Box - só Guardian vê */}
-            {player.id === 'guardian-skema-universe' && (
+            {/* Skema Box - só master_admin vê */}
+            {player.playerTier === 'master_admin' && (
               <div 
                 className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-lg p-2 text-center border border-yellow-500/30 cursor-pointer hover:border-yellow-500/50 transition-colors"
-                onClick={() => setShowTransactions(!showTransactions)}
-                title="Clique para ver extrato"
+                title="Skema Box (Cloud)"
               >
-                <div className="text-lg font-bold text-yellow-400">k${skemaBoxBalanceState.toFixed(2)}</div>
+                <div className="text-lg font-bold text-yellow-400">k${skemaBox.balance.toFixed(2)}</div>
                 <div className="text-xs text-yellow-400/70">Skema Box</div>
               </div>
             )}
           </div>
         </motion.header>
-
-        {/* Painel de Extrato do Skema Box - só Guardian */}
-        <AnimatePresence>
-          {showTransactions && player.id === 'guardian-skema-universe' && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mx-4 mt-2 bg-gradient-to-br from-yellow-900/30 to-orange-900/30 border border-yellow-500/30 rounded-xl overflow-hidden"
-            >
-              <div className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-bold text-yellow-400">📦 Extrato Skema Box</h3>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        if (confirm('Limpar histórico de transações?')) {
-                          clearSkemaBoxTransactions();
-                          refreshSkemaBoxBalance();
-                        }
-                      }}
-                      className="text-xs text-white/50 hover:text-white"
-                    >
-                      Limpar Log
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => {
-                        if (confirm('Zerar o saldo do Skema Box?')) {
-                          setSkemaBoxBalance(0, 'reset');
-                          refreshSkemaBoxBalance();
-                        }
-                      }}
-                      className="text-xs"
-                    >
-                      Zerar Saldo
-                    </Button>
-                  </div>
-                </div>
-                
-                <div className="text-2xl font-bold text-yellow-400 mb-4">
-                  Saldo: k${skemaBoxBalanceState.toFixed(2)}
-                </div>
-                
-                {transactions.length === 0 ? (
-                  <div className="text-sm text-white/40 italic text-center py-4">
-                    Nenhuma transação registrada
-                  </div>
-                ) : (
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {transactions.map((tx) => (
-                      <div 
-                        key={tx.id}
-                        className="flex items-center justify-between p-2 bg-black/30 rounded-lg text-sm"
-                      >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className={tx.amount >= 0 ? 'text-green-400' : 'text-red-400'}>
-                              {tx.amount >= 0 ? '+' : ''}{tx.amount.toFixed(2)}
-                            </span>
-                            <span className="text-white/40 text-xs">→ k${tx.balanceAfter.toFixed(2)}</span>
-                          </div>
-                          <div className="text-xs text-white/50 truncate">{tx.description}</div>
-                        </div>
-                        <div className="text-xs text-white/30 ml-2">
-                          {new Date(tx.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* Conteúdo rolável */}
         <div className="flex-1 overflow-y-auto pb-28">
@@ -822,10 +730,10 @@ export function SkemaLobby({
                           onAddEnergy(officialRace.constants.entryFee);
                           setError(result.error || 'Erro ao inscrever');
                         } else {
-                          // INSCRIÇÃO OK: credita rake no Skema Box
-                          const newBox = addToSkemaBox(officialRace.constants.skemaBoxFee, 'official_rake');
-                          console.log(`[OFFICIAL] 💰 Rake k$${officialRace.constants.skemaBoxFee.toFixed(2)} → Skema Box: k$${newBox.toFixed(2)}`);
-                          refreshSkemaBoxBalance();
+                          // INSCRIÇÃO OK: credita rake no Skema Box (Cloud)
+                          skemaBox.addToBox(officialRace.constants.skemaBoxFee, 'official_rake').then(newBal => {
+                            console.log(`[OFFICIAL] 💰 Rake Cloud k$${officialRace.constants.skemaBoxFee.toFixed(2)} → Skema Box: k$${(newBal ?? 0).toFixed(2)}`);
+                          });
                         }
                       }}
                       disabled={!canAffordOfficial}
@@ -847,10 +755,10 @@ export function SkemaLobby({
                           if (result.success) {
                             // Devolve energia ao jogador
                             onAddEnergy(officialRace.constants.entryFee);
-                            // Remove rake do Skema Box
-                            const newBox = subtractFromSkemaBox(officialRace.constants.skemaBoxFee, 'official_refund');
-                            console.log(`[OFFICIAL] ↩️ Rake devolvido → Skema Box: k$${newBox.toFixed(2)}`);
-                            refreshSkemaBoxBalance();
+                            // Remove rake do Skema Box (Cloud)
+                            skemaBox.subtractFromBox(officialRace.constants.skemaBoxFee, 'official_refund').then(newBal => {
+                              console.log(`[OFFICIAL] ↩️ Rake Cloud devolvido → Skema Box: k$${(newBal ?? 0).toFixed(2)}`);
+                            });
                             setError(null);
                           } else {
                             setError(result.error || 'Erro ao cancelar inscrição');
