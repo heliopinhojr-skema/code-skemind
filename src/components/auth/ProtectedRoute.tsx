@@ -9,9 +9,8 @@ import { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Session } from '@supabase/supabase-js';
-import { Database } from '@/integrations/supabase/types';
 
-type AppRole = Database['public']['Enums']['app_role'];
+type AppRole = 'master_admin' | 'guardiao' | 'grao_mestre' | 'mestre' | 'jogador';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -59,7 +58,7 @@ export function ProtectedRoute({ children, requireRole, playerOnly }: ProtectedR
       }
 
       // Check if user is master_admin (only /guardian access)
-      const { data: isGuardianAdmin, error: guardianError } = await supabase.rpc('has_role', {
+      const { data: isGuardianAdmin, error: guardianError } = await (supabase.rpc as any)('has_role', {
         _user_id: session.user.id,
         _role: 'master_admin'
       });
@@ -69,7 +68,7 @@ export function ProtectedRoute({ children, requireRole, playerOnly }: ProtectedR
       }
 
       // Check if user is guardiao (guardian that plays - normal lobby access)
-      const { data: isGuardiaoRole, error: guardiaoError } = await supabase.rpc('has_role', {
+      const { data: isGuardiaoRole, error: guardiaoError } = await (supabase.rpc as any)('has_role', {
         _user_id: session.user.id,
         _role: 'guardiao'
       });
@@ -91,7 +90,7 @@ export function ProtectedRoute({ children, requireRole, playerOnly }: ProtectedR
         setHasRequiredRole(isGuardianMasterAdmin);
       } else if (requireRole) {
         // Check other specific roles
-        const { data, error } = await supabase.rpc('has_role', {
+        const { data, error } = await (supabase.rpc as any)('has_role', {
           _user_id: session.user.id,
           _role: requireRole
         });
