@@ -118,6 +118,30 @@ export type Database = {
           },
         ]
       }
+      bot_treasury: {
+        Row: {
+          balance: number
+          balance_per_bot: number
+          bot_count: number
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          balance?: number
+          balance_per_bot?: number
+          bot_count?: number
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          balance?: number
+          balance_per_bot?: number
+          bot_count?: number
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       game_history: {
         Row: {
           attempts: number
@@ -547,6 +571,10 @@ export type Database = {
           p_target_user_id: string
         }
         Returns: undefined
+      }
+      update_bot_treasury: {
+        Args: { p_amount: number; p_description?: string }
+        Returns: number
       }
       update_player_energy: {
         Args: { p_amount: number; p_player_id: string }
