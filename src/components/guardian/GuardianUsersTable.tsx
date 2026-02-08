@@ -51,7 +51,7 @@ const TIER_CONFIG: Record<string, { label: string; icon: React.ReactNode; color:
     color: 'text-muted-foreground bg-muted/30 border-border' 
   },
   'jogador': { 
-    label: 'Jogador', 
+    label: 'Ploft', 
     icon: <Gamepad2 className="h-3 w-3" />, 
     color: 'text-muted-foreground bg-muted/30 border-border' 
   },
@@ -92,7 +92,11 @@ export function GuardianUsersTable() {
     
     // Filter by tier
     if (tierFilter !== 'all') {
-      filtered = filtered.filter(p => p.player_tier === tierFilter);
+      // Match both display tier and legacy 'jogador' when filtering for Ploft
+      filtered = filtered.filter(p => {
+        const normalizedTier = (p.player_tier === 'jogador' || !p.player_tier) ? 'Ploft' : p.player_tier;
+        return normalizedTier === tierFilter;
+      });
     }
     
     // Filter by search
@@ -113,7 +117,8 @@ export function GuardianUsersTable() {
     if (!players) return {};
     const counts: Record<string, number> = {};
     players.forEach(p => {
-      const tier = p.player_tier || 'jogador';
+      // Normalize 'jogador' → 'Ploft' for display grouping
+      const tier = (p.player_tier === 'jogador' || !p.player_tier) ? 'Ploft' : p.player_tier;
       counts[tier] = (counts[tier] || 0) + 1;
     });
     return counts;
