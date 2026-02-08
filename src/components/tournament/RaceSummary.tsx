@@ -13,7 +13,7 @@ import { Trophy, Target, Clock, Star, Users, TrendingUp, Medal, Zap, DollarSign 
 import { Symbol } from '@/components/game/Symbol';
 import type { TournamentPlayer, TournamentResult } from '@/hooks/useTournament';
 import type { GameSymbol } from '@/hooks/useGame';
-import { isITM, ITM_POSITIONS, getArenaPrize } from '@/lib/arenaPayouts';
+import { isITM, ITM_POSITIONS, getScaledArenaPrize } from '@/lib/arenaPayouts';
 
 interface RaceSummaryProps {
   humanResult: TournamentResult;
@@ -23,6 +23,7 @@ interface RaceSummaryProps {
   symbolsById: Map<string, GameSymbol>;
   prizeAmount: number;
   totalPlayers: number;
+  arenaPool?: number;
 }
 
 export function RaceSummary({
@@ -33,6 +34,7 @@ export function RaceSummary({
   symbolsById,
   prizeAmount,
   totalPlayers,
+  arenaPool = 50,
 }: RaceSummaryProps) {
   const didWin = humanResult.status === 'won';
   const rank = humanResult.rank;
@@ -191,7 +193,7 @@ export function RaceSummary({
             const player = players.find(p => p.id === result.playerId);
             const isHuman = result.playerId === humanResult.playerId;
             const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
-            const prize = getArenaPrize(result.rank);
+            const prize = getScaledArenaPrize(result.rank, arenaPool);
             
             return (
               <motion.div
