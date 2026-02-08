@@ -262,7 +262,7 @@ export function useSupabasePlayer() {
 
   // ==================== VALIDATE INVITE CODE ====================
 
-  const validateInviteCode = useCallback(async (code: string): Promise<{ valid: boolean; inviterId: string | null; inviterName?: string }> => {
+  const validateInviteCode = useCallback(async (code: string): Promise<{ valid: boolean; inviterId: string | null; inviterName?: string; reason?: string }> => {
     const upperCode = code.toUpperCase().trim();
     
     // Master codes
@@ -270,25 +270,32 @@ export function useSupabasePlayer() {
       return { valid: true, inviterId: null, inviterName: 'SKEMA' };
     }
     
-    // Check format SK + 6 chars
-    const validCodePattern = /^SK[A-Z0-9]{6}$/;
-    if (!validCodePattern.test(upperCode)) {
+    // Validate via RPC (checks invite_codes table + legacy profile codes)
+    try {
+      const { data, error } = await supabase.rpc('validate_invite_code', { p_code: upperCode });
+      
+      if (error) {
+        console.error('[SUPABASE] Validate invite code error:', error);
+        return { valid: false, inviterId: null };
+      }
+      
+      const result = data as unknown as { 
+        valid: boolean; 
+        inviter_id: string | null; 
+        inviter_name: string | null; 
+        reason?: string;
+      };
+      
+      return { 
+        valid: result.valid, 
+        inviterId: result.inviter_id || null, 
+        inviterName: result.inviter_name || undefined,
+        reason: result.reason,
+      };
+    } catch (e) {
+      console.error('[SUPABASE] Validate error:', e);
       return { valid: false, inviterId: null };
     }
-    
-    // Look up in database
-    const { data: inviter } = await supabase
-      .from('profiles')
-      .select('id, name')
-      .eq('invite_code', upperCode)
-      .maybeSingle();
-    
-    if (inviter) {
-      return { valid: true, inviterId: inviter.id, inviterName: inviter.name };
-    }
-    
-    // Accept valid format even if not found (might be new)
-    return { valid: true, inviterId: null, inviterName: 'Jogador SKEMA' };
   }, []);
 
   // ==================== REGISTER (uses Auth page now) ====================
