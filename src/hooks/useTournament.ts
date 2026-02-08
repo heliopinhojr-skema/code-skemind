@@ -10,6 +10,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { generateSecret, CODE_LENGTH, MAX_ATTEMPTS } from '@/lib/mastermindEngine';
 import { createBot, simulateBotGame } from '@/lib/botAI';
 import { UI_SYMBOLS, GAME_DURATION } from './useGame';
+import { getArenaPrize, isITM, ITM_POSITIONS } from '@/lib/arenaPayouts';
 
 // ==================== TIPOS ====================
 
@@ -41,7 +42,7 @@ export const TOURNAMENT_ENTRY_FEE = 100;
 export const TOURNAMENT_PLAYERS = 100;
 export const BOT_COUNT = 99;
 
-const PRIZE_DISTRIBUTION = [0.50, 0.30, 0.20];
+// Payout table now in src/lib/arenaPayouts.ts (25 ITM positions, poker-style)
 
 // ==================== HOOK ====================
 
@@ -247,16 +248,15 @@ export function useTournament() {
       return next;
     });
     
-    const prizePool = TOURNAMENT_ENTRY_FEE * TOURNAMENT_PLAYERS;
-    
     setStatus('finished');
     
+    // Prize distribution via arenaPayouts (25 ITM positions)
     setTimeout(() => {
       setResults(prev => {
         const humanResult = prev.get(humanPlayerId);
-        if (humanResult && humanResult.rank <= PRIZE_DISTRIBUTION.length) {
-          const prize = Math.floor(prizePool * PRIZE_DISTRIBUTION[humanResult.rank - 1]);
-          setCredits(c => c + prize);
+        if (humanResult && isITM(humanResult.rank)) {
+          const prizeCents = Math.round(getArenaPrize(humanResult.rank) * 100);
+          setCredits(c => c + prizeCents);
         }
         return prev;
       });

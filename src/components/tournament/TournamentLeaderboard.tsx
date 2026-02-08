@@ -6,10 +6,11 @@
  */
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, Clock, Target, Loader2, Crown, Eye } from 'lucide-react';
+import { Trophy, Clock, Target, Loader2, Crown, Eye, DollarSign } from 'lucide-react';
 import { TournamentPlayer, TournamentResult } from '@/hooks/useTournament';
 import { Symbol } from '@/components/game/Symbol';
 import type { GameSymbol } from '@/hooks/useGame';
+import { isITM, getArenaPrize, ITM_POSITIONS } from '@/lib/arenaPayouts';
 
 interface TournamentLeaderboardProps {
   players: TournamentPlayer[];
@@ -62,7 +63,7 @@ export function TournamentLeaderboard({
       <div className="bg-muted/50 px-4 py-3 border-b flex items-center gap-2">
         <Trophy className="w-5 h-5 text-yellow-500" />
         <span className="font-bold">Ranking</span>
-        <span className="text-xs text-muted-foreground ml-1">(códigos individuais)</span>
+        <span className="text-xs text-muted-foreground ml-1">ITM: top {ITM_POSITIONS}</span>
         {!isFinished && (
           <Loader2 className="w-4 h-4 ml-auto animate-spin text-muted-foreground" />
         )}
@@ -76,7 +77,8 @@ export function TournamentLeaderboard({
             const isWaiting = !result || result.status === 'waiting';
             const isPlaying = result?.status === 'playing';
             const rank = isFinished && result?.rank ? result.rank : (isWaiting || isPlaying ? '-' : index + 1);
-            
+            const itmPosition = typeof rank === 'number' && isITM(rank);
+            const prize = typeof rank === 'number' ? getArenaPrize(rank) : 0;
             return (
               <motion.div
                 key={player.id}
@@ -87,7 +89,8 @@ export function TournamentLeaderboard({
                 className={`
                   px-4 py-3
                   ${isHuman ? 'bg-primary/10' : ''}
-                  ${result?.status === 'won' ? 'bg-green-500/10' : ''}
+                  ${result?.status === 'won' && isFinished && itmPosition ? 'bg-green-500/10' : ''}
+                  ${isFinished && typeof rank === 'number' && rank === ITM_POSITIONS ? 'border-b-2 border-dashed border-yellow-500/30' : ''}
                 `}
               >
                 <div className="flex items-center gap-3">
@@ -136,6 +139,11 @@ export function TournamentLeaderboard({
                             </span>
                           )}
                         </div>
+                        {isFinished && prize > 0 && (
+                          <span className="text-xs font-bold text-yellow-400 mt-0.5">
+                            +k${prize.toFixed(2)}
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>

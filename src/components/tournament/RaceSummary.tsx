@@ -2,16 +2,18 @@
  * RaceSummary - Demonstrativo da corrida após término
  * 
  * Mostra:
- * - Posição final do jogador
+ * - Posição final do jogador (ITM ou fora)
  * - Comparativo com outros participantes
  * - Estatísticas da partida
+ * - Sistema de pagamento poker (25 ITM de 100)
  */
 
 import { motion } from 'framer-motion';
-import { Trophy, Target, Clock, Star, Users, TrendingUp, Medal, Zap } from 'lucide-react';
+import { Trophy, Target, Clock, Star, Users, TrendingUp, Medal, Zap, DollarSign } from 'lucide-react';
 import { Symbol } from '@/components/game/Symbol';
 import type { TournamentPlayer, TournamentResult } from '@/hooks/useTournament';
 import type { GameSymbol } from '@/hooks/useGame';
+import { isITM, ITM_POSITIONS, getArenaPrize } from '@/lib/arenaPayouts';
 
 interface RaceSummaryProps {
   humanResult: TournamentResult;
@@ -40,7 +42,7 @@ export function RaceSummary({
     if (rank === 1) return { icon: '🏆', text: 'CAMPEÃO!', color: 'text-yellow-400' };
     if (rank === 2) return { icon: '🥈', text: 'Vice-Campeão', color: 'text-gray-300' };
     if (rank === 3) return { icon: '🥉', text: '3º Lugar', color: 'text-orange-400' };
-    if (rank <= 4) return { icon: '🎖️', text: `${rank}º Lugar`, color: 'text-primary' };
+    if (isITM(rank)) return { icon: '💰', text: `${rank}º Lugar • ITM`, color: 'text-green-400' };
     return { icon: '📊', text: `${rank}º de ${totalPlayers}`, color: 'text-muted-foreground' };
   };
   
@@ -53,9 +55,9 @@ export function RaceSummary({
     ? Math.round(winners.reduce((sum, r) => sum + r.attempts, 0) / winners.length)
     : 0;
   
-  // Top 3 para mostrar
-  const top3 = allResults
-    .filter(r => r.rank <= 3)
+  // Top 5 para mostrar no pódio (com prêmios)
+  const top5 = allResults
+    .filter(r => r.rank <= 5)
     .sort((a, b) => a.rank - b.rank);
 
   return (
@@ -77,6 +79,8 @@ export function RaceSummary({
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
           Posição {rank} de {totalPlayers} jogadores
+          {isITM(rank) && rank > 3 && <span className="text-green-400 ml-1">• ITM</span>}
+          {!isITM(rank) && <span className="text-red-400/60 ml-1">• Fora do ITM ({ITM_POSITIONS}º pago)</span>}
         </p>
       </motion.div>
 
@@ -170,7 +174,7 @@ export function RaceSummary({
         </motion.div>
       )}
 
-      {/* Top 3 mini */}
+      {/* Top 5 + Prêmios */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -179,13 +183,15 @@ export function RaceSummary({
       >
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Medal className="w-3 h-3" />
-          <span>Pódio</span>
+          <span>Pódio & Prêmios</span>
+          <span className="ml-auto text-white/40">25 ITM de {totalPlayers}</span>
         </div>
         <div className="space-y-1">
-          {top3.map((result, i) => {
+          {top5.map((result, i) => {
             const player = players.find(p => p.id === result.playerId);
             const isHuman = result.playerId === humanResult.playerId;
-            const medals = ['🥇', '🥈', '🥉'];
+            const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+            const prize = getArenaPrize(result.rank);
             
             return (
               <motion.div
@@ -202,9 +208,16 @@ export function RaceSummary({
                 <span className={`flex-1 font-medium ${isHuman ? 'text-primary' : 'text-white'}`}>
                   {player?.name} {isHuman && '(Você)'}
                 </span>
-                <span className="text-xs text-muted-foreground">
-                  {result.attempts} tent. • {result.score} pts
-                </span>
+                <div className="text-right">
+                  <span className="text-xs text-muted-foreground">
+                    {result.attempts} tent. • {result.score} pts
+                  </span>
+                  {prize > 0 && (
+                    <div className="text-xs font-bold text-yellow-400">
+                      +k${prize.toFixed(2)}
+                    </div>
+                  )}
+                </div>
               </motion.div>
             );
           })}

@@ -31,6 +31,7 @@ import { ArrowLeft, Trophy } from 'lucide-react';
 import { UI_SYMBOLS } from '@/hooks/useGame';
 import { roundCurrency } from '@/lib/currencyUtils';
 import { useSkemaBox } from '@/hooks/useSkemaBox';
+import { getArenaPrize, isITM, ITM_POSITIONS } from '@/lib/arenaPayouts';
 
 type SkemaView = 'lobby' | 'training' | 'bots' | 'official' | 'party-setup' | 'party-playing' | 'party-collect' | 'party-results';
 
@@ -223,9 +224,9 @@ export default function Skema() {
   // Rake = fee de TODOS os jogadores (incluindo bots virtuais)
   const ARENA_TOTAL_RAKE = ARENA_FEE_PER_PLAYER * ARENA_PLAYERS; // k$5.00
   
-  // Prêmios ITM (top 3 de 100) - distribuição poker sobre k$50.00
-  // 1º: 50% = k$25.00, 2º: 30% = k$15.00, 3º: 20% = k$10.00
-  const ARENA_PRIZE_DISTRIBUTION = [0.50, 0.30, 0.20];
+  // Prêmios ITM (top 25 de 100) - distribuição poker sobre k$50.00
+  // Tabela completa em src/lib/arenaPayouts.ts
+  // 1º: k$13.50, 2º: k$8.00, 3º: k$5.00, ..., 25º: k$0.55 (min-cash)
   
   const handleStartBotRace = (buyIn: number, fee: number): { success: boolean; error?: string } => {
     const total = roundCurrency(buyIn + fee); // 0.50 + 0.05 = 0.55 (entrada do humano)
@@ -355,11 +356,10 @@ export default function Skema() {
           console.log('[SKEMA PREMIO] Saldo ANTES (storage):', JSON.parse(storageBefore).energy);
         }
         
-        if (humanResult && humanResult.rank >= 1 && humanResult.rank <= 3) {
-          // ITM: top 3 ganham
-          const prizePercent = ARENA_PRIZE_DISTRIBUTION[humanResult.rank - 1];
-          const prize = roundCurrency(ARENA_TOTAL_POOL * prizePercent);
-          console.log(`[SKEMA PREMIO] 🏆 Rank: ${humanResult.rank}º | ${prizePercent * 100}% de k$${ARENA_TOTAL_POOL.toFixed(2)} = k$${prize.toFixed(2)}`);
+        if (humanResult && isITM(humanResult.rank)) {
+          // ITM: posição 1-25 ganham prêmio (tabela poker)
+          const prize = getArenaPrize(humanResult.rank);
+          console.log(`[SKEMA PREMIO] 🏆 Rank: ${humanResult.rank}º | ITM! Prêmio: k$${prize.toFixed(2)}`);
           
           // Adiciona prêmio
           skemaPlayer.actions.addEnergy(prize);
@@ -368,25 +368,14 @@ export default function Skema() {
           // Verifica localStorage diretamente após um tick
           setTimeout(() => {
             const stored = localStorage.getItem('skema_player');
-            const accounts = localStorage.getItem('skema_accounts');
-            const skemaBox = localStorage.getItem('skema_box_balance');
             if (stored) {
               const parsed = JSON.parse(stored);
               console.log('[SKEMA PREMIO] 📦 Saldo DEPOIS (storage):', parsed.energy);
-              console.log('[SKEMA PREMIO] 📦 Stats DEPOIS:', parsed.stats);
             }
-            if (accounts) {
-              const acc = JSON.parse(accounts);
-              const playerCode = skemaPlayer.player?.inviteCode;
-              if (playerCode && acc[playerCode]) {
-                console.log('[SKEMA PREMIO] 📦 Saldo em ACCOUNTS:', acc[playerCode].energy);
-              }
-            }
-            console.log('[SKEMA PREMIO] 📦 Skema Box:', skemaBox);
             console.log('[SKEMA PREMIO] ======= FIM VERIFICAÇÃO =======');
           }, 200);
         } else {
-          console.log(`[SKEMA PREMIO] ❌ Fora do ITM (${humanResult?.rank || '?'}º lugar) - sem prêmio`);
+          console.log(`[SKEMA PREMIO] ❌ Fora do ITM (${humanResult?.rank || '?'}º lugar, ITM até ${ITM_POSITIONS}º) - sem prêmio`);
         }
       }
     }
@@ -551,15 +540,15 @@ export default function Skema() {
   
   // Cálculo de prêmio para display
   let prizeAmount = 0;
-  if (humanResult && (gameMode === 'bots' || gameMode === 'official')) {
-    if (gameMode === 'bots' && humanResult.rank >= 1 && humanResult.rank <= 3) {
-      // Arena x Bots: ITM top 3
-      prizeAmount = ARENA_TOTAL_POOL * ARENA_PRIZE_DISTRIBUTION[humanResult.rank - 1];
-    } else if (gameMode === 'official' && humanResult.rank <= 4) {
-      // Official usa distribuição diferente
-      prizeAmount = Math.floor(tournament.state.prizePool * [0.5, 0.25, 0.15, 0.1][humanResult.rank - 1]);
+    if (humanResult && (gameMode === 'bots' || gameMode === 'official')) {
+      if (gameMode === 'bots' && isITM(humanResult.rank)) {
+        // Arena x Bots: ITM top 25 (poker-style)
+        prizeAmount = getArenaPrize(humanResult.rank);
+      } else if (gameMode === 'official' && humanResult.rank <= 4) {
+        // Official usa distribuição diferente
+        prizeAmount = Math.floor(tournament.state.prizePool * [0.5, 0.25, 0.15, 0.1][humanResult.rank - 1]);
+      }
     }
-  }
   
   return (
     <div className="min-h-screen relative">
