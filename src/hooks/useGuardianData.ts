@@ -40,8 +40,11 @@ export interface ReferralNode {
   invite_code: string;
   invited_by: string | null;
   inviter_name: string | null;
+  player_tier: string | null;
+  energy: number;
   total_invited: number;
   rewards_credited: number;
+  reward_transferred: number;
   created_at: string;
 }
 
@@ -196,32 +199,33 @@ export function usePlayersList() {
   });
 }
 
-// Hook para árvore de convites
+// Hook para árvore de convites (hierarquia baseada em invite_code)
 export function useReferralTree() {
   return useQuery({
     queryKey: ['guardian-referral-tree'],
     queryFn: async () => {
-      // Buscar todos os profiles com informações de quem convidou
+      // Buscar todos os profiles com tier e saldo
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, name, emoji, invite_code, invited_by, invited_by_name, created_at')
+        .select('id, name, emoji, invite_code, invited_by, invited_by_name, player_tier, energy, created_at')
         .order('created_at', { ascending: true });
       
       if (profilesError) throw profilesError;
       
-      // Buscar contagem de referrals por inviter
+      // Buscar referrals com amounts
       const { data: referrals, error: referralsError } = await supabase
         .from('referrals')
-        .select('inviter_id, reward_credited');
+        .select('inviter_id, reward_credited, reward_amount');
       
       if (referralsError) throw referralsError;
       
-      // Agregar dados
-      const referralCounts = new Map<string, { total: number; credited: number }>();
+      // Agregar dados de referral por inviter
+      const referralCounts = new Map<string, { total: number; credited: number; totalTransferred: number }>();
       referrals?.forEach(r => {
-        const current = referralCounts.get(r.inviter_id) || { total: 0, credited: 0 };
+        const current = referralCounts.get(r.inviter_id) || { total: 0, credited: 0, totalTransferred: 0 };
         current.total++;
         if (r.reward_credited) current.credited++;
+        current.totalTransferred += Number(r.reward_amount) || 0;
         referralCounts.set(r.inviter_id, current);
       });
       
@@ -230,10 +234,14 @@ export function useReferralTree() {
         name: p.name,
         emoji: p.emoji,
         invite_code: p.invite_code,
+        // invited_by stores the invite_code of the inviter (not the profile id)
         invited_by: p.invited_by,
         inviter_name: p.invited_by_name,
+        player_tier: p.player_tier,
+        energy: Number(p.energy) || 0,
         total_invited: referralCounts.get(p.id)?.total || 0,
         rewards_credited: referralCounts.get(p.id)?.credited || 0,
+        reward_transferred: referralCounts.get(p.id)?.totalTransferred || 0,
         created_at: p.created_at,
       })) as ReferralNode[];
     },
