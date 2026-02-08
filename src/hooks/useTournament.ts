@@ -41,7 +41,7 @@ export const TOURNAMENT_ENTRY_FEE = 100;
 export const TOURNAMENT_PLAYERS = 100;
 export const BOT_COUNT = 99;
 
-const PRIZE_DISTRIBUTION = [0.5, 0.25, 0.15, 0.1];
+const PRIZE_DISTRIBUTION = [0.50, 0.30, 0.20];
 
 // ==================== HOOK ====================
 
