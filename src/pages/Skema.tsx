@@ -29,7 +29,7 @@ import { CosmicBackground } from '@/components/CosmicBackground';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trophy } from 'lucide-react';
 import { UI_SYMBOLS } from '@/hooks/useGame';
-import { roundCurrency } from '@/lib/currencyUtils';
+// Currency math now uses inline cents arithmetic (see handleStartBotRace)
 import { useSkemaBox } from '@/hooks/useSkemaBox';
 import { getArenaPrize, isITM, ITM_POSITIONS } from '@/lib/arenaPayouts';
 
@@ -215,36 +215,47 @@ export default function Skema() {
   };
   
   // Constantes Arena x Bots (poker NL Hold'em style)
-  const ARENA_BUY_IN = 0.50;              // k$0.50 buy-in por jogador (vai pro pot)
-  const ARENA_FEE_PER_PLAYER = 0.05;      // k$0.05 fee por jogador (vai pro Skema Box)
-  const ARENA_ENTRY_FEE = ARENA_BUY_IN + ARENA_FEE_PER_PLAYER; // k$0.55 entrada total
+  // TODOS os valores derivados de CENTAVOS para evitar floating-point
+  const ARENA_BUY_IN_CENTS = 50;           // 50 cents = k$0.50
+  const ARENA_FEE_PER_PLAYER_CENTS = 5;    // 5 cents = k$0.05
+  const ARENA_ENTRY_FEE_CENTS = ARENA_BUY_IN_CENTS + ARENA_FEE_PER_PLAYER_CENTS; // 55 cents = k$0.55
   const ARENA_PLAYERS = 100;
-  // Pool = buy-ins de TODOS (sem fee) - é o pot disputado
-  const ARENA_TOTAL_POOL = ARENA_BUY_IN * ARENA_PLAYERS; // k$50.00
-  // Rake = fee de TODOS os jogadores (incluindo bots virtuais)
-  const ARENA_TOTAL_RAKE = ARENA_FEE_PER_PLAYER * ARENA_PLAYERS; // k$5.00
+  const ARENA_TOTAL_POOL_CENTS = ARENA_BUY_IN_CENTS * ARENA_PLAYERS;           // 5000 cents = k$50.00
+  const ARENA_TOTAL_RAKE_CENTS = ARENA_FEE_PER_PLAYER_CENTS * ARENA_PLAYERS;   // 500 cents = k$5.00
+
+  // Converte para k$ (sem drift: divisão simples de inteiros)
+  const ARENA_BUY_IN = ARENA_BUY_IN_CENTS / 100;                 // 0.5
+  const ARENA_FEE_PER_PLAYER = ARENA_FEE_PER_PLAYER_CENTS / 100; // 0.05
+  const ARENA_ENTRY_FEE = ARENA_ENTRY_FEE_CENTS / 100;           // 0.55
+  const ARENA_TOTAL_POOL = ARENA_TOTAL_POOL_CENTS / 100;         // 50
+  const ARENA_TOTAL_RAKE = ARENA_TOTAL_RAKE_CENTS / 100;         // 5
   
   // Prêmios ITM (top 25 de 100) - distribuição poker sobre k$50.00
   // Tabela completa em src/lib/arenaPayouts.ts
   // 1º: k$13.50, 2º: k$8.00, 3º: k$5.00, ..., 25º: k$0.55 (min-cash)
   
   const handleStartBotRace = (buyIn: number, fee: number): { success: boolean; error?: string } => {
-    const total = roundCurrency(buyIn + fee); // 0.50 + 0.05 = 0.55 (entrada do humano)
+    // Aritmética em centavos para evitar floating-point
+    const buyInCents = Math.round(buyIn * 100);
+    const feeCents = Math.round(fee * 100);
+    const totalCents = buyInCents + feeCents;
+    const total = totalCents / 100; // k$ sem drift
     
     console.log('[SKEMA ARENA] 🎮 Iniciando Arena x Bots...');
     console.log('[SKEMA ARENA] Saldo atual:', skemaPlayer.player!.energy);
-    console.log('[SKEMA ARENA] Custo entrada:', total);
+    console.log('[SKEMA ARENA] Custo entrada:', total, `(${totalCents} cents)`);
     
-    if (skemaPlayer.player!.energy < total) {
+    const energyCents = Math.round(skemaPlayer.player!.energy * 100);
+    if (energyCents < totalCents) {
       console.log('[SKEMA ARENA] ❌ Energia insuficiente!');
-      return { success: false, error: 'Energia insuficiente (k$0.55)' };
+      return { success: false, error: `Energia insuficiente (k$${total.toFixed(2)})` };
     }
     
     // Deduz entrada do humano
     const deducted = skemaPlayer.actions.deductEnergy(total);
     console.log('[SKEMA ARENA] ✅ Entrada deduzida:', deducted);
     
-    // Rake = fee de TODOS os 10 jogadores (bots são virtuais mas contam) → Cloud
+    // Rake = fee de TODOS os 100 jogadores (bots são virtuais mas contam) → Cloud
     skemaBox.addToBox(ARENA_TOTAL_RAKE, 'arena_rake').then(newBal => {
       console.log(`[SKEMA ARENA] 💰 Rake Cloud: k$${ARENA_TOTAL_RAKE.toFixed(2)} → Skema Box: k$${(newBal ?? 0).toFixed(2)}`);
     });

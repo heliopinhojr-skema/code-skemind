@@ -11,7 +11,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { addCurrency, roundCurrency } from '@/lib/currencyUtils';
+// Currency utils: using local toCents() for safe integer math
 
 // ==================== TIPOS ====================
 
@@ -321,15 +321,20 @@ export function useSupabasePlayer() {
     const current = playerRef.current;
     if (!current) return;
 
+    // Aritmética em centavos para evitar float drift
+    const currentCents = Math.round(current.energy * 100);
+    const amountCents = Math.round(amount * 100);
+    const newEnergyCents = Math.max(0, currentCents + amountCents);
+    const newEnergy = newEnergyCents / 100;
+    
     // Optimistic update
-    const newEnergy = Math.max(0, addCurrency(current.energy, amount));
     setPlayer(prev => prev ? { ...prev, energy: newEnergy } : null);
 
-    // Persist to database
+    // Persist to database (pass the original amount, RPC handles atomically)
     try {
       const { error } = await supabase.rpc('update_player_energy', {
         p_player_id: current.id,
-        p_amount: amount
+        p_amount: amountCents / 100, // k$ value derived from cents
       });
 
       if (error) {
@@ -341,7 +346,7 @@ export function useSupabasePlayer() {
 
       // Update cache
       saveToCache({ ...current, energy: newEnergy });
-      console.log('[SUPABASE] Energy updated:', amount, '→', newEnergy);
+      console.log(`[SUPABASE] Energy updated: ${amount >= 0 ? '+' : ''}${(amountCents / 100).toFixed(2)} → ${newEnergy.toFixed(2)}`);
     } catch (e) {
       console.error('[SUPABASE] Energy update error:', e);
     }
@@ -351,13 +356,13 @@ export function useSupabasePlayer() {
     const current = playerRef.current;
     if (!current) return false;
 
-    // No infinite energy bypass - everyone uses real balance
-
-    const currentCents = toCents(roundCurrency(current.energy));
-    const amountCents = toCents(roundCurrency(amount));
+    // Comparação segura em centavos
+    const currentCents = toCents(current.energy);
+    const amountCents = toCents(amount);
     if (currentCents < amountCents) return false;
     
-    updateEnergy(-amount);
+    // Passa valor derivado de centavos (sem float drift)
+    updateEnergy(-(amountCents / 100));
     return true;
   }, [updateEnergy]);
 
@@ -369,15 +374,17 @@ export function useSupabasePlayer() {
     const current = playerRef.current;
     if (!current) return { success: false, error: 'Jogador não encontrado' };
     
-    const totalCost = roundCurrency(amount * (1 + TRANSFER_TAX));
-    const currentCents = toCents(roundCurrency(current.energy));
-    const totalCostCents = toCents(totalCost);
+    // Aritmética em centavos
+    const amountCents = toCents(amount);
+    const taxCents = Math.round(amountCents * TRANSFER_TAX);
+    const totalCostCents = amountCents + taxCents;
+    const currentCents = toCents(current.energy);
     
     if (currentCents < totalCostCents) {
       return { success: false, error: 'Energia insuficiente (inclua a taxa de 6.43%)' };
     }
     
-    updateEnergy(-totalCost);
+    updateEnergy(-(totalCostCents / 100));
     // TODO: Implement recipient credit via edge function
     
     return { success: true };
