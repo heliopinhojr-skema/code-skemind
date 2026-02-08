@@ -68,7 +68,7 @@ export interface OfficialRace {
   registrations_count?: number;
 }
 
-// Hook para verificar se usuário é guardian
+// Hook para verificar se usuário é guardian (master_admin ou guardiao)
 export function useIsGuardian() {
   return useQuery({
     queryKey: ['guardian-role-check'],
@@ -76,7 +76,6 @@ export function useIsGuardian() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return false;
       
-      // Check for master_admin OR guardiao role
       const { data: isMaster } = await supabase.rpc('has_role', {
         _user_id: user.id,
         _role: 'master_admin'
@@ -96,7 +95,26 @@ export function useIsGuardian() {
       
       return isGuardiao === true;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// Hook para verificar se é master_admin (para controles admin exclusivos)
+export function useIsMasterAdmin() {
+  return useQuery({
+    queryKey: ['master-admin-role-check'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return false;
+      
+      const { data: isMaster } = await supabase.rpc('has_role', {
+        _user_id: user.id,
+        _role: 'master_admin'
+      });
+      
+      return isMaster === true;
+    },
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -164,10 +182,11 @@ export function usePlayersList() {
   return useQuery({
     queryKey: ['guardian-players-list'],
     queryFn: async () => {
+      // Select only non-sensitive fields (exclude pin)
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
-        .neq('player_tier', 'master_admin') // Exclui Master Admins da lista
+        .select('id, user_id, name, emoji, energy, invite_code, invited_by, invited_by_name, player_tier, stats_wins, stats_races, stats_best_time, created_at, updated_at')
+        .neq('player_tier', 'master_admin')
         .order('created_at', { ascending: false });
       
       if (error) throw error;

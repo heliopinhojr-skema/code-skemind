@@ -1,5 +1,6 @@
 /**
  * GuardianRacesPanel - Gerenciamento de corridas oficiais
+ * Ações de criar/cancelar são restritas a master_admin
  */
 
 import { useState } from 'react';
@@ -8,21 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from '@/components/ui/table';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -48,7 +39,11 @@ const statusLabels: Record<string, string> = {
   cancelled: 'Cancelada',
 };
 
-export function GuardianRacesPanel() {
+interface GuardianRacesPanelProps {
+  isMasterAdmin: boolean;
+}
+
+export function GuardianRacesPanel({ isMasterAdmin }: GuardianRacesPanelProps) {
   const { data: races, isLoading, error } = useOfficialRaces();
   const queryClient = useQueryClient();
   const [isCreating, setIsCreating] = useState(false);
@@ -63,6 +58,7 @@ export function GuardianRacesPanel() {
   });
 
   const handleCreateRace = async () => {
+    if (!isMasterAdmin) return;
     try {
       const { error } = await supabase
         .from('official_races')
@@ -85,13 +81,9 @@ export function GuardianRacesPanel() {
 
       setIsCreating(false);
       setNewRace({
-        name: '',
-        scheduled_date: '',
-        entry_fee: '1.10',
-        prize_per_player: '1.00',
-        skema_box_fee: '0.10',
-        min_players: '2',
-        max_players: '16',
+        name: '', scheduled_date: '', entry_fee: '1.10',
+        prize_per_player: '1.00', skema_box_fee: '0.10',
+        min_players: '2', max_players: '16',
       });
       queryClient.invalidateQueries({ queryKey: ['guardian-official-races'] });
     } catch (err: any) {
@@ -104,6 +96,7 @@ export function GuardianRacesPanel() {
   };
 
   const handleCancelRace = async (raceId: string, raceName: string) => {
+    if (!isMasterAdmin) return;
     try {
       const { error } = await supabase
         .from('official_races')
@@ -144,102 +137,85 @@ export function GuardianRacesPanel() {
             Corridas Oficiais ({races?.length || 0})
           </CardTitle>
           
-          <Dialog open={isCreating} onOpenChange={setIsCreating}>
-            <DialogTrigger asChild>
-              <Button variant="primary" size="sm">
-                <Plus className="h-4 w-4 mr-1" />
-                Nova Corrida
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>Criar Nova Corrida</DialogTitle>
-                <DialogDescription>
-                  Configure os parâmetros da nova corrida oficial.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="name">Nome da Corrida</Label>
-                  <Input
-                    id="name"
-                    value={newRace.name}
-                    onChange={(e) => setNewRace({ ...newRace, name: e.target.value })}
-                    placeholder="Corrida Estelar #1"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="date">Data e Hora</Label>
-                  <Input
-                    id="date"
-                    type="datetime-local"
-                    value={newRace.scheduled_date}
-                    onChange={(e) => setNewRace({ ...newRace, scheduled_date: e.target.value })}
-                  />
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <Label htmlFor="entry_fee">Taxa Entrada</Label>
-                    <Input
-                      id="entry_fee"
-                      type="number"
-                      step="0.01"
-                      value={newRace.entry_fee}
-                      onChange={(e) => setNewRace({ ...newRace, entry_fee: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="prize">Prêmio/Jogador</Label>
-                    <Input
-                      id="prize"
-                      type="number"
-                      step="0.01"
-                      value={newRace.prize_per_player}
-                      onChange={(e) => setNewRace({ ...newRace, prize_per_player: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="box_fee">Taxa Box</Label>
-                    <Input
-                      id="box_fee"
-                      type="number"
-                      step="0.01"
-                      value={newRace.skema_box_fee}
-                      onChange={(e) => setNewRace({ ...newRace, skema_box_fee: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label htmlFor="min">Mín. Jogadores</Label>
-                    <Input
-                      id="min"
-                      type="number"
-                      value={newRace.min_players}
-                      onChange={(e) => setNewRace({ ...newRace, min_players: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="max">Máx. Jogadores</Label>
-                    <Input
-                      id="max"
-                      type="number"
-                      value={newRace.max_players}
-                      onChange={(e) => setNewRace({ ...newRace, max_players: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsCreating(false)}>
-                  Cancelar
+          {/* Only master_admin can create races */}
+          {isMasterAdmin && (
+            <Dialog open={isCreating} onOpenChange={setIsCreating}>
+              <DialogTrigger asChild>
+                <Button size="sm">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Nova Corrida
                 </Button>
-                <Button onClick={handleCreateRace} disabled={!newRace.name || !newRace.scheduled_date}>
-                  Criar Corrida
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Criar Nova Corrida</DialogTitle>
+                  <DialogDescription>
+                    Configure os parâmetros da nova corrida oficial.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="name">Nome da Corrida</Label>
+                    <Input
+                      id="name"
+                      value={newRace.name}
+                      onChange={(e) => setNewRace({ ...newRace, name: e.target.value })}
+                      placeholder="Corrida Estelar #1"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="date">Data e Hora</Label>
+                    <Input
+                      id="date"
+                      type="datetime-local"
+                      value={newRace.scheduled_date}
+                      onChange={(e) => setNewRace({ ...newRace, scheduled_date: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <Label htmlFor="entry_fee">Taxa Entrada</Label>
+                      <Input id="entry_fee" type="number" step="0.01"
+                        value={newRace.entry_fee}
+                        onChange={(e) => setNewRace({ ...newRace, entry_fee: e.target.value })} />
+                    </div>
+                    <div>
+                      <Label htmlFor="prize">Prêmio/Jogador</Label>
+                      <Input id="prize" type="number" step="0.01"
+                        value={newRace.prize_per_player}
+                        onChange={(e) => setNewRace({ ...newRace, prize_per_player: e.target.value })} />
+                    </div>
+                    <div>
+                      <Label htmlFor="box_fee">Taxa Box</Label>
+                      <Input id="box_fee" type="number" step="0.01"
+                        value={newRace.skema_box_fee}
+                        onChange={(e) => setNewRace({ ...newRace, skema_box_fee: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label htmlFor="min">Mín. Jogadores</Label>
+                      <Input id="min" type="number"
+                        value={newRace.min_players}
+                        onChange={(e) => setNewRace({ ...newRace, min_players: e.target.value })} />
+                    </div>
+                    <div>
+                      <Label htmlFor="max">Máx. Jogadores</Label>
+                      <Input id="max" type="number"
+                        value={newRace.max_players}
+                        onChange={(e) => setNewRace({ ...newRace, max_players: e.target.value })} />
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsCreating(false)}>Cancelar</Button>
+                  <Button onClick={handleCreateRace} disabled={!newRace.name || !newRace.scheduled_date}>
+                    Criar Corrida
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </CardHeader>
       <CardContent>
@@ -252,14 +228,14 @@ export function GuardianRacesPanel() {
                 <TableHead>Data</TableHead>
                 <TableHead>Inscritos</TableHead>
                 <TableHead>Taxas</TableHead>
-                <TableHead>Ações</TableHead>
+                {isMasterAdmin && <TableHead>Ações</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 6 }).map((_, j) => (
+                    {Array.from({ length: isMasterAdmin ? 6 : 5 }).map((_, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-6 w-20" />
                       </TableCell>
@@ -268,7 +244,7 @@ export function GuardianRacesPanel() {
                 ))
               ) : races?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={isMasterAdmin ? 6 : 5} className="text-center text-muted-foreground py-8">
                     Nenhuma corrida oficial criada
                   </TableCell>
                 </TableRow>
@@ -301,17 +277,19 @@ export function GuardianRacesPanel() {
                         k${Number(race.entry_fee).toFixed(2)}
                       </div>
                     </TableCell>
-                    <TableCell>
-                      {race.status === 'registration' && (
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() => handleCancelRace(race.id, race.name)}
-                        >
-                          Cancelar
-                        </Button>
-                      )}
-                    </TableCell>
+                    {isMasterAdmin && (
+                      <TableCell>
+                        {race.status === 'registration' && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleCancelRace(race.id, race.name)}
+                          >
+                            Cancelar
+                          </Button>
+                        )}
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))
               )}

@@ -186,13 +186,14 @@ export function useSupabasePlayer() {
         return;
       }
 
-      // Check if user is master_admin (only HX has infinite energy)
+      // Check if user is master_admin (for admin features, NOT infinite energy)
       const { data: isMasterAdmin } = await supabase.rpc('has_role', {
         _user_id: userId,
         _role: 'master_admin'
       });
       
-      const isKeeper = isMasterAdmin === true;
+      // isKeeper is no longer used for infinite energy - everyone shows real balance
+      const isKeeper = false;
 
       // Fetch referrals count
       const { count: referralsCount } = await supabase
@@ -210,8 +211,8 @@ export function useSupabasePlayer() {
         invitedBy: profile.invited_by,
         invitedByName: profile.invited_by_name,
         registeredAt: profile.created_at,
-        // Keepers have infinite energy (displayed as 999999)
-        energy: isKeeper ? 999999 : Number(profile.energy),
+        // Always show real balance from database
+        energy: Number(profile.energy),
         lastRefillDate: profile.last_refill_date,
         referrals: Array(referralsCount || 0).fill(''), // Just for count
         playerTier,
@@ -350,11 +351,7 @@ export function useSupabasePlayer() {
     const current = playerRef.current;
     if (!current) return false;
 
-    // Keepers have infinite energy - always allow
-    if (current.isKeeper) {
-      console.log('[SUPABASE] Keeper bypass - no energy deduction');
-      return true;
-    }
+    // No infinite energy bypass - everyone uses real balance
 
     const currentCents = toCents(roundCurrency(current.energy));
     const amountCents = toCents(roundCurrency(amount));
