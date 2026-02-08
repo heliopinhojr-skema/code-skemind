@@ -1,24 +1,34 @@
 /**
  * PlayerDetailDrawer - Drawer lateral com detalhes completos de um jogador
  * Mostra: perfil, saldo, ascendência, descendência, histórico de jogos
+ * Admin actions: zerar saldo, penalizar, bloquear/desbloquear (master_admin only)
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { useQuery } from '@tanstack/react-query';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ReferralNode } from '@/hooks/useGuardianData';
 import { calculateBalanceBreakdown, formatEnergy } from '@/lib/tierEconomy';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { toast } from 'sonner';
 import {
   Zap, Trophy, Clock, Users, GitBranch, ChevronUp, ChevronDown,
   Shield, Star, Crown, Swords, Rocket, Gamepad2, Lock, Unlock,
-  Target, Calendar, ArrowUpRight, ArrowDownRight, TrendingUp
+  Target, Calendar, ArrowUpRight, ArrowDownRight, TrendingUp,
+  Ban, MinusCircle, Trash2, AlertTriangle, CheckCircle, DollarSign,
+  ArrowUp, ArrowDown
 } from 'lucide-react';
 
 const TIER_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
@@ -40,6 +50,7 @@ interface PlayerDetailDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   allNodes: ReferralNode[];
+  isMasterAdmin?: boolean;
 }
 
 function usePlayerGameHistory(playerId: string | null) {
@@ -60,11 +71,56 @@ function usePlayerGameHistory(playerId: string | null) {
   });
 }
 
-export function PlayerDetailDrawer({ playerId, open, onOpenChange, allNodes }: PlayerDetailDrawerProps) {
+function usePlayerArenaEntries(playerId: string | null) {
+  return useQuery({
+    queryKey: ['player-arena-entries', playerId],
+    queryFn: async () => {
+      if (!playerId) return [];
+      const { data, error } = await supabase
+        .from('arena_entries')
+        .select('*, arena_listings(name, buy_in, rake_fee)')
+        .eq('player_id', playerId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!playerId,
+  });
+}
+
+type AdminAction = 'zero' | 'penalize' | 'block' | 'unblock' | null;
+
+export function PlayerDetailDrawer({ playerId, open, onOpenChange, allNodes, isMasterAdmin }: PlayerDetailDrawerProps) {
   const player = useMemo(() => allNodes.find(n => n.id === playerId), [allNodes, playerId]);
   const { data: gameHistory, isLoading: historyLoading } = usePlayerGameHistory(playerId);
+  const { data: arenaEntries } = usePlayerArenaEntries(playerId);
+  const queryClient = useQueryClient();
 
-  // Build ancestry (who invited this player, and their inviter, etc.)
+  // Admin action state
+  const [adminAction, setAdminAction] = useState<AdminAction>(null);
+  const [penaltyAmount, setPenaltyAmount] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Arena P&L calculation
+  const arenaPnL = useMemo(() => {
+    if (!arenaEntries || arenaEntries.length === 0) return { totalBuyIns: 0, totalPrizes: 0, net: 0, arenas: 0 };
+    let totalBuyIns = 0;
+    let totalPrizes = 0;
+    arenaEntries.forEach((entry: any) => {
+      const buyIn = Number(entry.arena_listings?.buy_in || 0);
+      totalBuyIns += buyIn;
+      totalPrizes += Number(entry.prize_won || 0);
+    });
+    return {
+      totalBuyIns,
+      totalPrizes,
+      net: totalPrizes - totalBuyIns,
+      arenas: arenaEntries.length,
+    };
+  }, [arenaEntries]);
+
+  // Build ancestry
   const ancestry = useMemo(() => {
     if (!player || !allNodes.length) return [];
     const chain: ReferralNode[] = [];
@@ -84,7 +140,7 @@ export function PlayerDetailDrawer({ playerId, open, onOpenChange, allNodes }: P
     return chain;
   }, [player, allNodes]);
 
-  // Build descendants (who this player invited, recursively)
+  // Build descendants
   const descendants = useMemo(() => {
     if (!player || !allNodes.length) return [];
     const result: Array<ReferralNode & { depth: number }> = [];
@@ -103,11 +159,10 @@ export function PlayerDetailDrawer({ playerId, open, onOpenChange, allNodes }: P
     return result;
   }, [player, allNodes]);
 
-  // Stats
   const totalDescendants = descendants.length;
   const totalEnergyTree = descendants.reduce((sum, d) => sum + d.energy, 0);
   
-  // Game stats from history
+  // Game stats
   const gameStats = useMemo(() => {
     if (!gameHistory) return { total: 0, wins: 0, losses: 0, avgAttempts: 0, bestTime: 0 };
     const wins = gameHistory.filter((g: any) => g.won).length;
@@ -124,10 +179,66 @@ export function PlayerDetailDrawer({ playerId, open, onOpenChange, allNodes }: P
     };
   }, [gameHistory]);
 
-  // Time since registration
   const timeSinceRegistration = player 
     ? formatDistanceToNow(new Date(player.created_at), { locale: ptBR, addSuffix: true })
     : '';
+
+  // Admin actions
+  const handleAdminAction = async () => {
+    if (!player || !playerId) return;
+    setIsProcessing(true);
+
+    try {
+      if (adminAction === 'zero') {
+        const { error } = await supabase.rpc('admin_adjust_player_energy', {
+          p_player_id: playerId,
+          p_new_energy: 0,
+          p_reason: 'Zerado pelo admin',
+        });
+        if (error) throw error;
+        toast.success(`Saldo de ${player.name} zerado com sucesso`);
+      } else if (adminAction === 'penalize') {
+        const amount = parseFloat(penaltyAmount);
+        if (isNaN(amount) || amount <= 0) {
+          toast.error('Valor inválido para penalização');
+          return;
+        }
+        const newEnergy = Math.max(0, player.energy - amount);
+        const { error } = await supabase.rpc('admin_adjust_player_energy', {
+          p_player_id: playerId,
+          p_new_energy: newEnergy,
+          p_reason: `Penalização: -${amount} k$`,
+        });
+        if (error) throw error;
+        toast.success(`${player.name} penalizado em ${formatEnergy(amount)}`);
+      } else if (adminAction === 'block') {
+        const { error } = await supabase.rpc('admin_set_player_status', {
+          p_player_id: playerId,
+          p_status: 'blocked',
+        });
+        if (error) throw error;
+        toast.success(`${player.name} foi bloqueado`);
+      } else if (adminAction === 'unblock') {
+        const { error } = await supabase.rpc('admin_set_player_status', {
+          p_player_id: playerId,
+          p_status: 'active',
+        });
+        if (error) throw error;
+        toast.success(`${player.name} foi desbloqueado`);
+      }
+
+      // Refresh data
+      queryClient.invalidateQueries({ queryKey: ['guardian-players-list'] });
+      queryClient.invalidateQueries({ queryKey: ['guardian-referral-tree'] });
+      queryClient.invalidateQueries({ queryKey: ['guardian-dashboard-stats'] });
+    } catch (err: any) {
+      toast.error(`Erro: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+      setAdminAction(null);
+      setPenaltyAmount('');
+    }
+  };
 
   if (!player) return null;
 
@@ -135,6 +246,7 @@ export function PlayerDetailDrawer({ playerId, open, onOpenChange, allNodes }: P
   const balance = calculateBalanceBreakdown(player.energy, player.player_tier, player.invites_sent);
 
   return (
+    <>
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-lg overflow-hidden p-0">
         <ScrollArea className="h-full">
@@ -185,6 +297,86 @@ export function PlayerDetailDrawer({ playerId, open, onOpenChange, allNodes }: P
               </div>
             </div>
 
+            {/* Arena P&L */}
+            {arenaPnL.arenas > 0 && (
+              <div className="bg-muted/20 rounded-lg p-4 border border-border/50">
+                <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                  <DollarSign className="h-4 w-4 text-yellow-400" />
+                  Balanço de Arenas ({arenaPnL.arenas} participações)
+                </h3>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <div className="flex items-center justify-center gap-1 text-red-400 text-xs mb-1">
+                      <ArrowDown className="h-3 w-3" /> Buy-ins
+                    </div>
+                    <div className="text-sm font-bold text-red-400">-{formatEnergy(arenaPnL.totalBuyIns)}</div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-center gap-1 text-green-400 text-xs mb-1">
+                      <ArrowUp className="h-3 w-3" /> Prêmios
+                    </div>
+                    <div className="text-sm font-bold text-green-400">+{formatEnergy(arenaPnL.totalPrizes)}</div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-center gap-1 text-xs mb-1">
+                      <TrendingUp className="h-3 w-3" /> P&L
+                    </div>
+                    <div className={`text-sm font-bold ${arenaPnL.net >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {arenaPnL.net >= 0 ? '+' : ''}{formatEnergy(arenaPnL.net)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Admin Actions (master_admin only) */}
+            {isMasterAdmin && (
+              <div className="bg-destructive/5 rounded-lg p-4 border border-destructive/20">
+                <h3 className="text-sm font-semibold flex items-center gap-2 mb-3 text-destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  Ações Administrativas
+                </h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs border-destructive/30 hover:bg-destructive/10 text-destructive"
+                    onClick={() => setAdminAction('zero')}
+                  >
+                    <Trash2 className="h-3 w-3 mr-1" />
+                    Zerar Saldo
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs border-orange-500/30 hover:bg-orange-500/10 text-orange-400"
+                    onClick={() => setAdminAction('penalize')}
+                  >
+                    <MinusCircle className="h-3 w-3 mr-1" />
+                    Penalizar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs border-red-500/30 hover:bg-red-500/10 text-red-400"
+                    onClick={() => setAdminAction('block')}
+                  >
+                    <Ban className="h-3 w-3 mr-1" />
+                    Bloquear
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400"
+                    onClick={() => setAdminAction('unblock')}
+                  >
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Desbloquear
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Game stats */}
             <div>
               <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
@@ -229,7 +421,7 @@ export function PlayerDetailDrawer({ playerId, open, onOpenChange, allNodes }: P
 
             <Separator />
 
-            {/* Ancestry (who invited them) */}
+            {/* Ancestry */}
             <div>
               <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
                 <ArrowUpRight className="h-4 w-4 text-amber-400" />
@@ -241,7 +433,7 @@ export function PlayerDetailDrawer({ playerId, open, onOpenChange, allNodes }: P
                 </div>
               ) : (
                 <div className="space-y-1">
-                  {ancestry.map((a, i) => {
+                  {ancestry.map((a) => {
                     const tc = getTierConfig(a.player_tier);
                     return (
                       <div key={a.id} className="flex items-center gap-2 text-xs bg-muted/20 rounded-lg p-2">
@@ -363,5 +555,133 @@ export function PlayerDetailDrawer({ playerId, open, onOpenChange, allNodes }: P
         </ScrollArea>
       </SheetContent>
     </Sheet>
+
+    {/* Confirmation Dialogs */}
+    <AlertDialog open={adminAction === 'zero'} onOpenChange={(o) => !o && setAdminAction(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+            <Trash2 className="h-5 w-5" />
+            Zerar Saldo
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            Tem certeza que deseja zerar o saldo de <strong>{player.name}</strong>?
+            <br />
+            <span className="text-yellow-400">Saldo atual: {formatEnergy(player.energy)}</span>
+            <br />
+            Esta ação <strong>não pode ser desfeita</strong>.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isProcessing}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleAdminAction}
+            disabled={isProcessing}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {isProcessing ? 'Processando...' : 'Confirmar — Zerar'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <AlertDialog open={adminAction === 'penalize'} onOpenChange={(o) => { if (!o) { setAdminAction(null); setPenaltyAmount(''); } }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2 text-orange-400">
+            <MinusCircle className="h-5 w-5" />
+            Penalizar Jogador
+          </AlertDialogTitle>
+          <AlertDialogDescription asChild>
+            <div className="space-y-3">
+              <p>
+                Deduzir energia de <strong>{player.name}</strong>
+                <br />
+                <span className="text-yellow-400">Saldo atual: {formatEnergy(player.energy)}</span>
+              </p>
+              <div>
+                <label className="text-xs text-foreground mb-1 block">Valor da penalização (k$):</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  max={player.energy}
+                  placeholder="Ex: 5.00"
+                  value={penaltyAmount}
+                  onChange={(e) => setPenaltyAmount(e.target.value)}
+                  className="bg-background"
+                />
+                {penaltyAmount && !isNaN(parseFloat(penaltyAmount)) && (
+                  <p className="text-xs mt-1 text-muted-foreground">
+                    Novo saldo: <strong>{formatEnergy(Math.max(0, player.energy - parseFloat(penaltyAmount)))}</strong>
+                  </p>
+                )}
+              </div>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isProcessing}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleAdminAction}
+            disabled={isProcessing || !penaltyAmount || isNaN(parseFloat(penaltyAmount)) || parseFloat(penaltyAmount) <= 0}
+            className="bg-orange-500 text-white hover:bg-orange-600"
+          >
+            {isProcessing ? 'Processando...' : `Penalizar -${penaltyAmount || '0'} k$`}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <AlertDialog open={adminAction === 'block'} onOpenChange={(o) => !o && setAdminAction(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2 text-red-400">
+            <Ban className="h-5 w-5" />
+            Bloquear Jogador
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            Tem certeza que deseja bloquear <strong>{player.name}</strong>?
+            <br />
+            O jogador não poderá mais participar de arenas ou corridas.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isProcessing}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleAdminAction}
+            disabled={isProcessing}
+            className="bg-red-500 text-white hover:bg-red-600"
+          >
+            {isProcessing ? 'Processando...' : 'Confirmar — Bloquear'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <AlertDialog open={adminAction === 'unblock'} onOpenChange={(o) => !o && setAdminAction(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2 text-emerald-400">
+            <CheckCircle className="h-5 w-5" />
+            Desbloquear Jogador
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            Desbloquear <strong>{player.name}</strong> e restaurar acesso normal?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isProcessing}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleAdminAction}
+            disabled={isProcessing}
+            className="bg-emerald-500 text-white hover:bg-emerald-600"
+          >
+            {isProcessing ? 'Processando...' : 'Confirmar — Desbloquear'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
