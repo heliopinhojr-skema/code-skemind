@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDashboardStats, useReferralTree } from '@/hooks/useGuardianData';
 import { useSupabasePlayer } from '@/hooks/useSupabasePlayer';
-import { Users, Zap, Box, Gift, Trophy, TrendingUp, Copy, Check, Share2, Link, ArrowDownRight, Lock, Unlock, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Users, Zap, Box, Gift, Trophy, TrendingUp, Copy, Check, Share2, Link, ArrowDownRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { calculateBalanceBreakdown, formatEnergy as formatEnergyUtil } from '@/lib/tierEconomy';
@@ -114,97 +114,57 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
     },
   ];
 
-  const INITIAL_SUPPLY = 10_000_000;
   const systemTotal = stats?.systemTotal || 0;
-  const diff = systemTotal - INITIAL_SUPPLY;
-  const isBalanced = Math.abs(diff) < 0.01;
 
   return (
     <div className="space-y-6">
       {/* Card de Auditoria Econômica */}
-      <Card className={cn(
-        "border-2",
-        isBalanced 
-          ? "bg-emerald-500/10 border-emerald-500/40" 
-          : "bg-destructive/10 border-destructive/40"
-      )}>
+      <Card className="border border-border/60 bg-card/90 backdrop-blur-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
-            {isBalanced ? (
-              <ShieldCheck className="h-5 w-5 text-emerald-500" />
-            ) : (
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-            )}
-            Auditoria Econômica — Balanço do Sistema
+            <TrendingUp className="h-5 w-5 text-primary" />
+            Balanço do Sistema
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            Soma total de k$ no sistema deve ser sempre {formatEnergyUtil(INITIAL_SUPPLY)}
+            Distribuição total de k$ — energia só é transferida, nunca criada
           </p>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <Skeleton className="h-20 w-full" />
           ) : (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="bg-background/60 rounded-lg p-3 border border-border/40">
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Zap className="h-3 w-3" /> HX (Tesouro)
-                  </p>
-                  <p className="text-lg font-bold text-foreground">
-                    {formatEnergyUtil(stats?.hxEnergy || 0)}
-                  </p>
-                </div>
-                <div className="bg-background/60 rounded-lg p-3 border border-border/40">
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Users className="h-3 w-3" /> Jogadores
-                  </p>
-                  <p className="text-lg font-bold text-foreground">
-                    {formatEnergyUtil(stats?.playersEnergy || 0)}
-                  </p>
-                </div>
-                <div className="bg-background/60 rounded-lg p-3 border border-border/40">
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Box className="h-3 w-3" /> Skema Box
-                  </p>
-                  <p className="text-lg font-bold text-foreground">
-                    {formatEnergyUtil(stats?.skemaBoxBalance || 0)}
-                  </p>
-                </div>
-                <div className={cn(
-                  "rounded-lg p-3 border-2",
-                  isBalanced 
-                    ? "bg-emerald-500/10 border-emerald-500/30" 
-                    : "bg-destructive/10 border-destructive/30"
-                )}>
-                  <p className="text-xs text-muted-foreground font-medium">
-                    ∑ Total Sistema
-                  </p>
-                  <p className={cn(
-                    "text-lg font-bold",
-                    isBalanced ? "text-emerald-500" : "text-destructive"
-                  )}>
-                    {formatEnergyUtil(systemTotal)}
-                  </p>
-                  {!isBalanced && (
-                    <p className="text-xs text-destructive mt-1">
-                      Δ {diff > 0 ? '+' : ''}{formatEnergyUtil(diff)}
-                    </p>
-                  )}
-                </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="bg-background/60 rounded-lg p-3 border border-border/40">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Zap className="h-3 w-3" /> HX (Tesouro)
+                </p>
+                <p className="text-lg font-bold text-foreground">
+                  {formatEnergyUtil(stats?.hxEnergy || 0)}
+                </p>
               </div>
-              <div className="flex items-center gap-2 text-xs">
-                {isBalanced ? (
-                  <span className="text-emerald-500 font-medium flex items-center gap-1">
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                    ✓ Sistema equilibrado — nenhuma energia criada ou perdida
-                  </span>
-                ) : (
-                  <span className="text-destructive font-medium flex items-center gap-1">
-                    <AlertTriangle className="h-3.5 w-3.5" />
-                    ⚠ Discrepância de {formatEnergyUtil(Math.abs(diff))} detectada
-                  </span>
-                )}
+              <div className="bg-background/60 rounded-lg p-3 border border-border/40">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Users className="h-3 w-3" /> Jogadores
+                </p>
+                <p className="text-lg font-bold text-foreground">
+                  {formatEnergyUtil(stats?.playersEnergy || 0)}
+                </p>
+              </div>
+              <div className="bg-background/60 rounded-lg p-3 border border-border/40">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Box className="h-3 w-3" /> Skema Box
+                </p>
+                <p className="text-lg font-bold text-foreground">
+                  {formatEnergyUtil(stats?.skemaBoxBalance || 0)}
+                </p>
+              </div>
+              <div className="bg-primary/10 rounded-lg p-3 border border-primary/30">
+                <p className="text-xs text-muted-foreground font-medium">
+                  ∑ Total Sistema
+                </p>
+                <p className="text-lg font-bold text-primary">
+                  {formatEnergyUtil(systemTotal)}
+                </p>
               </div>
             </div>
           )}
