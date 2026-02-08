@@ -14,6 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
+      game_history: {
+        Row: {
+          attempts: number
+          created_at: string
+          game_mode: string
+          guesses: Json | null
+          id: string
+          player_id: string
+          race_id: string | null
+          score: number
+          secret_code: Json | null
+          time_remaining: number | null
+          won: boolean
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          game_mode?: string
+          guesses?: Json | null
+          id?: string
+          player_id: string
+          race_id?: string | null
+          score?: number
+          secret_code?: Json | null
+          time_remaining?: number | null
+          won?: boolean
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          game_mode?: string
+          guesses?: Json | null
+          id?: string
+          player_id?: string
+          race_id?: string | null
+          score?: number
+          secret_code?: Json | null
+          time_remaining?: number | null
+          won?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_history_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "game_history_race_id_fkey"
+            columns: ["race_id"]
+            isOneToOne: false
+            referencedRelation: "official_races"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       official_races: {
         Row: {
           created_at: string
@@ -146,6 +203,57 @@ export type Database = {
           },
         ]
       }
+      race_results: {
+        Row: {
+          attempts: number
+          completed_at: string | null
+          created_at: string
+          id: string
+          player_id: string
+          race_id: string
+          score: number
+          status: string
+          time_remaining: number | null
+        }
+        Insert: {
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          player_id: string
+          race_id: string
+          score?: number
+          status?: string
+          time_remaining?: number | null
+        }
+        Update: {
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          player_id?: string
+          race_id?: string
+          score?: number
+          status?: string
+          time_remaining?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "race_results_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "race_results_race_id_fkey"
+            columns: ["race_id"]
+            isOneToOne: false
+            referencedRelation: "official_races"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       referrals: {
         Row: {
           created_at: string
@@ -268,6 +376,14 @@ export type Database = {
       }
       register_player: {
         Args: { p_emoji: string; p_invite_code: string; p_name: string }
+        Returns: undefined
+      }
+      set_user_role_and_tier: {
+        Args: {
+          p_new_role: Database["public"]["Enums"]["app_role"]
+          p_new_tier: string
+          p_target_user_id: string
+        }
         Returns: undefined
       }
       update_player_energy: {

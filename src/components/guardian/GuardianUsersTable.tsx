@@ -85,12 +85,12 @@ export function GuardianUsersTable() {
       // Map tier to role (they're the same in our system)
       const newRole = newTier;
       
-      // Use direct RPC call since types may not be updated yet
-      const { data, error } = await supabase.rpc('set_user_role_and_tier' as never, {
+      // Use RPC call to update role and tier
+      const { data, error } = await supabase.rpc('set_user_role_and_tier', {
         p_target_user_id: userId,
         p_new_role: newRole,
         p_new_tier: newTier,
-      } as never);
+      });
 
       if (error) {
         console.error('Error updating tier:', error);
