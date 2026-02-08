@@ -531,14 +531,14 @@ export function SkemaLobby({
                       <h3 className="font-bold text-white">Arena x Bots</h3>
                       <span className="text-sm font-medium text-yellow-400">k$0.55</span>
                     </div>
-                    <p className="text-sm text-white/60 mt-1">Enfrente 9 bots IA • Prêmios top 3</p>
+                    <p className="text-sm text-white/60 mt-1">Enfrente 99 bots IA • Prêmios top 3</p>
                     <div className="flex items-center gap-4 mt-2 text-xs text-white/50">
-                      <span><Users className="w-3 h-3 inline mr-1" />10 jogadores</span>
+                      <span><Users className="w-3 h-3 inline mr-1" />100 jogadores</span>
                       <span><Trophy className="w-3 h-3 inline mr-1" />ITM: 1º 50% • 2º 30% • 3º 20%</span>
                     </div>
                     <div className="flex items-center gap-3 mt-2 text-xs">
-                      <span className="text-green-400">Pool: k$5.00</span>
-                      <span className="text-purple-400">Rake: k$0.05</span>
+                      <span className="text-green-400">Pool: k$50.00</span>
+                      <span className="text-purple-400">Rake: k$5.00</span>
                     </div>
                   </div>
                 </div>
