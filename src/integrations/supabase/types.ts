@@ -14,16 +14,274 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      official_races: {
+        Row: {
+          created_at: string
+          entry_fee: number
+          id: string
+          max_players: number
+          min_players: number
+          name: string
+          prize_per_player: number
+          scheduled_date: string
+          skema_box_fee: number
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          entry_fee?: number
+          id?: string
+          max_players?: number
+          min_players?: number
+          name: string
+          prize_per_player?: number
+          scheduled_date: string
+          skema_box_fee?: number
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          entry_fee?: number
+          id?: string
+          max_players?: number
+          min_players?: number
+          name?: string
+          prize_per_player?: number
+          scheduled_date?: string
+          skema_box_fee?: number
+          status?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          emoji: string
+          energy: number
+          id: string
+          invite_code: string
+          invited_by: string | null
+          invited_by_name: string | null
+          last_refill_date: string | null
+          name: string
+          pin: string | null
+          player_tier: string | null
+          stats_best_time: number | null
+          stats_races: number
+          stats_wins: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          emoji?: string
+          energy?: number
+          id?: string
+          invite_code: string
+          invited_by?: string | null
+          invited_by_name?: string | null
+          last_refill_date?: string | null
+          name: string
+          pin?: string | null
+          player_tier?: string | null
+          stats_best_time?: number | null
+          stats_races?: number
+          stats_wins?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          emoji?: string
+          energy?: number
+          id?: string
+          invite_code?: string
+          invited_by?: string | null
+          invited_by_name?: string | null
+          last_refill_date?: string | null
+          name?: string
+          pin?: string | null
+          player_tier?: string | null
+          stats_best_time?: number | null
+          stats_races?: number
+          stats_wins?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      race_registrations: {
+        Row: {
+          id: string
+          player_id: string
+          race_id: string
+          registered_at: string
+        }
+        Insert: {
+          id?: string
+          player_id: string
+          race_id: string
+          registered_at?: string
+        }
+        Update: {
+          id?: string
+          player_id?: string
+          race_id?: string
+          registered_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "race_registrations_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "race_registrations_race_id_fkey"
+            columns: ["race_id"]
+            isOneToOne: false
+            referencedRelation: "official_races"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referrals: {
+        Row: {
+          created_at: string
+          id: string
+          invited_id: string
+          inviter_id: string
+          reward_amount: number | null
+          reward_credited: boolean
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invited_id: string
+          inviter_id: string
+          reward_amount?: number | null
+          reward_credited?: boolean
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invited_id?: string
+          inviter_id?: string
+          reward_amount?: number | null
+          reward_credited?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referrals_invited_id_fkey"
+            columns: ["invited_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referrals_inviter_id_fkey"
+            columns: ["inviter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      skema_box: {
+        Row: {
+          balance: number
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          balance?: number
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          balance?: number
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      skema_box_transactions: {
+        Row: {
+          amount: number
+          balance_after: number
+          created_at: string
+          description: string | null
+          id: string
+          type: string
+        }
+        Insert: {
+          amount: number
+          balance_after?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          type: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          type?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      register_player: {
+        Args: { p_emoji: string; p_invite_code: string; p_name: string }
+        Returns: undefined
+      }
+      update_player_energy: {
+        Args: { p_amount: number; p_player_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role:
+        | "master_admin"
+        | "guardiao"
+        | "grao_mestre"
+        | "mestre"
+        | "jogador"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +408,14 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: [
+        "master_admin",
+        "guardiao",
+        "grao_mestre",
+        "mestre",
+        "jogador",
+      ],
+    },
   },
 } as const
