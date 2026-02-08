@@ -1,1 +1,7 @@
 project_id = "ujeynkwteuhwisaxbnon"
+
+[functions.submit-race-result]
+verify_jwt = false
+
+[functions.process-referral-rewards]
+verify_jwt = false
