@@ -1,7 +1,7 @@
 /**
- * useTournament - Hook para gerenciar torneio de 10 jogadores
+ * useTournament - Hook para gerenciar torneio de 100 jogadores
  * 
- * - 1 jogador real + 9 bots IQ80
+ * - 1 jogador real + 99 bots IQ80
  * - CADA jogador tem seu próprio código secreto
  * - Ranking por: vitória > tentativas > score > tempo
  */
@@ -38,8 +38,8 @@ export type TournamentStatus = 'lobby' | 'playing' | 'finished';
 
 export const INITIAL_CREDITS = 1000;
 export const TOURNAMENT_ENTRY_FEE = 100;
-export const TOURNAMENT_PLAYERS = 10;
-export const BOT_COUNT = 9;
+export const TOURNAMENT_PLAYERS = 100;
+export const BOT_COUNT = 99;
 
 const PRIZE_DISTRIBUTION = [0.5, 0.25, 0.15, 0.1];
 
