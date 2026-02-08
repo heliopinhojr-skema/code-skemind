@@ -143,9 +143,13 @@ export default function Auth() {
         return;
       }
 
-      const result = validation as unknown as { valid: boolean; inviter_name: string | null };
+      const result = validation as unknown as { valid: boolean; inviter_name: string | null; reason?: string };
       if (!result.valid) {
-        setError('Código de convite inválido');
+        if (result.reason === 'code_already_used') {
+          setError('Este código de convite já foi utilizado. Peça um novo código.');
+        } else {
+          setError('Código de convite inválido');
+        }
         setIsLoading(false);
         return;
       }
@@ -284,7 +288,7 @@ export default function Auth() {
               <div>
                 <label className="text-sm text-muted-foreground mb-1 block">Código de Convite</label>
                 <Input
-                  placeholder="Ex: SKEMA2024 ou SKAB12CD"
+                  placeholder="Ex: SKINV1A2B3C"
                   value={inviteCode}
                   onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
                   className={`${inputClass} text-center tracking-wider`}

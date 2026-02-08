@@ -71,6 +71,48 @@ export type Database = {
           },
         ]
       }
+      invite_codes: {
+        Row: {
+          code: string
+          created_at: string
+          creator_id: string
+          id: string
+          used_at: string | null
+          used_by_id: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          creator_id: string
+          id?: string
+          used_at?: string | null
+          used_by_id?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          creator_id?: string
+          id?: string
+          used_at?: string | null
+          used_by_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invite_codes_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invite_codes_used_by_id_fkey"
+            columns: ["used_by_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       official_races: {
         Row: {
           created_at: string
@@ -367,6 +409,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_invite_code: {
+        Args: { p_creator_profile_id: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

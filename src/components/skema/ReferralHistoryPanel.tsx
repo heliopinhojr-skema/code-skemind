@@ -1,18 +1,18 @@
 /**
- * ReferralHistoryPanel - Painel de histórico de convites (colapsável)
+ * ReferralHistoryPanel - Painel de convites com códigos únicos
  * 
- * Mostra:
- * - Header compacto sempre visível (título, badges, chevron)
- * - Ao expandir: código pessoal, link de convite, lista de convidados
+ * Cada código SKINV... é gerado individualmente e só pode ser usado uma vez.
+ * Mostra lista de códigos gerados (usados/livres) e botão para gerar novos.
  */
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Gift, Copy, Check, Clock, Coins, ChevronDown, ChevronUp, Users, Loader2, Share2 } from 'lucide-react';
+import { Gift, Copy, Check, Clock, Coins, ChevronDown, ChevronUp, Users, Loader2, Share2, Plus, Ticket } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ReferralEntry, useReferralHistory } from '@/hooks/useReferralHistory';
+import { useInviteCodes, InviteCode } from '@/hooks/useInviteCodes';
 import { toast } from '@/components/ui/use-toast';
 
 const MAX_REFERRAL_REWARDS = 10;
@@ -30,65 +30,52 @@ export function ReferralHistoryPanel({
   onProcessRewards,
   onRefreshProfile,
 }: ReferralHistoryPanelProps) {
-  const { referrals, isLoading, error, pendingRewardsCount, pendingRewardsTotal, refetch } = useReferralHistory(playerId);
+  const { referrals, isLoading: referralsLoading, error: referralsError, pendingRewardsCount, pendingRewardsTotal, refetch: refetchReferrals } = useReferralHistory(playerId);
+  const { codes, isLoading: codesLoading, isGenerating, error: codesError, unusedCount, generateCode, refetch: refetchCodes } = useInviteCodes(playerId);
   
-  const [copiedCode, setCopiedCode] = useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [isCardExpanded, setIsCardExpanded] = useState(false);
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [shareSuccess, setShareSuccess] = useState(false);
 
-  const inviteLink = `${window.location.origin}/?convite=${encodeURIComponent(inviteCode)}`;
   const usedCount = referrals.length;
 
-  const handleCopyCode = async () => {
+  const handleCopyCode = async (code: string) => {
     try {
-      await navigator.clipboard.writeText(inviteCode);
-      setCopiedCode(true);
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(code);
       toast({
         title: '✅ Código copiado!',
-        description: 'Cole onde quiser para compartilhar.',
+        description: `${code} — envie para seu convidado.`,
       });
-      setTimeout(() => setCopiedCode(false), 2000);
+      setTimeout(() => setCopiedCode(null), 2000);
     } catch (e) {
       console.error('Erro ao copiar:', e);
     }
   };
 
-  const handleCopyLink = async () => {
+  const handleCopyLink = async (code: string) => {
+    const link = `${window.location.origin}/?convite=${encodeURIComponent(code)}`;
     try {
-      await navigator.clipboard.writeText(inviteLink);
-      setCopiedLink(true);
+      await navigator.clipboard.writeText(link);
+      setCopiedCode(`link-${code}`);
       toast({
         title: '✅ Link copiado!',
-        description: 'Envie para seus amigos.',
+        description: 'Envie para seu convidado.',
       });
-      setTimeout(() => setCopiedLink(false), 2000);
+      setTimeout(() => setCopiedCode(null), 2000);
     } catch (e) {
       console.error('Erro ao copiar:', e);
     }
   };
 
-  const handleNativeShare = async () => {
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      try {
-        await navigator.share({
-          title: 'SKEMIND - Jogue comigo!',
-          text: `Use meu código de convite ${inviteCode} e ganhe k$10 para começar!`,
-          url: inviteLink,
-        });
-        setShareSuccess(true);
-        toast({
-          title: '🎉 Compartilhado!',
-          description: 'Seu convite foi enviado com sucesso.',
-        });
-        setTimeout(() => setShareSuccess(false), 2000);
-      } catch (e) {
-        if ((e as Error).name !== 'AbortError') {
-          console.error('Erro ao compartilhar:', e);
-        }
-      }
+  const handleGenerateCode = async () => {
+    const code = await generateCode();
+    if (code) {
+      toast({
+        title: '🎟️ Código gerado!',
+        description: `${code} — copie e envie para seu convidado.`,
+      });
     }
   };
 
@@ -104,7 +91,8 @@ export function ReferralHistoryPanel({
           title: '💰 Recompensas Creditadas!',
           description: `Você recebeu k$${result.total_reward.toFixed(2)} por ${result.processed} convite(s).`,
         });
-        await refetch();
+        await refetchReferrals();
+        await refetchCodes();
         onRefreshProfile();
       } else {
         toast({
@@ -134,7 +122,7 @@ export function ReferralHistoryPanel({
 
   return (
     <div className="bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20 rounded-xl overflow-hidden">
-      {/* Header Compacto - Sempre Visível */}
+      {/* Header Compacto */}
       <button
         onClick={() => setIsCardExpanded(!isCardExpanded)}
         className="w-full p-3 flex items-center justify-between hover:bg-primary/5 transition-colors"
@@ -145,6 +133,11 @@ export function ReferralHistoryPanel({
         </div>
         
         <div className="flex items-center gap-2">
+          {unusedCount > 0 && (
+            <span className="px-1.5 py-0.5 bg-green-500/20 text-green-300 text-xs rounded-full">
+              {unusedCount} livre{unusedCount > 1 ? 's' : ''}
+            </span>
+          )}
           <span className="text-xs text-muted-foreground">
             {usedCount}/{MAX_REFERRAL_REWARDS}
           </span>
@@ -172,75 +165,60 @@ export function ReferralHistoryPanel({
             className="border-t border-border overflow-hidden"
           >
             <div className="p-4 space-y-3">
-              {/* Código pessoal */}
-              <div className="space-y-1.5">
-                <div className="text-xs text-muted-foreground">Seu código pessoal:</div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-background/30 border border-border rounded-lg px-3 py-2 font-mono text-sm text-primary">
-                    {inviteCode}
-                  </div>
-                  <motion.div
-                    animate={copiedCode ? { scale: [1, 1.2, 1] } : {}}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={handleCopyCode}
-                      className={`shrink-0 gap-1 transition-colors ${copiedCode ? 'bg-primary/20 border-primary/40' : ''}`}
-                    >
-                      {copiedCode ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
-                    </Button>
-                  </motion.div>
-                </div>
-              </div>
+              {/* Botão Gerar Novo Código */}
+              <Button
+                onClick={handleGenerateCode}
+                disabled={isGenerating}
+                variant="default"
+                className="w-full gap-2"
+              >
+                {isGenerating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Plus className="w-4 h-4" />
+                )}
+                Gerar Código de Convite
+              </Button>
 
-              {/* Link de convite */}
-              <div className="space-y-1.5">
-                <div className="text-xs text-muted-foreground">Link de convite:</div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-background/30 border border-border rounded-lg px-3 py-2 text-xs text-primary truncate">
-                    {inviteLink}
-                  </div>
-                  <motion.div
-                    animate={copiedLink ? { scale: [1, 1.2, 1] } : {}}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={handleCopyLink}
-                      className={`shrink-0 gap-1 transition-colors ${copiedLink ? 'bg-primary/20 border-primary/40' : ''}`}
-                    >
-                      {copiedLink ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
-                    </Button>
-                  </motion.div>
-                  {typeof navigator !== 'undefined' && navigator.share && (
-                    <motion.div
-                      animate={shareSuccess ? { scale: [1, 1.2, 1], rotate: [0, 10, -10, 0] } : {}}
-                      transition={{ duration: 0.4 }}
-                    >
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={handleNativeShare}
-                        className={`shrink-0 gap-1 transition-colors ${shareSuccess ? 'bg-primary text-primary-foreground' : ''}`}
-                      >
-                        {shareSuccess ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
-                      </Button>
-                    </motion.div>
-                  )}
+              {/* Lista de códigos gerados */}
+              {codesLoading ? (
+                <div className="flex items-center justify-center py-3">
+                  <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
                 </div>
-              </div>
+              ) : codes.length > 0 ? (
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {codes.map((code) => (
+                    <InviteCodeItem
+                      key={code.id}
+                      code={code}
+                      copiedCode={copiedCode}
+                      onCopyCode={handleCopyCode}
+                      onCopyLink={handleCopyLink}
+                      formatDate={formatDate}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-background/20 rounded-lg p-3 text-center">
+                  <Ticket className="w-6 h-6 text-muted-foreground mx-auto mb-1" />
+                  <p className="text-xs text-muted-foreground">
+                    Nenhum código gerado ainda. Clique acima para criar!
+                  </p>
+                </div>
+              )}
 
-              {/* Expandir histórico */}
+              {codesError && (
+                <div className="text-xs text-destructive text-center">{codesError}</div>
+              )}
+
+              {/* Expandir histórico de convidados */}
               {usedCount > 0 && (
                 <button
                   onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
                   className="w-full flex items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors py-2"
                 >
                   <Users className="w-3 h-3" />
-                  <span>Ver histórico ({usedCount})</span>
+                  <span>Convidados ({usedCount})</span>
                   {isHistoryExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                 </button>
               )}
@@ -254,14 +232,14 @@ export function ReferralHistoryPanel({
                     exit={{ height: 0, opacity: 0 }}
                     className="space-y-2 max-h-48 overflow-y-auto"
                   >
-                    {isLoading ? (
+                    {referralsLoading ? (
                       <div className="flex items-center justify-center py-4">
                         <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
                       </div>
-                    ) : error ? (
+                    ) : referralsError ? (
                       <div className="text-center py-4">
-                        <p className="text-sm text-destructive">{error}</p>
-                        <Button variant="ghost" size="sm" onClick={refetch} className="mt-2 text-xs">
+                        <p className="text-sm text-destructive">{referralsError}</p>
+                        <Button variant="ghost" size="sm" onClick={refetchReferrals} className="mt-2 text-xs">
                           Tentar novamente
                         </Button>
                       </div>
@@ -296,7 +274,7 @@ export function ReferralHistoryPanel({
               )}
 
               {/* Mensagem de incentivo */}
-              {usedCount === 0 && (
+              {usedCount === 0 && codes.length === 0 && (
                 <div className="bg-background/20 rounded-lg p-3 text-center">
                   <p className="text-xs text-muted-foreground">
                     🎁 Convide amigos e ganhe <span className="text-primary font-medium">k$10</span> por cada um!
@@ -314,7 +292,85 @@ export function ReferralHistoryPanel({
   );
 }
 
-// Componente de item da lista
+// ==================== Componente de código individual ====================
+
+function InviteCodeItem({ 
+  code, 
+  copiedCode, 
+  onCopyCode, 
+  onCopyLink,
+  formatDate 
+}: { 
+  code: InviteCode; 
+  copiedCode: string | null;
+  onCopyCode: (code: string) => void;
+  onCopyLink: (code: string) => void;
+  formatDate: (d: string) => string;
+}) {
+  const isUsed = !!code.usedById;
+  const isCopied = copiedCode === code.code;
+  const isLinkCopied = copiedCode === `link-${code.code}`;
+
+  return (
+    <div className={`flex items-center gap-2 rounded-lg p-2 border ${
+      isUsed 
+        ? 'bg-background/10 border-border/50 opacity-60' 
+        : 'bg-background/30 border-primary/20'
+    }`}>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <Ticket className={`w-3 h-3 shrink-0 ${isUsed ? 'text-muted-foreground' : 'text-primary'}`} />
+          <span className={`font-mono text-sm ${isUsed ? 'text-muted-foreground line-through' : 'text-primary'}`}>
+            {code.code}
+          </span>
+        </div>
+        <div className="text-[10px] text-muted-foreground mt-0.5">
+          {isUsed ? (
+            <span>✅ Usado por <span className="text-foreground">{code.usedByName || '?'}</span> • {formatDate(code.usedAt!)}</span>
+          ) : (
+            <span>🟢 Livre • {formatDate(code.createdAt)}</span>
+          )}
+        </div>
+      </div>
+
+      {!isUsed && (
+        <div className="flex items-center gap-1 shrink-0">
+          <motion.div
+            animate={isCopied ? { scale: [1, 1.2, 1] } : {}}
+            transition={{ duration: 0.3 }}
+          >
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onCopyCode(code.code)}
+              className="h-7 w-7"
+              title="Copiar código"
+            >
+              {isCopied ? <Check className="w-3 h-3 text-primary" /> : <Copy className="w-3 h-3" />}
+            </Button>
+          </motion.div>
+          <motion.div
+            animate={isLinkCopied ? { scale: [1, 1.2, 1] } : {}}
+            transition={{ duration: 0.3 }}
+          >
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onCopyLink(code.code)}
+              className="h-7 w-7"
+              title="Copiar link"
+            >
+              {isLinkCopied ? <Check className="w-3 h-3 text-primary" /> : <Share2 className="w-3 h-3" />}
+            </Button>
+          </motion.div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ==================== Componente de item referral ====================
+
 function ReferralItem({ referral, formatDate }: { referral: ReferralEntry; formatDate: (d: string) => string }) {
   return (
     <div className="flex items-center gap-3 bg-background/20 rounded-lg p-2">
