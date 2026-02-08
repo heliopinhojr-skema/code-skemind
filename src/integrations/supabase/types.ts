@@ -14,6 +14,110 @@ export type Database = {
   }
   public: {
     Tables: {
+      arena_entries: {
+        Row: {
+          arena_id: string
+          attempts: number
+          completed_at: string | null
+          created_at: string
+          id: string
+          player_id: string
+          prize_won: number
+          rank: number | null
+          score: number
+          status: string
+          time_remaining: number | null
+        }
+        Insert: {
+          arena_id: string
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          player_id: string
+          prize_won?: number
+          rank?: number | null
+          score?: number
+          status?: string
+          time_remaining?: number | null
+        }
+        Update: {
+          arena_id?: string
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          player_id?: string
+          prize_won?: number
+          rank?: number | null
+          score?: number
+          status?: string
+          time_remaining?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_entries_arena_id_fkey"
+            columns: ["arena_id"]
+            isOneToOne: false
+            referencedRelation: "arena_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_entries_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arena_listings: {
+        Row: {
+          bot_count: number
+          buy_in: number
+          created_at: string
+          creator_id: string
+          id: string
+          max_entries: number
+          name: string
+          rake_fee: number
+          status: string
+          total_entries: number
+        }
+        Insert: {
+          bot_count?: number
+          buy_in?: number
+          created_at?: string
+          creator_id: string
+          id?: string
+          max_entries?: number
+          name: string
+          rake_fee?: number
+          status?: string
+          total_entries?: number
+        }
+        Update: {
+          bot_count?: number
+          buy_in?: number
+          created_at?: string
+          creator_id?: string
+          id?: string
+          max_entries?: number
+          name?: string
+          rake_fee?: number
+          status?: string
+          total_entries?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_listings_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       game_history: {
         Row: {
           attempts: number

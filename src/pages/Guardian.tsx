@@ -15,8 +15,9 @@ import { GuardianUsersTable } from '@/components/guardian/GuardianUsersTable';
 import { GuardianReferralTree } from '@/components/guardian/GuardianReferralTree';
 import { GuardianSkemaBox } from '@/components/guardian/GuardianSkemaBox';
 import { GuardianRacesPanel } from '@/components/guardian/GuardianRacesPanel';
+import { GuardianArenasPanel } from '@/components/guardian/GuardianArenasPanel';
 import { supabase } from '@/integrations/supabase/client';
-import { Crown, LogOut, LayoutDashboard, Users, GitBranch, Box, Trophy, Eye } from 'lucide-react';
+import { Crown, LogOut, LayoutDashboard, Users, GitBranch, Box, Trophy, Eye, Swords } from 'lucide-react';
 import { CosmicBackground } from '@/components/CosmicBackground';
 
 export default function Guardian() {
@@ -55,6 +56,7 @@ export default function Guardian() {
     { id: 'users', label: 'Usuários', icon: Users },
     { id: 'referrals', label: 'Convites', icon: GitBranch },
     { id: 'skemabox', label: 'Skema Box', icon: Box },
+    { id: 'arenas', label: 'Arenas', icon: Swords },
     { id: 'races', label: 'Corridas', icon: Trophy },
   ];
 
@@ -118,7 +120,7 @@ export default function Guardian() {
         {/* Main Content */}
         <main className="container mx-auto px-4 py-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-flex bg-card/80 backdrop-blur-sm border border-border/50">
+            <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-flex bg-card/80 backdrop-blur-sm border border-border/50">
               {tabs.map((tab) => (
                 <TabsTrigger 
                   key={tab.id} 
@@ -145,6 +147,10 @@ export default function Guardian() {
 
             <TabsContent value="skemabox" className="space-y-6">
               <GuardianSkemaBox />
+            </TabsContent>
+
+            <TabsContent value="arenas" className="space-y-6">
+              <GuardianArenasPanel />
             </TabsContent>
 
             <TabsContent value="races" className="space-y-6">

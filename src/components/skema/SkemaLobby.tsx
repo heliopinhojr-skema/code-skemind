@@ -13,11 +13,14 @@ import { formatEnergy, calculateBalanceBreakdown } from '@/lib/tierEconomy';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Zap, Trophy, Users, Clock, Brain, Swords, Target,
-  Rocket, Sparkles, Calendar, Crown, AlertCircle, LogOut, UserCheck, PartyPopper
+  Rocket, Sparkles, Calendar, Crown, AlertCircle, LogOut, UserCheck, PartyPopper, Bot
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { SkemaPlayer, getSkemaHour, PlayerTier } from '@/hooks/useSupabasePlayer';
 import { useOfficialRace } from '@/hooks/useOfficialRace';
+import { useOpenArenas, ArenaListing } from '@/hooks/useArenaListings';
+import { calculateArenaPool, getScaledArenaPrize } from '@/lib/arenaPayouts';
 import { OnlinePlayer } from '@/hooks/useOnlinePlayers';
 import { RegisteredPlayersPanel } from './RegisteredPlayersPanel';
 import { ReferralHistoryPanel } from './ReferralHistoryPanel';
@@ -149,6 +152,7 @@ export function SkemaLobby({
   skemaBox,
 }: SkemaLobbyProps) {
   const officialRace = useOfficialRace();
+  const { data: openArenas } = useOpenArenas();
   const { onlinePlayers, isConnected, updateStatus, onlineCount } = onlinePresence;
   const skemaHour = getSkemaHour();
   
@@ -620,6 +624,54 @@ export function SkemaLobby({
               </motion.button>
             </div>
           </motion.section>
+          
+          {/* Arenas Abertas */}
+          {openArenas && openArenas.length > 0 && (
+            <motion.section
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+              className="mx-4 mt-6"
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <Bot className="w-4 h-4 text-orange-400" />
+                <span className="text-sm font-medium text-white/80">Arenas Abertas</span>
+                <Badge variant="outline" className="text-[10px] border-orange-400/30 text-orange-400">
+                  {openArenas.length}
+                </Badge>
+              </div>
+              <div className="space-y-2">
+                {openArenas.map((arena) => {
+                  const pool = calculateArenaPool(Number(arena.buy_in), Number(arena.rake_fee), arena.bot_count);
+                  const first = getScaledArenaPrize(1, pool);
+                  const canAfford = Math.round(player.energy * 100) >= Math.round(Number(arena.buy_in) * 100);
+                  return (
+                    <motion.div
+                      key={arena.id}
+                      whileHover={{ scale: 1.01 }}
+                      className="p-3 rounded-xl bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/20"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-bold text-white text-sm">{arena.name}</span>
+                        <span className="text-xs text-yellow-400 font-medium">
+                          k${Number(arena.buy_in).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 text-[10px] text-white/50">
+                        <span><Bot className="w-3 h-3 inline mr-0.5" />{arena.bot_count} bots</span>
+                        <span><Trophy className="w-3 h-3 inline mr-0.5" />Pool: {formatEnergy(pool)}</span>
+                        <span>1º: {formatEnergy(first)}</span>
+                        <span className="ml-auto text-white/30">por {arena.creator_name}</span>
+                      </div>
+                      {!canAfford && (
+                        <div className="text-[10px] text-red-400 mt-1">⚠️ Saldo insuficiente</div>
+                      )}
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </motion.section>
+          )}
           
           {/* Painel de Jogadores Registrados - sempre visível */}
           {officialRace.race && (

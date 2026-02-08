@@ -1,62 +1,106 @@
 /**
  * arenaPayouts - Tabela de pagamento estilo poker para Arena x Bots
  * 
- * 100 jogadores, 25 ITM (25% do field)
- * Pool total: k$50.00 (100 × k$0.50 buy-in)
+ * Base: 100 jogadores, 25 ITM (25% do field)
+ * Pool base: k$50.00 (100 × k$0.50 buy-in)
  * 
- * Estrutura graduada:
- * - Top 3: prêmios grandes (bolada)
- * - 4º-10º: prêmios médios decrescentes
- * - 11º-25º: min-cash (pelo menos o buy-in de volta)
+ * Estrutura escalável:
+ * - Percentuais fixos aplicados ao pool total
+ * - Pool escala com buy_in: pool = 100 × net_buy_in
+ * - net_buy_in = buy_in - rake (rake ≈ 9.09% do buy_in)
  * 
  * Todos os valores em CENTAVOS para evitar floating-point.
- * Soma total = 5000 cents = k$50.00 ✓
  */
 
 /** Número de posições pagas (25% de 100) */
 export const ITM_POSITIONS = 25;
 
 /**
- * Tabela de pagamento em centavos por posição.
- * Posições 1-10: valores individuais
- * Posições 11-15: k$0.75 cada
- * Posições 16-20: k$0.65 cada
- * Posições 21-25: k$0.55 cada (min-cash = entry fee)
+ * Tabela de pagamento em MILÉSIMOS (‰) do pool total.
+ * Soma = 1000‰ = 100%
  */
-const PAYOUT_CENTS: Record<number, number> = {
-  1:  1350,  // k$13.50  (27.0%)
-  2:   800,  // k$ 8.00  (16.0%)
-  3:   500,  // k$ 5.00  (10.0%)
-  4:   350,  // k$ 3.50  ( 7.0%)
-  5:   275,  // k$ 2.75  ( 5.5%)
-  6:   200,  // k$ 2.00  ( 4.0%)
-  7:   175,  // k$ 1.75  ( 3.5%)
-  8:   150,  // k$ 1.50  ( 3.0%)
-  9:   125,  // k$ 1.25  ( 2.5%)
-  10:  100,  // k$ 1.00  ( 2.0%)
-  // 11-15: 75 cents cada (k$0.75)
-  11: 75, 12: 75, 13: 75, 14: 75, 15: 75,
-  // 16-20: 65 cents cada (k$0.65)
-  16: 65, 17: 65, 18: 65, 19: 65, 20: 65,
-  // 21-25: 55 cents cada (k$0.55) — min-cash = entry fee
-  21: 55, 22: 55, 23: 55, 24: 55, 25: 55,
+const PAYOUT_PERMIL: Record<number, number> = {
+  1:  270,  // 27.0%
+  2:  160,  // 16.0%
+  3:  100,  // 10.0%
+  4:   70,  //  7.0%
+  5:   55,  //  5.5%
+  6:   40,  //  4.0%
+  7:   35,  //  3.5%
+  8:   30,  //  3.0%
+  9:   25,  //  2.5%
+  10:  20,  //  2.0%
+  // 11-15: 15‰ cada (1.5%)
+  11: 15, 12: 15, 13: 15, 14: 15, 15: 15,
+  // 16-20: 13‰ cada (1.3%)
+  16: 13, 17: 13, 18: 13, 19: 13, 20: 13,
+  // 21-25: 11‰ cada (1.1%)
+  21: 11, 22: 11, 23: 11, 24: 11, 25: 11,
 };
 
-/**
- * Retorna o prêmio em k$ para uma posição no ranking.
- * Retorna 0 se a posição não é ITM (> 25).
- */
-export function getArenaPrize(rank: number): number {
-  const cents = PAYOUT_CENTS[rank];
-  if (!cents) return 0;
-  return cents / 100;
+// Validação estática: soma = 1000‰
+const _TOTAL_PERMIL = Object.values(PAYOUT_PERMIL).reduce((a, b) => a + b, 0);
+if (_TOTAL_PERMIL !== 1000) {
+  console.error(`[ARENA PAYOUTS] ❌ Soma dos permil errada: ${_TOTAL_PERMIL} (esperado 1000)`);
 }
 
 /**
- * Retorna o prêmio em centavos para uma posição.
+ * Calcula o pool total para uma arena com buy-in e bot_count customizados.
+ * total_players = bot_count + 1 (humano)
+ * net_buy_in = buy_in - rake_fee
+ * pool = total_players × net_buy_in
+ */
+export function calculateArenaPool(buyIn: number, rakeFee: number, botCount: number = 99): number {
+  const totalPlayers = botCount + 1;
+  const netBuyIn = buyIn - rakeFee;
+  return totalPlayers * netBuyIn;
+}
+
+/**
+ * Calcula o rake total de uma arena.
+ */
+export function calculateTotalRake(rakeFee: number, botCount: number = 99): number {
+  return (botCount + 1) * rakeFee;
+}
+
+/**
+ * Retorna o prêmio em k$ para uma posição no ranking, dado um pool total.
+ * Retorna 0 se a posição não é ITM (> 25).
+ */
+export function getScaledArenaPrize(rank: number, pool: number): number {
+  const permil = PAYOUT_PERMIL[rank];
+  if (!permil) return 0;
+  // prize = pool × (permil / 1000), arredondado para 2 casas
+  return Math.round(pool * permil / 1000 * 100) / 100;
+}
+
+/**
+ * Retorna o prêmio em centavos para uma posição, dado um pool total.
+ */
+export function getScaledArenaPrizeCents(rank: number, pool: number): number {
+  const permil = PAYOUT_PERMIL[rank];
+  if (!permil) return 0;
+  return Math.round(pool * permil / 1000 * 100);
+}
+
+// ========== Compatibilidade com arena padrão (k$0.55 buy-in) ==========
+
+/** Pool padrão: 100 × k$0.50 = k$50.00 */
+const DEFAULT_POOL = 50;
+
+/**
+ * Retorna o prêmio em k$ para a arena padrão (buy-in k$0.55).
+ * Mantém backward-compatibility.
+ */
+export function getArenaPrize(rank: number): number {
+  return getScaledArenaPrize(rank, DEFAULT_POOL);
+}
+
+/**
+ * Retorna o prêmio em centavos para a arena padrão.
  */
 export function getArenaPrizeCents(rank: number): number {
-  return PAYOUT_CENTS[rank] ?? 0;
+  return getScaledArenaPrizeCents(rank, DEFAULT_POOL);
 }
 
 /**
@@ -67,33 +111,45 @@ export function isITM(rank: number): boolean {
 }
 
 /**
- * Retorna a tabela completa de pagamento formatada.
- * Útil para exibição na UI.
+ * Retorna a tabela completa de pagamento formatada para um pool dado.
  */
-export function getPayoutSummary(): Array<{
+export function getPayoutSummary(pool: number = DEFAULT_POOL): Array<{
   positions: string;
   prizeEach: number;
   label: string;
 }> {
   return [
-    { positions: '1º',      prizeEach: 13.50, label: 'Campeão' },
-    { positions: '2º',      prizeEach: 8.00,  label: 'Vice' },
-    { positions: '3º',      prizeEach: 5.00,  label: 'Bronze' },
-    { positions: '4º',      prizeEach: 3.50,  label: '' },
-    { positions: '5º',      prizeEach: 2.75,  label: '' },
-    { positions: '6º',      prizeEach: 2.00,  label: '' },
-    { positions: '7º',      prizeEach: 1.75,  label: '' },
-    { positions: '8º',      prizeEach: 1.50,  label: '' },
-    { positions: '9º',      prizeEach: 1.25,  label: '' },
-    { positions: '10º',     prizeEach: 1.00,  label: '' },
-    { positions: '11º-15º', prizeEach: 0.75,  label: '' },
-    { positions: '16º-20º', prizeEach: 0.65,  label: '' },
-    { positions: '21º-25º', prizeEach: 0.55,  label: 'Min-cash' },
+    { positions: '1º',      prizeEach: getScaledArenaPrize(1, pool),  label: 'Campeão' },
+    { positions: '2º',      prizeEach: getScaledArenaPrize(2, pool),  label: 'Vice' },
+    { positions: '3º',      prizeEach: getScaledArenaPrize(3, pool),  label: 'Bronze' },
+    { positions: '4º',      prizeEach: getScaledArenaPrize(4, pool),  label: '' },
+    { positions: '5º',      prizeEach: getScaledArenaPrize(5, pool),  label: '' },
+    { positions: '6º',      prizeEach: getScaledArenaPrize(6, pool),  label: '' },
+    { positions: '7º',      prizeEach: getScaledArenaPrize(7, pool),  label: '' },
+    { positions: '8º',      prizeEach: getScaledArenaPrize(8, pool),  label: '' },
+    { positions: '9º',      prizeEach: getScaledArenaPrize(9, pool),  label: '' },
+    { positions: '10º',     prizeEach: getScaledArenaPrize(10, pool), label: '' },
+    { positions: '11º-15º', prizeEach: getScaledArenaPrize(11, pool), label: '' },
+    { positions: '16º-20º', prizeEach: getScaledArenaPrize(16, pool), label: '' },
+    { positions: '21º-25º', prizeEach: getScaledArenaPrize(21, pool), label: 'Min-cash' },
   ];
 }
 
-// Validação estática: soma = 5000 cents
-const _TOTAL = Object.values(PAYOUT_CENTS).reduce((a, b) => a + b, 0);
-if (_TOTAL !== 5000) {
-  console.error(`[ARENA PAYOUTS] ❌ Soma da tabela errada: ${_TOTAL} (esperado 5000)`);
-}
+/**
+ * Pre-defined arena buy-in options for Grão Mestre+ to create.
+ * buy_in = total entry fee (includes rake)
+ * rake_fee ≈ 9.09% of buy_in (same ratio as k$0.05/k$0.55)
+ */
+export const ARENA_BUY_IN_OPTIONS = [
+  { buyIn: 0.55,  rakeFee: 0.05,  label: 'k$ 0,55' },
+  { buyIn: 1.10,  rakeFee: 0.10,  label: 'k$ 1,10' },
+  { buyIn: 2.20,  rakeFee: 0.20,  label: 'k$ 2,20' },
+  { buyIn: 3.30,  rakeFee: 0.30,  label: 'k$ 3,30' },
+  { buyIn: 5.50,  rakeFee: 0.50,  label: 'k$ 5,50' },
+  { buyIn: 11.00, rakeFee: 1.00,  label: 'k$ 11,00' },
+];
+
+/**
+ * Bot count options for custom arenas.
+ */
+export const ARENA_BOT_OPTIONS = [3, 9, 19, 49, 99];
