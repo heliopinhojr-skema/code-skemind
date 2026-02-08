@@ -23,7 +23,7 @@ interface TournamentLobbyProps {
   credits: number;
   entryFee: number;
   prizePool: number;
-  onStart: () => { success: boolean; error?: string; humanSecretCode?: string[] };
+  onStart: () => Promise<{ success: boolean; error?: string; humanSecretCode?: string[] }>;
 }
 
 type GameMode = 'training' | 'solo' | 'arena';
@@ -164,12 +164,13 @@ export function TournamentLobby({
     if (countdown === null || countdown < 0) return;
     
     if (countdown === 0) {
-      const result = onStart();
-      if (!result.success && result.error) {
-        console.error(result.error);
-        setIsStarting(false);
-        setCountdown(null);
-      }
+      onStart().then(result => {
+        if (!result.success && result.error) {
+          console.error(result.error);
+          setIsStarting(false);
+          setCountdown(null);
+        }
+      });
       return;
     }
     

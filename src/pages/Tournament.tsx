@@ -36,10 +36,9 @@ export default function Tournament() {
   }, [game.state.status, game.state.attempts, game.state.score, game.state.timeRemaining, tournament.state.status, tournament.actions]);
   
   // Inicia torneio - passa código secreto do humano para o jogo
-  const handleStartTournament = useCallback(() => {
-    const result = tournament.actions.startTournament();
+  const handleStartTournament = useCallback(async () => {
+    const result = await tournament.actions.startTournament();
     if (result.success && result.humanSecretCode) {
-      // Inicia jogo com o código secreto gerado pelo torneio
       game.actions.startGameWithSecret(result.humanSecretCode);
     }
     return result;
@@ -55,7 +54,7 @@ export default function Tournament() {
     return (
       <TournamentLobby
         players={tournament.state.players}
-        credits={tournament.state.credits}
+        credits={0}
         entryFee={tournament.state.entryFee}
         prizePool={tournament.state.prizePool}
         onStart={handleStartTournament}
@@ -88,7 +87,7 @@ export default function Tournament() {
           </div>
           <div className="flex items-center gap-2 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 px-3 py-1 rounded-full border border-yellow-500/30">
             <Coins className="w-4 h-4 text-yellow-500" />
-            <span className="font-bold text-yellow-400">{tournament.state.credits.toLocaleString()} K$</span>
+            <span className="font-bold text-yellow-400">Arena</span>
           </div>
         </div>
         
