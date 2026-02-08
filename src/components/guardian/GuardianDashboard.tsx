@@ -133,7 +133,7 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
           {isLoading ? (
             <Skeleton className="h-20 w-full" />
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <div className="bg-background/60 rounded-lg p-3 border border-border/40">
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <Zap className="h-3 w-3" /> HX (Tesouro)
@@ -148,6 +148,14 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
                 </p>
                 <p className="text-lg font-bold text-foreground">
                   {formatEnergyUtil(stats?.playersEnergy || 0)}
+                </p>
+              </div>
+              <div className="bg-background/60 rounded-lg p-3 border border-border/40">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  🤖 Bot Treasury
+                </p>
+                <p className="text-lg font-bold text-foreground">
+                  {formatEnergyUtil(stats?.botTreasuryBalance || 0)}
                 </p>
               </div>
               <div className="bg-background/60 rounded-lg p-3 border border-border/40">

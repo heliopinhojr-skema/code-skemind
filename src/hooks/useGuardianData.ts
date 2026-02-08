@@ -13,6 +13,7 @@ export interface DashboardStats {
   hxEnergy: number;
   playersEnergy: number;
   skemaBoxBalance: number;
+  botTreasuryBalance: number;
   totalReferrals: number;
   creditedReferrals: number;
   totalDistributed: number;
@@ -165,8 +166,21 @@ export function useDashboardStats() {
       
       const skemaBoxBalance = Number(skemaBox?.balance) || 0;
       
-      // System total = HX + players + skema box (should always equal initial 10M)
-      const systemTotal = hxEnergy + playersEnergy + skemaBoxBalance;
+      // Buscar saldo do Bot Treasury
+      const { data: botTreasury, error: botTreasuryError } = await supabase
+        .from('bot_treasury')
+        .select('balance')
+        .eq('id', '00000000-0000-0000-0000-000000000002')
+        .single();
+      
+      if (botTreasuryError && botTreasuryError.code !== 'PGRST116') {
+        console.error('Bot treasury error:', botTreasuryError);
+      }
+      
+      const botTreasuryBalance = Number(botTreasury?.balance) || 0;
+      
+      // System total = HX + players + skema box + bot treasury (should always equal initial 10M)
+      const systemTotal = hxEnergy + playersEnergy + skemaBoxBalance + botTreasuryBalance;
       
       // Buscar referrals com amounts
       const { data: referrals, error: referralsError } = await supabase
@@ -192,6 +206,7 @@ export function useDashboardStats() {
         hxEnergy,
         playersEnergy,
         skemaBoxBalance,
+        botTreasuryBalance,
         totalReferrals,
         creditedReferrals,
         totalDistributed,
