@@ -75,10 +75,8 @@ export function calculateBalanceBreakdown(
 }
 
 /**
- * Formata valor de energia para exibição
+ * Formata valor de energia no padrão monetário brasileiro: k$ 200.000,00
  */
 export function formatEnergy(energy: number): string {
-  if (energy >= 1_000_000) return `k$${(energy / 1_000_000).toFixed(2)}M`;
-  if (energy >= 1_000) return `k$${(energy / 1_000).toFixed(1)}k`;
-  return `k$${energy.toFixed(2)}`;
+  return `k$ ${energy.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
