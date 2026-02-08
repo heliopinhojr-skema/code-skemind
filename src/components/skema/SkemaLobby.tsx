@@ -9,7 +9,7 @@
  */
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { formatEnergy } from '@/lib/tierEconomy';
+import { formatEnergy, calculateBalanceBreakdown } from '@/lib/tierEconomy';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Zap, Trophy, Users, Clock, Brain, Swords, Target,
@@ -353,7 +353,7 @@ export function SkemaLobby({
               </div>
             </div>
             
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col items-end gap-1">
               <motion.div 
                 className="flex items-center gap-2 bg-gradient-to-r from-yellow-500/30 to-orange-500/30 px-4 py-2 rounded-full border border-yellow-500/50"
                 whileHover={{ scale: 1.05 }}
@@ -363,6 +363,15 @@ export function SkemaLobby({
                   {formatEnergy(player.energy)}
                 </span>
               </motion.div>
+              {(() => {
+                const bal = calculateBalanceBreakdown(player.energy, player.playerTier, player.referrals.length);
+                return bal.locked > 0 ? (
+                  <div className="flex items-center gap-2 text-[10px]">
+                    <span className="text-orange-400/80">🔒 {formatEnergy(bal.locked)}</span>
+                    <span className="text-emerald-400/80">🔓 {formatEnergy(bal.available)}</span>
+                  </div>
+                ) : null;
+              })()}
               
               <Button
                 variant="ghost"
