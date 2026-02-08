@@ -52,7 +52,7 @@ interface SkemaLobbyProps {
   remainingReferralRewards: number;
   transferTax: number;
   onStartTraining: () => void;
-  onStartBotRace: (buyIn: number, fee: number) => Promise<{ success: boolean; error?: string }>;
+  onStartBotRace: (buyIn: number, fee: number, botCount?: number) => Promise<{ success: boolean; error?: string }>;
   onStartOfficialRace: (raceId: string, buyIn: number, fee: number) => Promise<{ success: boolean; error?: string }>;
   onStartParty: () => void;
   onDeductEnergy: (amount: number) => boolean;
@@ -160,6 +160,7 @@ export function SkemaLobby({
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingArenaConfig, setPendingArenaConfig] = useState<{ buyIn: number; rakeFee: number; botCount: number } | null>(null);
 
   // Estrelas animadas
   const stars = useMemo(() => 
@@ -216,6 +217,7 @@ export function SkemaLobby({
   const handleCancelCountdown = useCallback(() => {
     setIsStarting(false);
     setCountdown(null);
+    setPendingArenaConfig(null);
   }, []);
 
   // Countdown timer
@@ -229,12 +231,17 @@ export function SkemaLobby({
       if (selectedMode === 'training') {
         onStartTraining();
       } else if (selectedMode === 'bots') {
-        // Arena x Bots: 50 cents pool + 5 cents rake (derivado de inteiros)
-        onStartBotRace(50 / 100, 5 / 100).then(result => {
+        // Use pending arena config if available (custom arena), otherwise default
+        const buyIn = pendingArenaConfig ? pendingArenaConfig.buyIn : 50 / 100;
+        const fee = pendingArenaConfig ? pendingArenaConfig.rakeFee : 5 / 100;
+        const botCount = pendingArenaConfig ? pendingArenaConfig.botCount : undefined;
+        
+        onStartBotRace(buyIn, fee, botCount).then(result => {
           if (!result.success) {
             setError(result.error || 'Erro ao iniciar');
             setIsStarting(false);
             setCountdown(null);
+            setPendingArenaConfig(null);
             updateStatus('online');
           }
         });
@@ -257,7 +264,7 @@ export function SkemaLobby({
     }, 1000);
     
     return () => clearTimeout(timer);
-  }, [countdown, selectedMode, onStartTraining, onStartBotRace, onStartOfficialRace, officialRace.constants, updateStatus]);
+  }, [countdown, selectedMode, onStartTraining, onStartBotRace, onStartOfficialRace, officialRace.constants, updateStatus, pendingArenaConfig]);
 
   return (
     <div className="min-h-screen relative overflow-x-hidden">
@@ -654,16 +661,41 @@ export function SkemaLobby({
                       className="p-3 rounded-xl bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/20"
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-bold text-white text-sm">{arena.name}</span>
-                        <span className="text-xs text-yellow-400 font-medium">
-                          k${Number(arena.buy_in).toFixed(2)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 text-[10px] text-white/50">
-                        <span><Bot className="w-3 h-3 inline mr-0.5" />{arena.bot_count} bots</span>
-                        <span><Trophy className="w-3 h-3 inline mr-0.5" />Pool: {formatEnergy(pool)}</span>
-                        <span>1º: {formatEnergy(first)}</span>
-                        <span className="ml-auto text-white/30">por {arena.creator_name}</span>
+                        <div className="flex-1">
+                          <span className="font-bold text-white text-sm">{arena.creator_emoji} {arena.name}</span>
+                          <div className="flex items-center gap-3 text-[10px] text-white/50 mt-1">
+                            <span><Bot className="w-3 h-3 inline mr-0.5" />{arena.bot_count} bots</span>
+                            <span><Trophy className="w-3 h-3 inline mr-0.5" />Pool: {formatEnergy(pool)}</span>
+                            <span>1º: {formatEnergy(first)}</span>
+                          </div>
+                          <div className="text-[10px] text-white/30 mt-0.5">por {arena.creator_name}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="text-right">
+                            <span className="text-xs text-yellow-400 font-bold">
+                              k${Number(arena.buy_in).toFixed(2)}
+                            </span>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              if (!canAfford || isStarting) return;
+                              setPendingArenaConfig({
+                                buyIn: Number(arena.buy_in),
+                                rakeFee: Number(arena.rake_fee),
+                                botCount: arena.bot_count,
+                              });
+                              setSelectedMode('bots');
+                              setIsStarting(true);
+                              setCountdown(COUNTDOWN_SECONDS);
+                            }}
+                            disabled={!canAfford || isStarting}
+                            className="h-8 px-3"
+                          >
+                            <Swords className="w-3 h-3 mr-1" />
+                            Jogar
+                          </Button>
+                        </div>
                       </div>
                       {!canAfford && (
                         <div className="text-[10px] text-red-400 mt-1">⚠️ Saldo insuficiente</div>
