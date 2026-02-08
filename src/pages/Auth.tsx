@@ -1,9 +1,12 @@
 /**
- * Auth - Página de autenticação Supabase
+ * Auth - Página de autenticação SKEMA
  * 
  * Fluxos:
- * 1. Registro: email + senha + código de convite obrigatório → cria profile
- * 2. Login: email + senha → restaura sessão
+ * 1. Registro: código de convite → nickname + emoji + PIN 4 dígitos
+ * 2. Login: nickname + PIN 4 dígitos
+ * 
+ * Internamente usa email derivado do nickname (nickname@skema.game) 
+ * + PIN como senha no Supabase Auth para manter sessões persistentes.
  */
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
@@ -11,20 +14,39 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Ticket, Sparkles, ArrowRight, Check, AlertCircle,
-  Zap, Gift, Lock, Eye, EyeOff, LogIn, UserPlus, Mail,
+  Zap, LogIn, UserPlus, KeyRound,
   Crown, Shield, Star, Users
 } from 'lucide-react';
+import { REGEXP_ONLY_DIGITS } from 'input-otp';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { supabase } from '@/integrations/supabase/client';
 import universeBg from '@/assets/universe-bg.jpg';
 
-// Códigos de convite master (para primeiros jogadores)
+// ==================== CONSTANTS ====================
+
 const MASTER_INVITE_CODES = ['SKEMA1', 'SKEMA2024', 'PRIMEIROSJOGADORES', 'BETATESTER', 'DEUSPAI'];
-
 const AVAILABLE_EMOJIS = ['🎮', '🚀', '⚡', '🔥', '💎', '🌟', '🎯', '👾', '🤖', '🧠', '💜', '🎲'];
+const NICKNAME_STORAGE_KEY = 'skema_last_nickname';
 
-// Animation variants for stagger effect
+// ==================== HELPERS ====================
+
+/** Derive a deterministic fake email from nickname for Supabase Auth */
+const makeAuthEmail = (nickname: string): string => {
+  const safe = nickname.toLowerCase().trim()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '') || 'player';
+  return `${safe}@skema.game`;
+};
+
+/** Extend 4-digit PIN to meet Supabase's 6-char password minimum */
+const makePinPassword = (pin: string): string => `${pin}SK`;
+
+// ==================== ANIMATION VARIANTS ====================
+
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -42,7 +64,8 @@ const itemVariants = {
   }
 };
 
-// Floating particles component
+// ==================== VISUAL COMPONENTS ====================
+
 const FloatingParticles = () => {
   const particles = useMemo(() => 
     Array.from({ length: 8 }, (_, i) => ({
@@ -84,7 +107,6 @@ const FloatingParticles = () => {
   );
 };
 
-// Pulsing glow behind card
 const GlowEffect = () => (
   <motion.div
     className="absolute inset-0 -z-10 rounded-3xl blur-3xl"
@@ -103,7 +125,6 @@ const GlowEffect = () => (
   />
 );
 
-// Shimmer logo component
 const ShimmerLogo = () => (
   <motion.h1 
     className="text-4xl font-black text-transparent bg-clip-text"
@@ -124,10 +145,10 @@ const ShimmerLogo = () => (
   </motion.h1>
 );
 
-// Input class with corrected colors
 const inputClassName = "bg-card/80 border-border text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:ring-primary/20 transition-all duration-200";
 
-// Tier benefits configuration
+// ==================== TIER BENEFITS ====================
+
 interface TierBenefits {
   tierName: string;
   tierLabel: string;
@@ -140,7 +161,6 @@ interface TierBenefits {
 }
 
 function getTierBenefits(inviterTier: string | null, inviterIsGuardian: boolean): TierBenefits {
-  // Master Admin convida → Guardião
   if (inviterIsGuardian || inviterTier === 'master_admin') {
     return {
       tierName: 'guardiao',
@@ -154,7 +174,6 @@ function getTierBenefits(inviterTier: string | null, inviterIsGuardian: boolean)
     };
   }
   
-  // Guardião convida → Grão Mestre
   if (inviterTier === 'guardiao') {
     return {
       tierName: 'grao_mestre',
@@ -168,7 +187,6 @@ function getTierBenefits(inviterTier: string | null, inviterIsGuardian: boolean)
     };
   }
   
-  // Grão Mestre convida → Mestre
   if (inviterTier === 'grao_mestre') {
     return {
       tierName: 'mestre',
@@ -182,7 +200,6 @@ function getTierBenefits(inviterTier: string | null, inviterIsGuardian: boolean)
     };
   }
   
-  // Mestre ou Jogador convida → Jogador
   return {
     tierName: 'jogador',
     tierLabel: 'Jogador',
@@ -195,7 +212,6 @@ function getTierBenefits(inviterTier: string | null, inviterIsGuardian: boolean)
   };
 }
 
-// Tier Benefits Card Component
 const TierBenefitsCard = ({ 
   inviterTier, 
   inviterIsGuardian 
@@ -218,7 +234,6 @@ const TierBenefitsCard = ({
         <span className={`font-semibold ${benefits.color}`}>{benefits.description}</span>
       </div>
       
-      {/* Tier badge */}
       <div className="flex items-center gap-2 mb-3 bg-background/30 rounded-lg px-3 py-2">
         <span className="text-xs text-muted-foreground">Seu tier:</span>
         <span className={`font-bold ${benefits.color}`}>{benefits.tierLabel}</span>
@@ -240,36 +255,125 @@ const TierBenefitsCard = ({
   );
 };
 
+// ==================== PIN INPUT COMPONENT ====================
+
+const PinInput = ({ 
+  value, 
+  onChange, 
+  label 
+}: { 
+  value: string; 
+  onChange: (val: string) => void; 
+  label: string; 
+}) => (
+  <motion.div variants={itemVariants}>
+    <label className="text-sm text-muted-foreground mb-3 block">{label}</label>
+    <div className="flex justify-center">
+      <InputOTP 
+        maxLength={4} 
+        pattern={REGEXP_ONLY_DIGITS}
+        value={value} 
+        onChange={onChange}
+      >
+        <InputOTPGroup>
+          <InputOTPSlot index={0} className="w-12 h-14 text-xl border-border bg-card/80" />
+          <InputOTPSlot index={1} className="w-12 h-14 text-xl border-border bg-card/80" />
+          <InputOTPSlot index={2} className="w-12 h-14 text-xl border-border bg-card/80" />
+          <InputOTPSlot index={3} className="w-12 h-14 text-xl border-border bg-card/80" />
+        </InputOTPGroup>
+      </InputOTP>
+    </div>
+  </motion.div>
+);
+
+// ==================== ERROR DISPLAY ====================
+
+const ErrorMessage = ({ message }: { message: string }) => (
+  <motion.div
+    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+    animate={{ opacity: 1, y: 0, scale: 1 }}
+    className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 p-3 rounded-lg border border-destructive/20"
+  >
+    <AlertCircle className="w-4 h-4 shrink-0" />
+    {message}
+  </motion.div>
+);
+
+// ==================== LOADING BUTTON ====================
+
+const ActionButton = ({ 
+  onClick, 
+  disabled, 
+  isLoading, 
+  children 
+}: { 
+  onClick: () => void; 
+  disabled: boolean; 
+  isLoading: boolean; 
+  children: React.ReactNode;
+}) => (
+  <motion.div variants={itemVariants}>
+    <Button
+      onClick={onClick}
+      disabled={disabled || isLoading}
+      className="w-full h-12 relative overflow-hidden group"
+    >
+      <motion.div
+        className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary-foreground/10 to-primary/0"
+        animate={{ x: ['-100%', '100%'] }}
+        transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+      />
+      {isLoading ? (
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+        >
+          <Sparkles className="w-5 h-5" />
+        </motion.div>
+      ) : (
+        children
+      )}
+    </Button>
+  </motion.div>
+);
+
+// ==================== MAIN COMPONENT ====================
+
 export default function Auth() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initialInviteCode = searchParams.get('convite') || searchParams.get('invite') || '';
   
-  // Se vier com código de convite, abre direto na aba de registro
-  const [mode, setMode] = useState<'login' | 'register'>(initialInviteCode ? 'register' : 'login');
-  const [step, setStep] = useState<'credentials' | 'profile' | 'success'>('credentials');
+  const savedNickname = useMemo(() => localStorage.getItem(NICKNAME_STORAGE_KEY) || '', []);
   
-  // Form fields
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [mode, setMode] = useState<'login' | 'register'>(initialInviteCode ? 'register' : 'login');
+  const [step, setStep] = useState<'invite' | 'profile' | 'success'>('invite');
+  
+  // Registration fields
   const [inviteCode, setInviteCode] = useState(initialInviteCode.toUpperCase());
   const [name, setName] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState('🎮');
+  const [pin, setPin] = useState('');
   
+  // Login fields
+  const [loginNickname, setLoginNickname] = useState(savedNickname);
+  const [loginPin, setLoginPin] = useState('');
+  
+  // Shared state
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isValidCode, setIsValidCode] = useState(false);
   const [inviterName, setInviterName] = useState<string | null>(null);
   const [inviterTier, setInviterTier] = useState<string | null>(null);
   const [inviterIsGuardian, setInviterIsGuardian] = useState(false);
 
-  // Check if user is already logged in
+  // ==================== AUTH STATE CHECK ====================
+  
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
-        // Check if user has a profile
-        checkProfileAndRedirect(session.user.id);
+        setTimeout(() => {
+          checkProfileAndRedirect(session.user.id);
+        }, 0);
       }
     });
 
@@ -294,25 +398,30 @@ export default function Auth() {
     }
   };
 
-  // Validate invite code using RPC (works for anonymous users)
-  const validateInviteCode = useCallback(async (code: string): Promise<{ 
-    valid: boolean; 
-    inviterId: string | null; 
-    inviterName?: string;
-    inviterTier?: string;
-    inviterIsGuardian?: boolean;
-  }> => {
-    // Call the SECURITY DEFINER function that bypasses RLS
-    const { data, error } = await supabase.rpc('validate_invite_code', {
-      p_code: code
-    });
+  // ==================== VALIDATE INVITE CODE ====================
+  
+  const handleValidateCode = useCallback(async () => {
+    setError(null);
+    const trimmedCode = inviteCode.trim().toUpperCase();
     
-    if (error || !data) {
-      console.error('[AUTH] validate_invite_code error:', error);
-      return { valid: false, inviterId: null };
+    if (trimmedCode.length < 4) {
+      setError('Código muito curto');
+      return;
     }
     
-    // Cast the JSONB response
+    setIsLoading(true);
+    
+    const { data, error: rpcError } = await supabase.rpc('validate_invite_code', {
+      p_code: trimmedCode
+    });
+    
+    setIsLoading(false);
+    
+    if (rpcError || !data) {
+      setError('Código de convite inválido');
+      return;
+    }
+    
     const result = data as {
       valid: boolean;
       inviter_id: string | null;
@@ -321,87 +430,52 @@ export default function Auth() {
       inviter_is_guardian: boolean;
     };
     
-    return {
-      valid: result.valid === true,
-      inviterId: result.inviter_id || null,
-      inviterName: result.inviter_name || undefined,
-      inviterTier: result.inviter_tier || undefined,
-      inviterIsGuardian: result.inviter_is_guardian === true
-    };
-  }, []);
-
-  const handleValidateCode = useCallback(async () => {
-    setError(null);
-    const trimmedCode = inviteCode.trim().toUpperCase();
-    
-    console.log('[AUTH] Validating invite code:', trimmedCode);
-    
-    if (trimmedCode.length < 4) {
-      setError('Código muito curto');
-      return;
-    }
-    
-    setIsLoading(true);
-    const result = await validateInviteCode(trimmedCode);
-    setIsLoading(false);
-    
-    console.log('[AUTH] Validation result:', {
-      valid: result.valid,
-      inviterName: result.inviterName,
-      inviterTier: result.inviterTier,
-      inviterIsGuardian: result.inviterIsGuardian
-    });
-    
     if (result.valid) {
-      setIsValidCode(true);
-      setInviterName(result.inviterName || null);
-      setInviterTier(result.inviterTier || null);
-      setInviterIsGuardian(result.inviterIsGuardian || false);
+      setInviterName(result.inviter_name || null);
+      setInviterTier(result.inviter_tier || null);
+      setInviterIsGuardian(result.inviter_is_guardian === true);
       setStep('profile');
     } else {
       setError('Código de convite inválido');
-      setIsValidCode(false);
     }
-  }, [inviteCode, validateInviteCode]);
+  }, [inviteCode]);
 
+  // ==================== REGISTER ====================
+  
   const handleRegister = useCallback(async () => {
     setError(null);
     
-    if (name.length < 2) {
-      setError('Nome deve ter pelo menos 2 caracteres');
+    if (name.trim().length < 2) {
+      setError('Nickname deve ter pelo menos 2 caracteres');
       return;
     }
     
-    if (password.length < 6) {
-      setError('Senha deve ter pelo menos 6 caracteres');
+    if (pin.length !== 4) {
+      setError('PIN deve ter 4 dígitos');
       return;
     }
-    
-    console.log('[AUTH] Starting registration for:', {
-      name,
-      emoji: selectedEmoji,
-      inviteCode: inviteCode.toUpperCase(),
-      inviterTier,
-      inviterIsGuardian
-    });
     
     setIsLoading(true);
     
     try {
-      // 1. Sign up with Supabase Auth
-      const redirectUrl = `${window.location.origin}/`;
+      // 1. Sign up with fake email derived from nickname
+      const fakeEmail = makeAuthEmail(name);
+      const password = makePinPassword(pin);
+      
+      console.log('[AUTH] Registering:', { name, emoji: selectedEmoji, inviteCode: inviteCode.toUpperCase() });
+      
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
-        email,
+        email: fakeEmail,
         password,
         options: {
-          emailRedirectTo: redirectUrl
+          emailRedirectTo: `${window.location.origin}/`
         }
       });
       
       if (signUpError) {
         console.error('[AUTH] SignUp error:', signUpError);
         if (signUpError.message.includes('already registered')) {
-          setError('Este email já está cadastrado. Faça login.');
+          setError('Este nickname já está em uso. Escolha outro.');
         } else {
           setError(signUpError.message);
         }
@@ -410,46 +484,44 @@ export default function Auth() {
       }
       
       if (!authData.user) {
-        console.error('[AUTH] No user returned from signUp');
-        setError('Erro ao criar conta');
+        setError('Erro ao criar conta. Verifique se "Confirm email" está desabilitado no Supabase.');
         setIsLoading(false);
         return;
       }
       
-      console.log('[AUTH] Auth user created:', authData.user.id);
-      
-      // 2. Create profile using the database function
-      console.log('[AUTH] Calling register_player RPC with:', {
-        p_name: name,
-        p_emoji: selectedEmoji,
-        p_invite_code: inviteCode.toUpperCase()
-      });
-      
-      const { data: profile, error: profileError } = await supabase.rpc('register_player', {
-        p_name: name,
+      // 2. Create profile via RPC
+      const { error: profileError } = await supabase.rpc('register_player', {
+        p_name: name.trim(),
         p_emoji: selectedEmoji,
         p_invite_code: inviteCode.toUpperCase()
       });
       
       if (profileError) {
-        console.error('[AUTH] Profile creation error:', profileError);
-        setError('Erro ao criar perfil: ' + profileError.message);
+        console.error('[AUTH] Profile error:', profileError);
+        if (profileError.message.includes('duplicate') || profileError.message.includes('unique')) {
+          setError('Este nickname já está em uso. Escolha outro.');
+        } else {
+          setError('Erro ao criar perfil: ' + profileError.message);
+        }
+        // Clean up auth user since profile failed
+        await supabase.auth.signOut();
         setIsLoading(false);
         return;
       }
       
-      console.log('[AUTH] Profile created successfully:', {
-        id: profile?.id,
-        name: profile?.name,
-        player_tier: profile?.player_tier,
-        energy: profile?.energy,
-        invited_by: profile?.invited_by,
-        invited_by_name: profile?.invited_by_name
-      });
+      // 3. Save PIN in profile for reference
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await supabase
+        .from('profiles')
+        .update({ pin } as any)
+        .eq('user_id', authData.user.id);
       
+      // 4. Save nickname for auto-fill on next login
+      localStorage.setItem(NICKNAME_STORAGE_KEY, name.trim());
+      
+      console.log('[AUTH] Registration complete!');
       setStep('success');
       
-      // Redirect after success
       setTimeout(() => {
         navigate('/', { replace: true });
       }, 2000);
@@ -460,36 +532,45 @@ export default function Auth() {
     }
     
     setIsLoading(false);
-  }, [email, password, name, selectedEmoji, inviteCode, inviterTier, inviterIsGuardian, navigate]);
+  }, [name, pin, selectedEmoji, inviteCode, navigate]);
 
+  // ==================== LOGIN ====================
+  
   const handleLogin = useCallback(async () => {
     setError(null);
     
-    if (!email || !password) {
-      setError('Preencha email e senha');
+    if (!loginNickname.trim()) {
+      setError('Digite seu nickname');
+      return;
+    }
+    
+    if (loginPin.length !== 4) {
+      setError('PIN deve ter 4 dígitos');
       return;
     }
     
     setIsLoading(true);
     
     try {
+      const fakeEmail = makeAuthEmail(loginNickname);
+      const password = makePinPassword(loginPin);
+      
+      console.log('[AUTH] Logging in:', loginNickname.trim());
+      
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
+        email: fakeEmail,
         password
       });
       
       if (signInError) {
-        if (signInError.message.includes('Invalid login credentials')) {
-          setError('Email ou senha incorretos');
-        } else {
-          setError(signInError.message);
-        }
+        console.error('[AUTH] Login error:', signInError);
+        setError('Nickname ou PIN incorretos');
         setIsLoading(false);
         return;
       }
       
       if (data.user) {
-        // Check if user has profile
+        // Verify profile exists
         const { data: profile } = await supabase
           .from('profiles')
           .select('id')
@@ -497,21 +578,23 @@ export default function Auth() {
           .single();
         
         if (profile) {
+          localStorage.setItem(NICKNAME_STORAGE_KEY, loginNickname.trim());
           navigate('/', { replace: true });
         } else {
-          // User exists but no profile - should register
-          setError('Conta incompleta. Por favor, registre-se novamente.');
+          setError('Perfil não encontrado. Registre-se novamente.');
           await supabase.auth.signOut();
         }
       }
     } catch (e) {
-      console.error('Login error:', e);
+      console.error('[AUTH] Login error:', e);
       setError('Erro inesperado ao fazer login');
     }
     
     setIsLoading(false);
-  }, [email, password, navigate]);
+  }, [loginNickname, loginPin, navigate]);
 
+  // ==================== RENDER ====================
+  
   return (
     <div className="min-h-screen relative overflow-hidden flex items-center justify-center">
       {/* Background */}
@@ -521,16 +604,14 @@ export default function Auth() {
       />
       <div className="fixed inset-0 bg-black/80" />
       
-      {/* Floating particles */}
       <FloatingParticles />
       
-      {/* Content */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="relative z-10 w-full max-w-md mx-4"
       >
-        {/* Logo with shimmer */}
+        {/* Logo */}
         <motion.div 
           className="text-center mb-8"
           initial={{ scale: 0.8, opacity: 0 }}
@@ -548,8 +629,8 @@ export default function Auth() {
           </motion.p>
         </motion.div>
         
-        {/* Toggle Login/Register with animation */}
-        {step === 'credentials' && (
+        {/* Mode Toggle */}
+        {step === 'invite' && (
           <motion.div 
             className="flex gap-2 mb-4"
             initial={{ opacity: 0, y: -10 }}
@@ -570,14 +651,14 @@ export default function Auth() {
               className="flex-1 transition-all duration-300"
             >
               <UserPlus className="w-4 h-4 mr-2" />
-              Criar Conta
+              Novo Jogador
             </Button>
           </motion.div>
         )}
         
         <AnimatePresence mode="wait">
-          {/* LOGIN */}
-          {mode === 'login' && step === 'credentials' && (
+          {/* ==================== LOGIN ==================== */}
+          {mode === 'login' && step === 'invite' && (
             <motion.div
               key="login"
               initial={{ opacity: 0, x: -20 }}
@@ -601,97 +682,59 @@ export default function Auth() {
                   <LogIn className="w-6 h-6 text-secondary" />
                 </motion.div>
                 <div>
-                  <h2 className="text-lg font-bold text-foreground">Entrar na Conta</h2>
-                  <p className="text-sm text-muted-foreground">Use seu email e senha</p>
+                  <h2 className="text-lg font-bold text-foreground">Bem-vindo de volta!</h2>
+                  <p className="text-sm text-muted-foreground">Seu nickname + PIN de 4 dígitos</p>
                 </div>
               </motion.div>
               
               <motion.div 
-                className="space-y-4"
+                className="space-y-5"
                 variants={containerVariants}
                 initial="hidden"
                 animate="visible"
               >
                 <motion.div variants={itemVariants}>
-                  <label className="text-sm text-muted-foreground mb-2 block">Email</label>
+                  <label className="text-sm text-muted-foreground mb-2 block">Seu Nickname</label>
                   <div className="relative group">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                    <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                     <Input
-                      type="email"
-                      placeholder="seu@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      type="text"
+                      placeholder="Seu nickname"
+                      value={loginNickname}
+                      onChange={(e) => setLoginNickname(e.target.value)}
                       className={`${inputClassName} pl-10`}
+                      maxLength={15}
+                      autoComplete="username"
                     />
                   </div>
                 </motion.div>
                 
-                <motion.div variants={itemVariants}>
-                  <label className="text-sm text-muted-foreground mb-2 block">Senha</label>
-                  <div className="relative group">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                    <Input
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="Sua senha"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className={`${inputClassName} pl-10 pr-10`}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </motion.div>
+                <PinInput 
+                  value={loginPin} 
+                  onChange={setLoginPin} 
+                  label="Seu PIN de 4 dígitos" 
+                />
                 
-                {error && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 p-3 rounded-lg border border-destructive/20"
-                  >
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    {error}
-                  </motion.div>
-                )}
+                {error && <ErrorMessage message={error} />}
                 
-                <motion.div variants={itemVariants}>
-                  <Button
-                    onClick={handleLogin}
-                    disabled={!email || !password || isLoading}
-                    className="w-full h-12 relative overflow-hidden group"
-                  >
-                    <motion.div
-                      className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary-foreground/10 to-primary/0"
-                      animate={{ x: ['-100%', '100%'] }}
-                      transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                    />
-                    {isLoading ? (
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                      >
-                        <Sparkles className="w-5 h-5" />
-                      </motion.div>
-                    ) : (
-                      <>
-                        Entrar
-                        <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                      </>
-                    )}
-                  </Button>
-                </motion.div>
+                <ActionButton
+                  onClick={handleLogin}
+                  disabled={!loginNickname.trim() || loginPin.length !== 4}
+                  isLoading={isLoading}
+                >
+                  <>
+                    Entrar
+                    <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                  </>
+                </ActionButton>
               </motion.div>
             </motion.div>
           )}
           
-          {/* REGISTER - Step 1: Credentials + Invite Code */}
-          {mode === 'register' && step === 'credentials' && (
+          {/* ==================== REGISTER - Step 1: Invite Code ==================== */}
+          {mode === 'register' && step === 'invite' && (
             <motion.div
-              key="register-credentials"
+              key="register-invite"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
@@ -713,7 +756,7 @@ export default function Auth() {
                   <Ticket className="w-6 h-6 text-primary" />
                 </motion.div>
                 <div>
-                  <h2 className="text-lg font-bold text-foreground">Criar Conta</h2>
+                  <h2 className="text-lg font-bold text-foreground">Novo Jogador</h2>
                   <p className="text-sm text-muted-foreground">Código de convite obrigatório</p>
                 </div>
               </motion.div>
@@ -725,41 +768,6 @@ export default function Auth() {
                 animate="visible"
               >
                 <motion.div variants={itemVariants}>
-                  <label className="text-sm text-muted-foreground mb-2 block">Email</label>
-                  <div className="relative group">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                    <Input
-                      type="email"
-                      placeholder="seu@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className={`${inputClassName} pl-10`}
-                    />
-                  </div>
-                </motion.div>
-                
-                <motion.div variants={itemVariants}>
-                  <label className="text-sm text-muted-foreground mb-2 block">Senha</label>
-                  <div className="relative group">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                    <Input
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="Mínimo 6 caracteres"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className={`${inputClassName} pl-10 pr-10`}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </motion.div>
-                
-                <motion.div variants={itemVariants}>
                   <label className="text-sm text-muted-foreground mb-2 block">Código de Convite</label>
                   <Input
                     type="text"
@@ -768,49 +776,24 @@ export default function Auth() {
                     onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
                     className={`${inputClassName} text-center text-lg tracking-wider`}
                     maxLength={15}
+                    autoFocus
                   />
                 </motion.div>
                 
-                {error && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 p-3 rounded-lg border border-destructive/20"
-                  >
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    {error}
-                  </motion.div>
-                )}
+                {error && <ErrorMessage message={error} />}
                 
-                <motion.div variants={itemVariants}>
-                  <Button
-                    onClick={handleValidateCode}
-                    disabled={!email || password.length < 6 || inviteCode.length < 4 || isLoading}
-                    className="w-full h-12 relative overflow-hidden group"
-                  >
-                    <motion.div
-                      className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary-foreground/10 to-primary/0"
-                      animate={{ x: ['-100%', '100%'] }}
-                      transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                    />
-                    {isLoading ? (
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                      >
-                        <Sparkles className="w-5 h-5" />
-                      </motion.div>
-                    ) : (
-                      <>
-                        Validar Código
-                        <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                      </>
-                    )}
-                  </Button>
-                </motion.div>
+                <ActionButton
+                  onClick={handleValidateCode}
+                  disabled={inviteCode.length < 4}
+                  isLoading={isLoading}
+                >
+                  <>
+                    Validar Código
+                    <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                  </>
+                </ActionButton>
               </motion.div>
               
-              {/* Dicas */}
               <motion.div 
                 className="mt-6 pt-6 border-t border-border/50"
                 initial={{ opacity: 0 }}
@@ -824,7 +807,7 @@ export default function Auth() {
             </motion.div>
           )}
           
-          {/* REGISTER - Step 2: Profile */}
+          {/* ==================== REGISTER - Step 2: Profile + PIN ==================== */}
           {mode === 'register' && step === 'profile' && (
             <motion.div
               key="register-profile"
@@ -861,7 +844,7 @@ export default function Auth() {
               </motion.div>
               
               <motion.div 
-                className="space-y-6"
+                className="space-y-5"
                 variants={containerVariants}
                 initial="hidden"
                 animate="visible"
@@ -893,9 +876,9 @@ export default function Auth() {
                   </div>
                 </motion.div>
                 
-                {/* Nome */}
+                {/* Nickname */}
                 <motion.div variants={itemVariants}>
-                  <label className="text-sm text-muted-foreground mb-2 block">Seu nome</label>
+                  <label className="text-sm text-muted-foreground mb-2 block">Escolha seu nickname</label>
                   <div className="flex items-center gap-3">
                     <motion.div 
                       className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-2xl shrink-0"
@@ -906,62 +889,56 @@ export default function Auth() {
                     </motion.div>
                     <Input
                       type="text"
-                      placeholder="Escolha um nome único"
+                      placeholder="Seu nickname único"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       className={inputClassName}
                       maxLength={15}
+                      autoComplete="off"
                     />
                   </div>
                 </motion.div>
                 
-                {error && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 p-3 rounded-lg border border-destructive/20"
-                  >
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    {error}
-                  </motion.div>
-                )}
+                {/* PIN */}
+                <PinInput 
+                  value={pin} 
+                  onChange={setPin} 
+                  label="Crie uma senha de 4 dígitos" 
+                />
                 
-                {/* Benefícios personalizados por tier */}
+                {/* Warning */}
+                <motion.div 
+                  variants={itemVariants}
+                  className="bg-primary/10 border border-primary/20 rounded-lg p-3 flex items-start gap-2"
+                >
+                  <KeyRound className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                  <p className="text-xs text-foreground/80">
+                    <strong>Guarde seu nickname e PIN!</strong> Você vai precisar deles para entrar novamente.
+                  </p>
+                </motion.div>
+                
+                {error && <ErrorMessage message={error} />}
+                
+                {/* Tier Benefits */}
                 <TierBenefitsCard 
                   inviterTier={inviterTier} 
                   inviterIsGuardian={inviterIsGuardian} 
                 />
                 
-                <motion.div variants={itemVariants}>
-                  <Button
-                    onClick={handleRegister}
-                    disabled={name.length < 2 || isLoading}
-                    className="w-full h-12 relative overflow-hidden group"
-                  >
-                    <motion.div
-                      className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary-foreground/10 to-primary/0"
-                      animate={{ x: ['-100%', '100%'] }}
-                      transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                    />
-                    {isLoading ? (
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                      >
-                        <Sparkles className="w-5 h-5" />
-                      </motion.div>
-                    ) : (
-                      <>
-                        Criar Conta
-                        <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                      </>
-                    )}
-                  </Button>
-                </motion.div>
+                <ActionButton
+                  onClick={handleRegister}
+                  disabled={name.trim().length < 2 || pin.length !== 4}
+                  isLoading={isLoading}
+                >
+                  <>
+                    Entrar no SKEMA
+                    <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                  </>
+                </ActionButton>
                 
                 <Button
                   variant="ghost"
-                  onClick={() => setStep('credentials')}
+                  onClick={() => { setStep('invite'); setError(null); }}
                   className="w-full text-muted-foreground hover:text-foreground"
                 >
                   Voltar
@@ -970,7 +947,7 @@ export default function Auth() {
             </motion.div>
           )}
           
-          {/* SUCCESS */}
+          {/* ==================== SUCCESS ==================== */}
           {step === 'success' && (
             <motion.div
               key="success"
