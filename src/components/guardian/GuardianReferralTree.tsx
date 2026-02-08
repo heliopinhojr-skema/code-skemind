@@ -1,7 +1,7 @@
 /**
  * GuardianReferralTree - Árvore genealógica hierárquica de convites
  * Vincula por invite_code (invited_by armazena o código do convidador)
- * Mostra tier, saldo, valor transferido e contagem por nível
+ * Mostra tier, saldo bloqueado/disponível, valor transferido e contagem por nível
  */
 
 import { useState, useMemo } from 'react';
@@ -12,11 +12,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useReferralTree, ReferralNode } from '@/hooks/useGuardianData';
 import { 
   Search, GitBranch, Users, ChevronRight, ChevronDown, 
-  Zap, Shield, Star, Crown, Swords, Rocket, Gamepad2, ArrowDownRight 
+  Zap, Shield, Star, Crown, Swords, Rocket, Gamepad2, ArrowDownRight, Lock, Unlock
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { calculateBalanceBreakdown, formatEnergy } from '@/lib/tierEconomy';
 
 const TIER_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string; short: string }> = {
   'master_admin': { label: 'CD HX', short: 'HX', icon: <Shield className="h-3 w-3" />, color: 'text-red-400 bg-red-400/10 border-red-400/30' },
@@ -30,12 +31,6 @@ const TIER_CONFIG: Record<string, { label: string; icon: React.ReactNode; color:
 
 function getTierConfig(tier: string | null) {
   return TIER_CONFIG[tier || 'jogador'] || TIER_CONFIG['jogador'];
-}
-
-function formatEnergy(energy: number): string {
-  if (energy >= 1000000) return `k$${(energy / 1000000).toFixed(2)}M`;
-  if (energy >= 1000) return `k$${(energy / 1000).toFixed(1)}k`;
-  return `k$${energy.toFixed(2)}`;
 }
 
 // Map from invite_code → children nodes
@@ -74,6 +69,7 @@ function TreeNode({ node, childrenMap, level, expandedNodes, toggleExpand }: Tre
   const hasChildren = children.length > 0;
   const isExpanded = expandedNodes.has(node.id);
   const tierConfig = getTierConfig(node.player_tier);
+  const balance = calculateBalanceBreakdown(node.energy, node.player_tier, node.invites_sent);
 
   // Count all descendants
   const allDescendants = useMemo(() => 
@@ -123,22 +119,36 @@ function TreeNode({ node, childrenMap, level, expandedNodes, toggleExpand }: Tre
           </span>
         </Badge>
         
-        {/* Energy balance */}
-        <Badge variant="outline" className="text-[10px] font-mono shrink-0">
-          <Zap className="h-2.5 w-2.5 mr-0.5" />
-          {formatEnergy(node.energy)}
-        </Badge>
+        {/* Balance breakdown: total / locked / available */}
+        <div className="flex items-center gap-1 shrink-0">
+          <Badge variant="outline" className="text-[10px] font-mono">
+            <Zap className="h-2.5 w-2.5 mr-0.5" />
+            {formatEnergy(balance.total)}
+          </Badge>
+          {balance.locked > 0 && (
+            <Badge variant="outline" className="text-[10px] font-mono text-orange-400 border-orange-400/30 bg-orange-400/5">
+              <Lock className="h-2.5 w-2.5 mr-0.5" />
+              {formatEnergy(balance.locked)}
+            </Badge>
+          )}
+          {balance.maxInvites > 0 && (
+            <Badge variant="outline" className="text-[10px] font-mono text-emerald-400 border-emerald-400/30 bg-emerald-400/5">
+              <Unlock className="h-2.5 w-2.5 mr-0.5" />
+              {formatEnergy(balance.available)}
+            </Badge>
+          )}
+        </div>
         
         {/* Invite code */}
         <code className="text-[10px] bg-muted px-1 py-0.5 rounded text-muted-foreground hidden sm:inline shrink-0">
           {node.invite_code}
         </code>
         
-        {/* Direct invites count */}
-        {hasChildren && (
+        {/* Invite slots: sent/max */}
+        {balance.maxInvites > 0 && (
           <Badge variant="secondary" className="text-[10px] shrink-0">
             <Users className="h-2.5 w-2.5 mr-0.5" />
-            {children.length}
+            {balance.invitesSent}/{balance.maxInvites}
           </Badge>
         )}
         
@@ -191,12 +201,15 @@ function TreeNode({ node, childrenMap, level, expandedNodes, toggleExpand }: Tre
 // Summary card showing global tier breakdown
 function TierSummary({ nodes }: { nodes: ReferralNode[] }) {
   const tierCounts = useMemo(() => {
-    const counts: Record<string, { count: number; totalEnergy: number; totalTransferred: number }> = {};
+    const counts: Record<string, { count: number; totalEnergy: number; totalLocked: number; totalAvailable: number; totalTransferred: number }> = {};
     nodes.forEach(n => {
       const tier = n.player_tier || 'jogador';
-      if (!counts[tier]) counts[tier] = { count: 0, totalEnergy: 0, totalTransferred: 0 };
+      if (!counts[tier]) counts[tier] = { count: 0, totalEnergy: 0, totalLocked: 0, totalAvailable: 0, totalTransferred: 0 };
+      const bal = calculateBalanceBreakdown(n.energy, n.player_tier, n.invites_sent);
       counts[tier].count++;
       counts[tier].totalEnergy += n.energy;
+      counts[tier].totalLocked += bal.locked;
+      counts[tier].totalAvailable += bal.available;
       counts[tier].totalTransferred += n.reward_transferred;
     });
     return counts;
@@ -220,6 +233,18 @@ function TierSummary({ nodes }: { nodes: ReferralNode[] }) {
             <div className="text-[10px] opacity-80">
               {formatEnergy(data.totalEnergy)}
             </div>
+            {data.totalLocked > 0 && (
+              <div className="text-[9px] opacity-70 mt-0.5 flex items-center justify-center gap-0.5">
+                <Lock className="h-2.5 w-2.5" />
+                {formatEnergy(data.totalLocked)}
+              </div>
+            )}
+            {data.totalAvailable > 0 && (
+              <div className="text-[9px] opacity-70 flex items-center justify-center gap-0.5">
+                <Unlock className="h-2.5 w-2.5" />
+                {formatEnergy(data.totalAvailable)}
+              </div>
+            )}
             {data.totalTransferred > 0 && (
               <div className="text-[9px] opacity-60 mt-0.5">
                 ↓ {formatEnergy(data.totalTransferred)} dist.

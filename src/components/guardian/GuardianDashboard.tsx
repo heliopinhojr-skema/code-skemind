@@ -7,11 +7,12 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useDashboardStats } from '@/hooks/useGuardianData';
+import { useDashboardStats, useReferralTree } from '@/hooks/useGuardianData';
 import { useSupabasePlayer } from '@/hooks/useSupabasePlayer';
-import { Users, Zap, Box, Gift, Trophy, TrendingUp, Copy, Check, Share2, Link, ArrowDownRight } from 'lucide-react';
+import { Users, Zap, Box, Gift, Trophy, TrendingUp, Copy, Check, Share2, Link, ArrowDownRight, Lock, Unlock } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { calculateBalanceBreakdown, formatEnergy as formatEnergyUtil } from '@/lib/tierEconomy';
 
 interface GuardianDashboardProps {
   onNavigateTab?: (tab: string) => void;
@@ -19,8 +20,21 @@ interface GuardianDashboardProps {
 
 export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
   const { data: stats, isLoading, error } = useDashboardStats();
+  const { data: referralNodes } = useReferralTree();
   const { player } = useSupabasePlayer();
   const [copied, setCopied] = useState<'code' | 'link' | null>(null);
+
+  // Calculate total locked and available from all non-HX players
+  const { totalLocked, totalAvailable } = (() => {
+    if (!referralNodes) return { totalLocked: 0, totalAvailable: 0 };
+    let locked = 0, available = 0;
+    referralNodes.filter(n => n.player_tier !== 'master_admin').forEach(n => {
+      const bal = calculateBalanceBreakdown(n.energy, n.player_tier, n.invites_sent);
+      locked += bal.locked;
+      available += bal.available;
+    });
+    return { totalLocked: locked, totalAvailable: available };
+  })();
 
   const inviteCode = player?.inviteCode || '';
   const inviteLink = inviteCode ? `${window.location.origin}/?convite=${inviteCode}` : '';
@@ -58,12 +72,8 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
       title: 'Energia Circulando',
       value: stats?.totalEnergy || 0,
       icon: Zap,
-      format: (v: number) => {
-        if (v >= 1000000) return `k$${(v / 1000000).toFixed(2)}M`;
-        if (v >= 1000) return `k$${(v / 1000).toFixed(1)}k`;
-        return `k$${v.toFixed(2)}`;
-      },
-      subtitle: 'Soma de todos jogadores (excl. HX)',
+      format: (v: number) => formatEnergyUtil(v),
+      subtitle: `🔒 ${formatEnergyUtil(totalLocked)} bloq. | 🔓 ${formatEnergyUtil(totalAvailable)} livre`,
       tab: 'users',
       clickable: true,
     },
@@ -71,7 +81,7 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
       title: 'Skema Box',
       value: stats?.skemaBoxBalance || 0,
       icon: Box,
-      format: (v: number) => `k$${v.toFixed(2)}`,
+      format: (v: number) => formatEnergyUtil(v),
       subtitle: 'Rake acumulado de corridas',
       tab: 'skemabox',
       clickable: true,
@@ -89,11 +99,7 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
       title: 'Distribuído',
       value: stats?.totalDistributed || 0,
       icon: ArrowDownRight,
-      format: (v: number) => {
-        if (v >= 1000000) return `k$${(v / 1000000).toFixed(2)}M`;
-        if (v >= 1000) return `k$${(v / 1000).toFixed(1)}k`;
-        return `k$${v.toFixed(2)}`;
-      },
+      format: (v: number) => formatEnergyUtil(v),
       subtitle: 'k$ transferido via convites',
       tab: 'referrals',
       clickable: true,
