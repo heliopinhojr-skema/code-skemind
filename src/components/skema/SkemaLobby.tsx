@@ -57,31 +57,56 @@ const COUNTDOWN_SECONDS = 10;
 
 // Helper component to display player tier badge
 function TierBadge({ tier }: { tier: PlayerTier }) {
-  const config: Record<PlayerTier, { emoji: string; label: string; className: string }> = {
+  const config: Record<string, { emoji: string; label: string; className: string }> = {
     master_admin: { 
       emoji: '🔴', 
-      label: 'Master Admin', 
+      label: 'CD HX', 
       className: 'bg-gradient-to-r from-red-500/30 to-rose-500/30 border-red-500/50 text-red-300' 
     },
-    guardiao: { 
-      emoji: '🛡️', 
-      label: 'Guardião', 
+    'Criador': { 
+      emoji: '⭐', 
+      label: 'Criador', 
       className: 'bg-gradient-to-r from-amber-500/30 to-yellow-500/30 border-amber-500/50 text-amber-300' 
+    },
+    guardiao: { 
+      emoji: '⭐', 
+      label: 'Criador', 
+      className: 'bg-gradient-to-r from-amber-500/30 to-yellow-500/30 border-amber-500/50 text-amber-300' 
+    },
+    'Grão Mestre': { 
+      emoji: '👑', 
+      label: 'Grão Mestre', 
+      className: 'bg-gradient-to-r from-purple-500/30 to-pink-500/30 border-purple-500/50 text-purple-300' 
     },
     grao_mestre: { 
       emoji: '👑', 
       label: 'Grão Mestre', 
       className: 'bg-gradient-to-r from-purple-500/30 to-pink-500/30 border-purple-500/50 text-purple-300' 
     },
+    'Mestre': { 
+      emoji: '⚔️', 
+      label: 'Mestre', 
+      className: 'bg-gradient-to-r from-blue-500/30 to-cyan-500/30 border-blue-500/50 text-blue-300' 
+    },
     mestre: { 
       emoji: '⚔️', 
       label: 'Mestre', 
       className: 'bg-gradient-to-r from-blue-500/30 to-cyan-500/30 border-blue-500/50 text-blue-300' 
     },
+    'Boom': { 
+      emoji: '🚀', 
+      label: 'Boom', 
+      className: 'bg-gradient-to-r from-green-500/30 to-emerald-500/30 border-green-500/50 text-green-300' 
+    },
+    'Ploft': { 
+      emoji: '🎮', 
+      label: 'Ploft', 
+      className: 'bg-gradient-to-r from-slate-500/30 to-gray-500/30 border-slate-500/50 text-slate-300' 
+    },
     jogador: { 
       emoji: '🎮', 
-      label: 'Jogador', 
-      className: 'bg-gradient-to-r from-green-500/30 to-emerald-500/30 border-green-500/50 text-green-300' 
+      label: 'Ploft', 
+      className: 'bg-gradient-to-r from-slate-500/30 to-gray-500/30 border-slate-500/50 text-slate-300' 
     },
   };
   
