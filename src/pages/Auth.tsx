@@ -14,7 +14,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Ticket, Sparkles, ArrowRight, Check, AlertCircle,
-  Zap, LogIn, UserPlus, KeyRound,
+  Zap, LogIn, UserPlus,
   Crown, Shield, Star, Users
 } from 'lucide-react';
 import { REGEXP_ONLY_DIGITS } from 'input-otp';
@@ -462,7 +462,7 @@ export default function Auth() {
       const fakeEmail = makeAuthEmail(name);
       const password = makePinPassword(pin);
       
-      console.log('[AUTH] Registering:', { name, emoji: selectedEmoji, inviteCode: inviteCode.toUpperCase() });
+      console.log('[AUTH] Registering:', { name: name.trim(), emoji: selectedEmoji });
       
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: fakeEmail,
@@ -484,7 +484,7 @@ export default function Auth() {
       }
       
       if (!authData.user) {
-        setError('Erro ao criar conta. Verifique se "Confirm email" está desabilitado no Supabase.');
+        setError('Erro ao criar conta. Tente novamente.');
         setIsLoading(false);
         return;
       }
@@ -555,7 +555,7 @@ export default function Auth() {
       const fakeEmail = makeAuthEmail(loginNickname);
       const password = makePinPassword(loginPin);
       
-      console.log('[AUTH] Logging in:', loginNickname.trim());
+      console.log('[AUTH] Logging in:', loginNickname.trim().substring(0, 3) + '...');
       
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: fakeEmail,
@@ -683,7 +683,7 @@ export default function Auth() {
                 </motion.div>
                 <div>
                   <h2 className="text-lg font-bold text-foreground">Bem-vindo de volta!</h2>
-                  <p className="text-sm text-muted-foreground">Seu nickname + PIN de 4 dígitos</p>
+                  <p className="text-sm text-muted-foreground">Digite seu nickname e senha de 4 dígitos</p>
                 </div>
               </motion.div>
               
@@ -694,7 +694,7 @@ export default function Auth() {
                 animate="visible"
               >
                 <motion.div variants={itemVariants}>
-                  <label className="text-sm text-muted-foreground mb-2 block">Seu Nickname</label>
+                  <label className="text-sm text-muted-foreground mb-2 block">Nickname</label>
                   <div className="relative group">
                     <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                     <Input
@@ -712,7 +712,7 @@ export default function Auth() {
                 <PinInput 
                   value={loginPin} 
                   onChange={setLoginPin} 
-                  label="Seu PIN de 4 dígitos" 
+                  label="Senha de 4 dígitos" 
                 />
                 
                 {error && <ErrorMessage message={error} />}
@@ -903,7 +903,7 @@ export default function Auth() {
                 <PinInput 
                   value={pin} 
                   onChange={setPin} 
-                  label="Crie uma senha de 4 dígitos" 
+                  label="Crie sua senha de 4 dígitos" 
                 />
                 
                 {/* Warning */}
@@ -911,9 +911,9 @@ export default function Auth() {
                   variants={itemVariants}
                   className="bg-primary/10 border border-primary/20 rounded-lg p-3 flex items-start gap-2"
                 >
-                  <KeyRound className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                  <Sparkles className="w-4 h-4 text-primary mt-0.5 shrink-0" />
                   <p className="text-xs text-foreground/80">
-                    <strong>Guarde seu nickname e PIN!</strong> Você vai precisar deles para entrar novamente.
+                    <strong>Lembre do seu nickname e senha!</strong> É só isso que você precisa pra voltar.
                   </p>
                 </motion.div>
                 
