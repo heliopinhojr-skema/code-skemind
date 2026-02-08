@@ -46,6 +46,7 @@ export interface ReferralNode {
   total_invited: number;
   rewards_credited: number;
   reward_transferred: number;
+  invites_sent: number;
   created_at: string;
 }
 
@@ -232,21 +233,25 @@ export function useReferralTree() {
         referralCounts.set(r.inviter_id, current);
       });
       
-      return profiles?.map(p => ({
-        id: p.id,
-        name: p.name,
-        emoji: p.emoji,
-        invite_code: p.invite_code,
-        // invited_by stores the invite_code of the inviter (not the profile id)
-        invited_by: p.invited_by,
-        inviter_name: p.invited_by_name,
-        player_tier: p.player_tier,
-        energy: Number(p.energy) || 0,
-        total_invited: referralCounts.get(p.id)?.total || 0,
-        rewards_credited: referralCounts.get(p.id)?.credited || 0,
-        reward_transferred: referralCounts.get(p.id)?.totalTransferred || 0,
-        created_at: p.created_at,
-      })) as ReferralNode[];
+      return profiles?.map(p => {
+        const refData = referralCounts.get(p.id);
+        return {
+          id: p.id,
+          name: p.name,
+          emoji: p.emoji,
+          invite_code: p.invite_code,
+          // invited_by stores the invite_code of the inviter (not the profile id)
+          invited_by: p.invited_by,
+          inviter_name: p.invited_by_name,
+          player_tier: p.player_tier,
+          energy: Number(p.energy) || 0,
+          total_invited: refData?.total || 0,
+          rewards_credited: refData?.credited || 0,
+          reward_transferred: refData?.totalTransferred || 0,
+          invites_sent: refData?.total || 0,
+          created_at: p.created_at,
+        };
+      }) as ReferralNode[];
     },
     staleTime: 30 * 1000,
   });

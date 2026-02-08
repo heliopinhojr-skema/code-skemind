@@ -1,5 +1,6 @@
 /**
  * GuardianUsersTable - Lista de usuários agrupados por tier com filtros e busca
+ * Mostra saldo total, bloqueado e disponível por jogador
  */
 
 import { useState, useMemo } from 'react';
@@ -11,10 +12,11 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { usePlayersList } from '@/hooks/useGuardianData';
-import { Search, Users, Shield, Crown, Swords, Gamepad2, Zap, Rocket, Star } from 'lucide-react';
+import { usePlayersList, useReferralTree } from '@/hooks/useGuardianData';
+import { Search, Users, Shield, Crown, Swords, Gamepad2, Zap, Rocket, Star, Lock, Unlock } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { calculateBalanceBreakdown, formatEnergy } from '@/lib/tierEconomy';
 
 // Tier labels match the player_tier values set by register_player
 const TIER_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
@@ -68,16 +70,20 @@ function getTierConfig(tier: string | null) {
   return TIER_CONFIG[tier || 'jogador'] || TIER_CONFIG['jogador'];
 }
 
-function formatEnergy(energy: number): string {
-  if (energy >= 1000000) return `k$${(energy / 1000000).toFixed(2)}M`;
-  if (energy >= 1000) return `k$${(energy / 1000).toFixed(1)}k`;
-  return `k$${energy.toFixed(2)}`;
-}
-
 export function GuardianUsersTable() {
   const { data: players, isLoading, error } = usePlayersList();
+  const { data: referralNodes } = useReferralTree();
   const [search, setSearch] = useState('');
   const [tierFilter, setTierFilter] = useState('all');
+
+  // Build a map of player_id → invites_sent count from referral data
+  const invitesSentMap = useMemo(() => {
+    const map = new Map<string, number>();
+    referralNodes?.forEach(n => {
+      map.set(n.id, n.invites_sent);
+    });
+    return map;
+  }, [referralNodes]);
 
   const filteredPlayers = useMemo(() => {
     if (!players) return [];
@@ -168,10 +174,11 @@ export function GuardianUsersTable() {
               <TableRow>
                 <TableHead>Jogador</TableHead>
                 <TableHead>Tier</TableHead>
-                <TableHead>Saldo</TableHead>
-                <TableHead>Código</TableHead>
+                <TableHead>Saldo Total</TableHead>
+                <TableHead className="text-orange-400">🔒 Bloqueado</TableHead>
+                <TableHead className="text-emerald-400">🔓 Disponível</TableHead>
+                <TableHead>Convites</TableHead>
                 <TableHead>Convidado por</TableHead>
-                <TableHead>Stats</TableHead>
                 <TableHead>Registro</TableHead>
               </TableRow>
             </TableHeader>
@@ -179,7 +186,7 @@ export function GuardianUsersTable() {
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 7 }).map((_, j) => (
+                    {Array.from({ length: 8 }).map((_, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-6 w-20" />
                       </TableCell>
@@ -188,20 +195,27 @@ export function GuardianUsersTable() {
                 ))
               ) : filteredPlayers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                     {search || tierFilter !== 'all' ? 'Nenhum usuário encontrado' : 'Nenhum usuário registrado'}
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredPlayers.map((player) => {
                   const tierConfig = getTierConfig(player.player_tier);
+                  const invitesSent = invitesSentMap.get(player.id) || 0;
+                  const balance = calculateBalanceBreakdown(Number(player.energy), player.player_tier, invitesSent);
                   
                   return (
                     <TableRow key={player.id}>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <span className="text-xl">{player.emoji}</span>
-                          <span className="font-medium">{player.name}</span>
+                          <div>
+                            <span className="font-medium">{player.name}</span>
+                            <code className="text-[10px] bg-muted px-1 py-0.5 rounded text-muted-foreground ml-2">
+                              {player.invite_code}
+                            </code>
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -215,17 +229,42 @@ export function GuardianUsersTable() {
                       <TableCell>
                         <Badge variant="outline" className="font-mono">
                           <Zap className="h-3 w-3 mr-1" />
-                          {formatEnergy(Number(player.energy))}
+                          {formatEnergy(balance.total)}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <code className="text-xs bg-muted px-2 py-1 rounded">
-                          {player.invite_code}
-                        </code>
+                        {balance.locked > 0 ? (
+                          <Badge variant="outline" className="font-mono text-orange-400 border-orange-400/30 bg-orange-400/5">
+                            <Lock className="h-3 w-3 mr-1" />
+                            {formatEnergy(balance.locked)}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground/50 text-xs">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="font-mono text-emerald-400 border-emerald-400/30 bg-emerald-400/5">
+                          <Unlock className="h-3 w-3 mr-1" />
+                          {formatEnergy(balance.available)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {balance.maxInvites > 0 ? (
+                          <div className="text-xs">
+                            <span className="font-medium">{balance.invitesSent}/{balance.maxInvites}</span>
+                            <div className="text-muted-foreground text-[10px]">
+                              {balance.slotsRemaining > 0 
+                                ? `${balance.slotsRemaining} slots × ${formatEnergy(balance.costPerInvite)}`
+                                : 'Todos usados'}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground/50 text-xs">—</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         {player.invited_by_name ? (
-                          <span className="text-muted-foreground">
+                          <span className="text-muted-foreground text-xs">
                             {player.invited_by_name}
                           </span>
                         ) : (
@@ -233,14 +272,8 @@ export function GuardianUsersTable() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <div className="text-xs text-muted-foreground">
-                          <div>🏆 {player.stats_wins} vitórias</div>
-                          <div>🏁 {player.stats_races} corridas</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
                         <span className="text-xs text-muted-foreground">
-                          {format(new Date(player.created_at), "dd/MM/yyyy", { locale: ptBR })}
+                          {format(new Date(player.created_at), "dd/MM/yy", { locale: ptBR })}
                         </span>
                       </TableCell>
                     </TableRow>
