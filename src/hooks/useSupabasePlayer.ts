@@ -186,13 +186,13 @@ export function useSupabasePlayer() {
         return;
       }
 
-      // Check if user is a guardiao (infinite energy)
-      const { data: isGuardiaoRole } = await supabase.rpc('has_role', {
+      // Check if user is master_admin (only HX has infinite energy)
+      const { data: isMasterAdmin } = await supabase.rpc('has_role', {
         _user_id: userId,
-        _role: 'guardiao'
+        _role: 'master_admin'
       });
       
-      const isKeeper = isGuardiaoRole === true;
+      const isKeeper = isMasterAdmin === true;
 
       // Fetch referrals count
       const { count: referralsCount } = await supabase

@@ -76,9 +76,17 @@ export function useIsGuardian() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return false;
       
-      const { data, error } = await supabase.rpc('has_role', {
+      // Check for master_admin OR guardiao role
+      const { data: isMaster } = await supabase.rpc('has_role', {
         _user_id: user.id,
         _role: 'master_admin'
+      });
+      
+      if (isMaster) return true;
+      
+      const { data: isGuardiao, error } = await supabase.rpc('has_role', {
+        _user_id: user.id,
+        _role: 'guardiao'
       });
       
       if (error) {
@@ -86,7 +94,7 @@ export function useIsGuardian() {
         return false;
       }
       
-      return data === true;
+      return isGuardiao === true;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -105,9 +113,9 @@ export function useDashboardStats() {
       if (profilesError) throw profilesError;
       
       const totalPlayers = profiles?.length || 0;
-      // Excluir energia de guardiões e master_admins (energia infinita) do cálculo de energia circulando
+      // Only exclude master_admin from circulating energy (they have the root treasury)
       const totalEnergy = profiles
-        ?.filter(p => p.player_tier !== 'guardiao' && p.player_tier !== 'master_admin')
+        ?.filter(p => p.player_tier !== 'master_admin')
         .reduce((sum, p) => sum + Number(p.energy), 0) || 0;
       
       // Buscar saldo do Skema Box
