@@ -89,7 +89,7 @@ function usePlayerArenaEntries(playerId: string | null) {
   });
 }
 
-type AdminAction = 'zero' | 'penalize' | 'block' | 'unblock' | null;
+type AdminAction = 'zero' | 'penalize' | 'block' | 'unblock' | 'delete' | null;
 
 export function PlayerDetailDrawer({ playerId, open, onOpenChange, allNodes, isMasterAdmin }: PlayerDetailDrawerProps) {
   const player = useMemo(() => allNodes.find(n => n.id === playerId), [allNodes, playerId]);
@@ -225,6 +225,13 @@ export function PlayerDetailDrawer({ playerId, open, onOpenChange, allNodes, isM
         });
         if (error) throw error;
         toast.success(`${player.name} foi desbloqueado`);
+      } else if (adminAction === 'delete') {
+        const { error } = await supabase.rpc('admin_delete_player', {
+          p_player_id: playerId,
+        });
+        if (error) throw error;
+        toast.success(`${player.name} apagado — energia devolvida à ascendência`);
+        onOpenChange(false);
       }
 
       // Refresh data
@@ -374,6 +381,15 @@ export function PlayerDetailDrawer({ playerId, open, onOpenChange, allNodes, isM
                     Desbloquear
                   </Button>
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-2 text-xs border-red-700/40 hover:bg-red-900/20 text-red-500"
+                  onClick={() => setAdminAction('delete')}
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Apagar Conta (devolver energia à ascendência)
+                </Button>
               </div>
             )}
 
@@ -678,6 +694,48 @@ export function PlayerDetailDrawer({ playerId, open, onOpenChange, allNodes, isM
             className="bg-emerald-500 text-white hover:bg-emerald-600"
           >
             {isProcessing ? 'Processando...' : 'Confirmar — Desbloquear'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <AlertDialog open={adminAction === 'delete'} onOpenChange={(o) => !o && setAdminAction(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2 text-red-500">
+            <Trash2 className="h-5 w-5" />
+            Apagar Conta (Teste)
+          </AlertDialogTitle>
+          <AlertDialogDescription asChild>
+            <div className="space-y-2">
+              <p>
+                Tem certeza que deseja <strong>apagar permanentemente</strong> a conta de <strong>{player.name}</strong>?
+              </p>
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 text-sm">
+                <p className="text-emerald-400 font-medium">💰 Energia será devolvida:</p>
+                <p className="text-muted-foreground text-xs mt-1">
+                  • <strong>{formatEnergy(player.energy)}</strong> devolvido ao ascendente direto
+                </p>
+                {totalDescendants > 0 && (
+                  <p className="text-muted-foreground text-xs">
+                    • <strong>{totalDescendants} descendente(s)</strong> também serão apagados e sua energia ({formatEnergy(totalEnergyTree)}) devolvida recursivamente
+                  </p>
+                )}
+              </div>
+              <p className="text-xs text-destructive font-medium">
+                ⚠️ Histórico de jogos, arenas e referrals serão apagados. Nada se perde em k$ — tudo volta à cadeia.
+              </p>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isProcessing}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleAdminAction}
+            disabled={isProcessing}
+            className="bg-red-600 text-white hover:bg-red-700"
+          >
+            {isProcessing ? 'Apagando...' : `Confirmar — Apagar ${player.name}`}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
