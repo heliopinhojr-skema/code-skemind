@@ -144,39 +144,51 @@ export type Database = {
       }
       game_history: {
         Row: {
+          arena_buy_in: number | null
+          arena_pool: number | null
           attempts: number
           created_at: string
           game_mode: string
           guesses: Json | null
           id: string
           player_id: string
+          prize_won: number | null
           race_id: string | null
+          rank: number | null
           score: number
           secret_code: Json | null
           time_remaining: number | null
           won: boolean
         }
         Insert: {
+          arena_buy_in?: number | null
+          arena_pool?: number | null
           attempts?: number
           created_at?: string
           game_mode?: string
           guesses?: Json | null
           id?: string
           player_id: string
+          prize_won?: number | null
           race_id?: string | null
+          rank?: number | null
           score?: number
           secret_code?: Json | null
           time_remaining?: number | null
           won?: boolean
         }
         Update: {
+          arena_buy_in?: number | null
+          arena_pool?: number | null
           attempts?: number
           created_at?: string
           game_mode?: string
           guesses?: Json | null
           id?: string
           player_id?: string
+          prize_won?: number | null
           race_id?: string | null
+          rank?: number | null
           score?: number
           secret_code?: Json | null
           time_remaining?: number | null

@@ -25,6 +25,7 @@ import { OnlinePlayer } from '@/hooks/useOnlinePlayers';
 import { RegisteredPlayersPanel } from './RegisteredPlayersPanel';
 import { ReferralHistoryPanel } from './ReferralHistoryPanel';
 import { OnlinePlayersPanel } from './OnlinePlayersPanel';
+import { PlayerGameHistory } from './PlayerGameHistory';
 import universeBg from '@/assets/universe-bg.jpg';
 
 // Type for online presence passed from parent
@@ -455,6 +456,16 @@ export function SkemaLobby({
               onProcessRewards={onProcessReferralRewards}
               onRefreshProfile={onRefreshProfile}
             />
+          </motion.section>
+
+          {/* Extrato de Jogos */}
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.12 }}
+            className="mx-4 mt-3"
+          >
+            <PlayerGameHistory playerId={player.id} />
           </motion.section>
           
           {/* Taxa de transferência */}

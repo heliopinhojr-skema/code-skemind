@@ -370,6 +370,8 @@ export function useTournament() {
           score: humanResult.score,
           time_remaining: humanResult.finishTime || null,
           won: humanResult.status === 'won',
+          arena_buy_in: buyIn,
+          arena_pool: pool,
         },
       });
 
