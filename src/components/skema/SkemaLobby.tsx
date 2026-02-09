@@ -24,7 +24,6 @@ import { useOpenArenas, ArenaListing } from '@/hooks/useArenaListings';
 import { calculateArenaPool, getScaledArenaPrize } from '@/lib/arenaPayouts';
 import { OnlinePlayer } from '@/hooks/useOnlinePlayers';
 import { ReferralHistoryPanel } from './ReferralHistoryPanel';
-import { OnlinePlayersPanel } from './OnlinePlayersPanel';
 import { TransferPanel } from './TransferPanel';
 import { PlayerGameHistory } from './PlayerGameHistory';
 import universeBg from '@/assets/universe-bg.jpg';
@@ -295,6 +294,15 @@ export function SkemaLobby({
                 <div className="flex items-center gap-2 text-xs text-white/60">
                   <Calendar className="w-3 h-3" />
                   <span>Ano {skemaYear} • Dia {skemaDay} • {String(skemaHour).padStart(2, '0')}h</span>
+                  <span className="text-white/30">•</span>
+                  <span className="flex items-center gap-1">
+                    {isConnected ? (
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                    ) : (
+                      <span className="w-1.5 h-1.5 rounded-full bg-gray-500" />
+                    )}
+                    <span>{onlineCount} online</span>
+                  </span>
                 </div>
                 {player.invitedByName && (
                   <div className="text-xs text-purple-300 mt-0.5">
@@ -388,10 +396,7 @@ export function SkemaLobby({
             <span>Taxa de transferência: {(transferTax * 100).toFixed(2)}%</span>
           </motion.div>
           
-          {/* Online */}
-          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.17 }} className="mx-4 mt-4">
-            <OnlinePlayersPanel players={onlinePlayers} currentPlayerId={player.id} isConnected={isConnected} />
-          </motion.section>
+          
           
           {/* ═══════════════════════════════════════════
               LOBBY POKERSTARS-STYLE — Tabs
