@@ -490,13 +490,13 @@ export function SkemaLobby({
                   </div>
                 </motion.div>
 
-                {/* Arenas customizadas do banco */}
+                {/* Arenas customizadas do banco (ordenadas por buy-in desc) */}
                 {arenasLoading ? (
                   <div className="flex items-center justify-center py-4">
                     <Loader2 className="w-5 h-5 animate-spin text-white/30" />
                   </div>
                 ) : (
-                  openArenas?.map((arena) => {
+                  [...(openArenas || [])].sort((a, b) => Number(b.buy_in) - Number(a.buy_in)).map((arena) => {
                     const pool = calculateArenaPool(Number(arena.buy_in), Number(arena.rake_fee), arena.bot_count);
                     const first = getScaledArenaPrize(1, pool);
                     const canAfford = Math.round(player.energy * 100) >= Math.round(Number(arena.buy_in) * 100);
