@@ -397,12 +397,12 @@ export function SkemaLobby({
 
         {/* Conteúdo rolável */}
         <div className="flex-1 overflow-y-auto pb-6">
-          {/* Banner SKEMA */}
+          {/* Banner SKEMA - compacto no topo */}
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.05 }}
-            className="relative mx-4 mt-4 rounded-xl overflow-hidden h-28"
+            className="relative mx-4 mt-3 rounded-xl overflow-hidden h-20"
           >
             <div 
               className="absolute inset-0 bg-cover bg-center" 
@@ -410,64 +410,23 @@ export function SkemaLobby({
             />
             <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-black/70" />
             <div className="relative z-10 h-full flex flex-col items-center justify-center text-center px-4">
-              <h2 className="text-2xl font-black tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-white to-purple-300">
+              <h2 className="text-xl font-black tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-white to-purple-300">
                 SKEMA
               </h2>
-              <p className="text-[10px] tracking-[0.12em] uppercase text-purple-200/70 font-light mt-1">
+              <p className="text-[9px] tracking-[0.12em] uppercase text-purple-200/70 font-light mt-0.5">
                 Cada escolha uma renúncia, uma consequência...
               </p>
             </div>
           </motion.div>
 
-          {/* Descendência (Criador+) */}
-          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mx-4 mt-3">
-            <CreatorDescendancyPanel playerId={player.id} playerTier={player.playerTier} />
-          </motion.section>
-
-          {/* Convites */}
-          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.11 }} className="mx-4 mt-3">
-            <ReferralHistoryPanel
-              playerId={player.id}
-              inviteCode={player.inviteCode}
-              playerTier={player.playerTier}
-              onProcessRewards={onProcessReferralRewards}
-              onRefreshProfile={onRefreshProfile}
-            />
-          </motion.section>
-
-          {/* Transferências */}
-          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} className="mx-4 mt-3">
-            <TransferPanel
-              playerId={player.id}
-              playerName={player.name}
-              playerTier={player.playerTier}
-              energy={player.energy}
-              referralsCount={player.referrals.length}
-              onTransferComplete={onRefreshProfile}
-            />
-          </motion.section>
-
-          {/* Extrato */}
-          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.14 }} className="mx-4 mt-3">
-            <PlayerGameHistory playerId={player.id} />
-          </motion.section>
-          
-          {/* Taxa */}
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.16 }} className="mx-4 mt-3 flex items-center gap-2 text-xs text-white/40">
-            <AlertCircle className="w-3 h-3" />
-            <span>Taxa de transferência: {(transferTax * 100).toFixed(2)}%</span>
-          </motion.div>
-          
-          
-          
           {/* ═══════════════════════════════════════════
-              LOBBY POKERSTARS-STYLE — Tabs
+              LOBBY POKERSTARS-STYLE — Tabs (logo abaixo do banner)
               ═══════════════════════════════════════════ */}
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="mx-4 mt-6"
+            transition={{ delay: 0.08 }}
+            className="mx-4 mt-3"
           >
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="w-full bg-white/5 border border-white/10 h-11">
@@ -752,6 +711,45 @@ export function SkemaLobby({
               </TabsContent>
             </Tabs>
           </motion.section>
+
+          {/* Descendência (Criador+) */}
+          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="mx-4 mt-4">
+            <CreatorDescendancyPanel playerId={player.id} playerTier={player.playerTier} />
+          </motion.section>
+
+          {/* Convites */}
+          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.27 }} className="mx-4 mt-3">
+            <ReferralHistoryPanel
+              playerId={player.id}
+              inviteCode={player.inviteCode}
+              playerTier={player.playerTier}
+              onProcessRewards={onProcessReferralRewards}
+              onRefreshProfile={onRefreshProfile}
+            />
+          </motion.section>
+
+          {/* Transferências */}
+          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.29 }} className="mx-4 mt-3">
+            <TransferPanel
+              playerId={player.id}
+              playerName={player.name}
+              playerTier={player.playerTier}
+              energy={player.energy}
+              referralsCount={player.referrals.length}
+              onTransferComplete={onRefreshProfile}
+            />
+          </motion.section>
+
+          {/* Extrato */}
+          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.31 }} className="mx-4 mt-3">
+            <PlayerGameHistory playerId={player.id} />
+          </motion.section>
+
+          {/* Taxa */}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.33 }} className="mx-4 mt-3 flex items-center gap-2 text-xs text-white/40">
+            <AlertCircle className="w-3 h-3" />
+            <span>Taxa de transferência: {(transferTax * 100).toFixed(2)}%</span>
+          </motion.div>
           
           {/* Erro */}
           <AnimatePresence>
