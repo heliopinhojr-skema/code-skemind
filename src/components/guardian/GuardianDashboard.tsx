@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { useDashboardStats, useReferralTree } from '@/hooks/useGuardianData';
 import { useSupabasePlayer } from '@/hooks/useSupabasePlayer';
 import { useInviteCodes } from '@/hooks/useInviteCodes';
-import { Users, Zap, Box, Gift, Trophy, TrendingUp, Copy, Check, Share2, Link, ArrowDownRight, Dna } from 'lucide-react';
+import { Users, Zap, Box, Gift, Trophy, TrendingUp, Copy, Check, Share2, Link, ArrowDownRight, Dna, TreePine } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { calculateBalanceBreakdown, formatEnergy as formatEnergyUtil } from '@/lib/tierEconomy';
@@ -283,6 +283,52 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
           </p>
         </CardContent>
       </Card>
+
+      {/* Descendência Direta — quem o player já convidou */}
+      {(() => {
+        const myInviteCode = player?.inviteCode;
+        const descendants = referralNodes?.filter(n => n.invited_by === myInviteCode) || [];
+        if (descendants.length === 0) return null;
+        return (
+          <Card className="border border-border/60 bg-card/90 backdrop-blur-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <TreePine className="h-5 w-5 text-primary" />
+                Descendência Direta
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                {descendants.length} jogador(es) convidado(s) por você
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {descendants.map(d => (
+                  <div
+                    key={d.id}
+                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 bg-background/60 border border-border/40"
+                  >
+                    <span className="text-xl">{d.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-foreground truncate">{d.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {d.player_tier || 'Ploft'} · k$ {formatEnergyUtil(d.energy)}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground">
+                        {d.total_invited > 0 && `${d.total_invited} convite(s)`}
+                      </p>
+                      <Badge variant="outline" className="text-xs">
+                        {d.invite_code}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       <h2 className="text-xl font-semibold text-foreground">Visão Geral</h2>
       
