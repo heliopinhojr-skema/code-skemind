@@ -60,29 +60,36 @@ export function TransferPanel({
     setLastResult(null);
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-
-      if (!token) {
-        setLastResult({ success: false, message: 'Sessão expirada. Faça login novamente.' });
-        setIsLoading(false);
-        return;
-      }
-
       const { data, error } = await supabase.functions.invoke('transfer-energy', {
         body: {
           recipientNickname: nickname.trim(),
           amount: parsedAmount,
         },
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
       if (error) {
-        const errorMsg = typeof error === 'object' && 'message' in error ? error.message : String(error);
+        // Try to extract actual error message from the response
+        let errorMsg = 'Erro na transferência';
+        try {
+          if (error instanceof Error && 'context' in error) {
+            const ctx = (error as any).context;
+            if (ctx?.body) {
+              const reader = ctx.body.getReader?.();
+              if (reader) {
+                const { value } = await reader.read();
+                const text = new TextDecoder().decode(value);
+                const parsed = JSON.parse(text);
+                errorMsg = parsed.error || errorMsg;
+              }
+            }
+          } else if (typeof error === 'object' && 'message' in error) {
+            errorMsg = error.message;
+          }
+        } catch {
+          errorMsg = String(error);
+        }
         setLastResult({ success: false, message: errorMsg });
-        toast.error('Transferência falhou');
+        toast.error(errorMsg);
       } else if (data?.error) {
         setLastResult({ success: false, message: data.error });
         toast.error(data.error);
@@ -94,6 +101,7 @@ export function TransferPanel({
         toast.success(`Transferência de ${formatEnergy(data.transferred)} realizada!`);
         setNickname('');
         setAmount('');
+        onTransferComplete();
         onTransferComplete();
       }
     } catch (err: any) {
