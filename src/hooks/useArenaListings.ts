@@ -94,6 +94,23 @@ export function useOpenArenas() {
   });
 }
 
+export function useBotTreasuryBalance() {
+  return useQuery({
+    queryKey: ['bot-treasury-balance'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('bot_treasury')
+        .select('balance')
+        .eq('id', '00000000-0000-0000-0000-000000000002')
+        .single();
+
+      if (error) throw error;
+      return Number(data?.balance ?? 0);
+    },
+    staleTime: 10 * 1000,
+  });
+}
+
 export function useCreateArena() {
   const queryClient = useQueryClient();
 
@@ -105,6 +122,25 @@ export function useCreateArena() {
       rake_fee: number;
       bot_count: number;
     }) => {
+      // Pre-validate: check bot treasury can cover bot buy-ins
+      const { data: treasury, error: treasuryError } = await supabase
+        .from('bot_treasury')
+        .select('balance')
+        .eq('id', '00000000-0000-0000-0000-000000000002')
+        .single();
+
+      if (treasuryError) throw new Error('Erro ao verificar Bot Treasury');
+
+      const botTotalBuyIn = params.bot_count * params.buy_in;
+      const treasuryBalance = Number(treasury?.balance ?? 0);
+
+      if (treasuryBalance < botTotalBuyIn) {
+        throw new Error(
+          `Bot Treasury insuficiente: k$ ${treasuryBalance.toFixed(2)} < k$ ${botTotalBuyIn.toFixed(2)} necessário. ` +
+          `Máximo buy-in suportado: k$ ${(treasuryBalance / params.bot_count).toFixed(2)}`
+        );
+      }
+
       const { data, error } = await supabase
         .from('arena_listings')
         .insert({
