@@ -564,6 +564,10 @@ export type Database = {
         Args: { p_player_id: string; p_status: string }
         Returns: undefined
       }
+      choose_generation_color: {
+        Args: { p_color: string; p_player_id: string }
+        Returns: undefined
+      }
       generate_invite_code: {
         Args: { p_creator_profile_id: string }
         Returns: string

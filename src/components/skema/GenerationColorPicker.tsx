@@ -69,28 +69,17 @@ export function GenerationColorPicker({ playerId, onColorChosen }: GenerationCol
 
   const chooseMutation = useMutation({
     mutationFn: async (colorId: string) => {
-      // Double-check it's still available
-      const { data: check } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('generation_color', colorId)
-        .in('player_tier', ['Criador', 'guardiao']);
-      
-      if (check && check.length > 0) {
-        throw new Error('Cor já foi escolhida por outro Criador!');
-      }
+      const { error } = await supabase.rpc('choose_generation_color', {
+        p_player_id: playerId,
+        p_color: colorId,
+      } as any);
 
-      const { error } = await supabase
-        .from('profiles')
-        .update({ generation_color: colorId } as any)
-        .eq('id', playerId);
-
-      if (error) throw error;
+      if (error) throw new Error(error.message);
       return colorId;
     },
     onSuccess: (colorId) => {
       queryClient.invalidateQueries({ queryKey: ['taken-generation-colors'] });
-      toast.success('Cor de geração escolhida!');
+      toast.success('Cor de geração escolhida! Toda sua linhagem agora carrega essa cor.');
       onColorChosen(colorId);
     },
     onError: (err: any) => {
