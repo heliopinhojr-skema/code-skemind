@@ -17,7 +17,7 @@ import { GameBoard } from '@/components/game/GameBoard';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trophy, Coins } from 'lucide-react';
 import { CosmicBackground } from '@/components/CosmicBackground';
-import { getScaledArenaPrize, isITM } from '@/lib/arenaPayouts';
+// isITM is unused now - prize computed inside RaceSummary
 
 export default function Tournament() {
   const tournament = useTournament();
@@ -72,9 +72,6 @@ export default function Tournament() {
   
   const isFinished = tournament.state.status === 'finished';
   const humanResult = tournament.state.results.get(tournament.state.humanPlayerId);
-  const prizeAmount = isFinished && humanResult && isITM(humanResult.rank)
-    ? getScaledArenaPrize(humanResult.rank, tournament.state.prizePool)
-    : 0;
   
   // Mapa de símbolos para exibição
   const symbolsById = new Map(UI_SYMBOLS.map(s => [s.id, s]));
@@ -118,7 +115,6 @@ export default function Tournament() {
                   players={tournament.state.players}
                   results={tournament.state.results}
                   symbolsById={symbolsById}
-                  prizeAmount={prizeAmount}
                   totalPlayers={tournament.state.players.length}
                   arenaPool={tournament.state.prizePool}
                 />
@@ -154,6 +150,7 @@ export default function Tournament() {
               humanPlayerId={tournament.state.humanPlayerId}
               isFinished={isFinished}
               symbolsById={symbolsById}
+              arenaPool={tournament.state.prizePool}
             />
           </div>
         </div>
@@ -166,6 +163,7 @@ export default function Tournament() {
             humanPlayerId={tournament.state.humanPlayerId}
             isFinished={isFinished}
             symbolsById={symbolsById}
+            arenaPool={tournament.state.prizePool}
           />
         </div>
         </main>
