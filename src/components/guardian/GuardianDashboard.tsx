@@ -3,20 +3,23 @@
  * Cards clicáveis para navegar entre tabs
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { useDashboardStats, useReferralTree } from '@/hooks/useGuardianData';
+import { useDashboardStats, useReferralTree, useSkemaBoxTransactions } from '@/hooks/useGuardianData';
 import { useSupabasePlayer } from '@/hooks/useSupabasePlayer';
 import { useInviteCodes } from '@/hooks/useInviteCodes';
-import { Users, Zap, Box, Gift, Trophy, TrendingUp, Copy, Check, Share2, Link, ArrowDownRight, Dna, TreePine, Heart, Loader2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Users, Zap, Box, Gift, Trophy, TrendingUp, Copy, Check, Share2, Link, ArrowDownRight, Dna, TreePine, Heart, Loader2, Calendar, Receipt } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { calculateBalanceBreakdown, formatEnergy as formatEnergyUtil } from '@/lib/tierEconomy';
-import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface GuardianDashboardProps {
   onNavigateTab?: (tab: string) => void;
@@ -25,12 +28,40 @@ interface GuardianDashboardProps {
 export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
   const { data: stats, isLoading, error } = useDashboardStats();
   const { data: referralNodes } = useReferralTree();
+  const { data: sboxTransactions } = useSkemaBoxTransactions();
   const { player } = useSupabasePlayer();
   const { codes, isLoading: isLoadingCodes, isAutoGenerating, unusedCount, usedCount } = useInviteCodes(player?.id || null, player?.playerTier || null);
   const [copied, setCopied] = useState<string | null>(null);
   const [showDonate, setShowDonate] = useState(false);
   const [donateAmount, setDonateAmount] = useState('');
   const [isDonating, setIsDonating] = useState(false);
+
+  // Fetch detailed referral data with inviter/invited info
+  const { data: detailedReferrals } = useQuery({
+    queryKey: ['guardian-detailed-referrals'],
+    queryFn: async () => {
+      const { data: referrals, error: refErr } = await supabase
+        .from('referrals')
+        .select('inviter_id, invited_id, reward_amount, reward_credited, created_at');
+      if (refErr) throw refErr;
+
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, name, player_tier');
+
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+      return referrals?.map(r => ({
+        ...r,
+        inviterName: profileMap.get(r.inviter_id)?.name || '?',
+        inviterTier: profileMap.get(r.inviter_id)?.player_tier || '?',
+        invitedName: profileMap.get(r.invited_id)?.name || '?',
+        invitedTier: profileMap.get(r.invited_id)?.player_tier || '?',
+        day: r.created_at.slice(0, 10),
+      })) || [];
+    },
+    staleTime: 30_000,
+  });
 
   const botCount = stats?.botTreasuryBotCount || 99;
 
@@ -288,6 +319,173 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Evolução Diária de Convites */}
+      {detailedReferrals && detailedReferrals.length > 0 && (
+        <Card className="border border-border/60 bg-card/90 backdrop-blur-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-primary" />
+              Evolução Diária de Convites
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Convites aceitos por dia — quem convidou, quem entrou, tier e valor transferido
+            </p>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              // Group by day
+              const byDay = new Map<string, typeof detailedReferrals>();
+              detailedReferrals.forEach(r => {
+                const list = byDay.get(r.day) || [];
+                list.push(r);
+                byDay.set(r.day, list);
+              });
+              const sortedDays = [...byDay.keys()].sort().reverse();
+
+              return (
+                <div className="space-y-4">
+                  {sortedDays.map(day => {
+                    const refs = byDay.get(day)!;
+                    const dayTotal = refs.reduce((s, r) => s + Number(r.reward_amount), 0);
+                    // Count by invited tier
+                    const tierCounts: Record<string, number> = {};
+                    refs.forEach(r => {
+                      const t = r.invitedTier === 'jogador' ? 'Ploft' : (r.invitedTier || 'Ploft');
+                      tierCounts[t] = (tierCounts[t] || 0) + 1;
+                    });
+
+                    return (
+                      <div key={day} className="bg-background/60 rounded-lg border border-border/40 p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs font-mono">
+                              {format(new Date(day + 'T12:00:00'), "dd/MM/yyyy (EEEE)", { locale: ptBR })}
+                            </Badge>
+                            <Badge variant="secondary" className="text-xs">
+                              {refs.length} convite(s)
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {Object.entries(tierCounts).map(([tier, count]) => (
+                              <span key={tier} className="text-[10px] text-muted-foreground">
+                                {tier}: {count}
+                              </span>
+                            ))}
+                            <Badge className="text-xs bg-primary/20 text-primary border-primary/30">
+                              k$ {formatEnergyUtil(dayTotal)} transferido
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          {refs.map((r, i) => (
+                            <div key={i} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded bg-muted/30">
+                              <span className="text-muted-foreground shrink-0">
+                                {r.inviterTier === 'master_admin' ? 'HX' : r.inviterName}
+                              </span>
+                              <span className="text-muted-foreground">→</span>
+                              <span className="font-medium text-foreground">{r.invitedName}</span>
+                              <Badge variant="outline" className="text-[10px] shrink-0">
+                                {r.invitedTier === 'jogador' ? 'Ploft' : r.invitedTier}
+                              </Badge>
+                              <span className="ml-auto font-mono text-foreground shrink-0">
+                                k$ {formatEnergyUtil(Number(r.reward_amount))}
+                              </span>
+                              {r.reward_credited ? (
+                                <Check className="h-3 w-3 text-emerald-400 shrink-0" />
+                              ) : (
+                                <span className="text-[9px] text-orange-400 shrink-0">pendente</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Extrato de Transações — Taxas Administrativas */}
+      {sboxTransactions && sboxTransactions.length > 0 && (
+        <Card className="border border-border/60 bg-card/90 backdrop-blur-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+              <Receipt className="h-5 w-5 text-primary" />
+              Extrato de Taxas & Receitas (Skema Box)
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Todas as taxas administrativas na fonte — arenas (9,09%), transferências (6,43%) e corridas (k$ 0,10)
+            </p>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              // Group by type and summarize
+              const byType: Record<string, { count: number; total: number }> = {};
+              sboxTransactions.forEach(t => {
+                if (!byType[t.type]) byType[t.type] = { count: 0, total: 0 };
+                byType[t.type].count++;
+                byType[t.type].total += t.amount;
+              });
+
+              const typeLabels: Record<string, string> = {
+                arena_rake: '🎮 Rake de Arenas (9,09%)',
+                transfer_tax: '💸 Taxa de Transferência (6,43%)',
+                official_rake: '🏆 Taxa de Corrida Oficial (k$ 0,10)',
+                correction: '🔧 Correção/Ajuste',
+              };
+
+              return (
+                <div className="space-y-3">
+                  {/* Resumo por tipo */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+                    {Object.entries(byType).map(([type, data]) => (
+                      <div key={type} className="bg-background/60 rounded-lg p-2 border border-border/40 text-center">
+                        <p className="text-[10px] text-muted-foreground">{typeLabels[type] || type}</p>
+                        <p className="text-sm font-bold text-foreground">{formatEnergyUtil(data.total)}</p>
+                        <p className="text-[10px] text-muted-foreground">{data.count} operação(ões)</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Lista detalhada (últimas 20) */}
+                  <div className="space-y-1 max-h-[300px] overflow-y-auto pr-1">
+                    {sboxTransactions.slice(0, 30).map(t => (
+                      <div key={t.id} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded bg-muted/30">
+                        <span className="text-[10px] text-muted-foreground font-mono shrink-0">
+                          {format(new Date(t.created_at), "dd/MM HH:mm", { locale: ptBR })}
+                        </span>
+                        <Badge variant="outline" className={cn("text-[10px] shrink-0", 
+                          t.type === 'transfer_tax' ? 'border-amber-400/30 text-amber-400' :
+                          t.type === 'arena_rake' ? 'border-blue-400/30 text-blue-400' :
+                          t.type === 'official_rake' ? 'border-purple-400/30 text-purple-400' :
+                          'border-border'
+                        )}>
+                          {t.type === 'transfer_tax' ? '💸 Transf.' :
+                           t.type === 'arena_rake' ? '🎮 Arena' :
+                           t.type === 'official_rake' ? '🏆 Corrida' : t.type}
+                        </Badge>
+                        <span className="text-muted-foreground truncate flex-1">
+                          {t.description || '-'}
+                        </span>
+                        <span className="font-mono font-medium text-emerald-400 shrink-0">
+                          +{formatEnergyUtil(t.amount)}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground font-mono shrink-0">
+                          saldo: {formatEnergyUtil(t.balance_after)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Seção de Códigos DNA Únicos */}
       <Card className="bg-gradient-to-r from-primary/20 to-primary/5 border-primary/30">
