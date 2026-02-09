@@ -3,7 +3,7 @@
  * Cards clicáveis para navegar entre tabs
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ import { useSupabasePlayer } from '@/hooks/useSupabasePlayer';
 import { useInviteCodes } from '@/hooks/useInviteCodes';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, Zap, Box, Gift, Trophy, TrendingUp, Copy, Check, Share2, Link, ArrowDownRight, Dna, TreePine, Heart, Loader2, Calendar, Receipt } from 'lucide-react';
+import { Users, Zap, Box, Gift, Trophy, TrendingUp, Copy, Check, Share2, Link, ArrowDownRight, Dna, TreePine, Heart, Loader2, Calendar, Receipt, Radio, UserPlus, Activity } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { calculateBalanceBreakdown, formatEnergy as formatEnergyUtil } from '@/lib/tierEconomy';
@@ -64,6 +64,77 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
   });
 
   const botCount = stats?.botTreasuryBotCount || 99;
+
+  // Real-time online player count via presence
+  const [onlineCount, setOnlineCount] = useState(0);
+  const channelRef = useRef<any>(null);
+
+  useEffect(() => {
+    const channel = supabase.channel('guardian-presence-monitor', {
+      config: { presence: { key: 'guardian-watcher' } },
+    });
+    channelRef.current = channel;
+
+    channel.on('presence', { event: 'sync' }, () => {
+      const state = channel.presenceState();
+      const uniqueIds = new Set<string>();
+      Object.values(state).forEach((presences: any) => {
+        presences.forEach((p: any) => { if (p.id) uniqueIds.add(p.id); });
+      });
+      setOnlineCount(uniqueIds.size);
+    });
+
+    channel.subscribe(async (status: string) => {
+      if (status === 'SUBSCRIBED') {
+        await channel.track({ id: 'guardian', role: 'watcher', joinedAt: new Date().toISOString() });
+      }
+    });
+
+    return () => { channel.unsubscribe(); channelRef.current = null; };
+  }, []);
+
+  // Real-time new player growth tracker - listens for profile inserts
+  const [newPlayersToday, setNewPlayersToday] = useState(0);
+  const [recentJoins, setRecentJoins] = useState<{ name: string; emoji: string; tier: string; time: string }[]>([]);
+
+  useEffect(() => {
+    // Count today's players on mount
+    const today = new Date().toISOString().slice(0, 10);
+    supabase
+      .from('profiles')
+      .select('id, name, emoji, player_tier, created_at')
+      .gte('created_at', today + 'T00:00:00')
+      .neq('player_tier', 'master_admin')
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        if (data) {
+          setNewPlayersToday(data.length);
+          setRecentJoins(data.slice(0, 5).map(p => ({
+            name: p.name, emoji: p.emoji,
+            tier: p.player_tier === 'jogador' ? 'Ploft' : (p.player_tier || 'Ploft'),
+            time: format(new Date(p.created_at), "HH:mm", { locale: ptBR }),
+          })));
+        }
+      });
+
+    // Subscribe to realtime inserts
+    const sub = supabase
+      .channel('guardian-new-players')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'profiles' }, (payload) => {
+        const p = payload.new as any;
+        if (p.player_tier !== 'master_admin') {
+          setNewPlayersToday(prev => prev + 1);
+          setRecentJoins(prev => [{
+            name: p.name, emoji: p.emoji,
+            tier: p.player_tier === 'jogador' ? 'Ploft' : (p.player_tier || 'Ploft'),
+            time: format(new Date(), "HH:mm", { locale: ptBR }),
+          }, ...prev].slice(0, 5));
+        }
+      })
+      .subscribe();
+
+    return () => { sub.unsubscribe(); };
+  }, []);
 
   const handleDonateToBots = useCallback(async () => {
     const totalAmount = parseFloat(donateAmount);
@@ -319,6 +390,97 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Live Counters Strip */}
+      <div className="grid grid-cols-3 gap-3">
+        {/* Online agora */}
+        <Card className="bg-card/90 backdrop-blur-sm border-border/60">
+          <CardContent className="p-3 flex items-center gap-3">
+            <div className="relative">
+              <Radio className="h-5 w-5 text-emerald-400" />
+              <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full animate-ping" />
+              <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-foreground">{onlineCount}</p>
+              <p className="text-[10px] text-muted-foreground">online agora</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Novos hoje */}
+        <Card className="bg-card/90 backdrop-blur-sm border-border/60">
+          <CardContent className="p-3 flex items-center gap-3">
+            <UserPlus className="h-5 w-5 text-primary" />
+            <div>
+              <p className="text-2xl font-bold text-foreground">+{newPlayersToday}</p>
+              <p className="text-[10px] text-muted-foreground">novos hoje</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Crescimento recente */}
+        <Card className="bg-card/90 backdrop-blur-sm border-border/60">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Activity className="h-4 w-4 text-primary" />
+              <span className="text-[10px] text-muted-foreground">Últimos registros</span>
+            </div>
+            {recentJoins.length === 0 ? (
+              <p className="text-[10px] text-muted-foreground">Nenhum hoje</p>
+            ) : (
+              <div className="space-y-0.5">
+                {recentJoins.map((j, i) => (
+                  <div key={i} className="flex items-center gap-1 text-[10px]">
+                    <span>{j.emoji}</span>
+                    <span className="text-foreground truncate">{j.name}</span>
+                    <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 shrink-0">{j.tier}</Badge>
+                    <span className="text-muted-foreground ml-auto shrink-0">{j.time}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Visão Geral */}
+      <h2 className="text-xl font-semibold text-foreground">Visão Geral</h2>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        {metrics.map((metric) => (
+          <Card 
+            key={metric.title} 
+            className={cn(
+              "bg-card/90 backdrop-blur-sm border-border/60 transition-all",
+              metric.clickable && onNavigateTab && "cursor-pointer hover:border-primary/40 hover:bg-card/95 hover:scale-[1.02]"
+            )}
+            onClick={() => metric.clickable && onNavigateTab?.(metric.tab)}
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                <metric.icon className="h-4 w-4" />
+                {metric.title}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <Skeleton className="h-8 w-20" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold text-foreground">
+                    {metric.format(metric.value)}
+                  </div>
+                  {metric.subtitle && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {metric.subtitle}
+                    </p>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
       {/* Evolução Diária de Convites */}
       {detailedReferrals && detailedReferrals.length > 0 && (
@@ -627,43 +789,6 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
         );
       })()}
 
-      <h2 className="text-xl font-semibold text-foreground">Visão Geral</h2>
-      
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        {metrics.map((metric) => (
-          <Card 
-            key={metric.title} 
-            className={cn(
-              "bg-card/90 backdrop-blur-sm border-border/60 transition-all",
-              metric.clickable && onNavigateTab && "cursor-pointer hover:border-primary/40 hover:bg-card/95 hover:scale-[1.02]"
-            )}
-            onClick={() => metric.clickable && onNavigateTab?.(metric.tab)}
-          >
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                <metric.icon className="h-4 w-4" />
-                {metric.title}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <Skeleton className="h-8 w-20" />
-              ) : (
-                <>
-                  <div className="text-2xl font-bold text-foreground">
-                    {metric.format(metric.value)}
-                  </div>
-                  {metric.subtitle && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {metric.subtitle}
-                    </p>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
     </div>
   );
 }
