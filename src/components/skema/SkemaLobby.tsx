@@ -12,6 +12,7 @@ import { formatEnergy, calculateBalanceBreakdown } from '@/lib/tierEconomy';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getColorConfig, PlanetFace } from './GenerationColorPicker';
 import { 
   Zap, Trophy, Users, Clock, Brain, Swords, Target,
   Rocket, Sparkles, Calendar, Crown, AlertCircle, LogOut, UserCheck, Bot,
@@ -26,7 +27,7 @@ import { useOpenArenas, ArenaListing } from '@/hooks/useArenaListings';
 import { calculateArenaPool, getScaledArenaPrize } from '@/lib/arenaPayouts';
 import { OnlinePlayer } from '@/hooks/useOnlinePlayers';
 import { ReferralHistoryPanel } from './ReferralHistoryPanel';
-import { getColorConfig } from './GenerationColorPicker';
+
 import { CreatorDescendancyPanel } from './CreatorDescendancyPanel';
 import { TransferPanel } from './TransferPanel';
 import { PlayerGameHistory } from './PlayerGameHistory';
@@ -318,12 +319,15 @@ export function SkemaLobby({
             <div className="flex items-center gap-3">
               {(() => {
                 const genColor = getColorConfig(player.generationColor);
+                if (genColor) {
+                  return (
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${genColor.bg} ${genColor.glow}`}>
+                      <PlanetFace className={genColor.face} />
+                    </div>
+                  );
+                }
                 return (
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl ${
-                    genColor 
-                      ? `${genColor.bg} ${genColor.glow}` 
-                      : 'bg-gradient-to-br from-primary to-purple-500'
-                  }`}>
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-2xl">
                     {player.emoji}
                   </div>
                 );
