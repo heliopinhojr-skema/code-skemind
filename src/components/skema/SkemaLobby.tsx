@@ -10,10 +10,12 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { formatEnergy, calculateBalanceBreakdown } from '@/lib/tierEconomy';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   Zap, Trophy, Users, Clock, Brain, Swords, Target,
   Rocket, Sparkles, Calendar, Crown, AlertCircle, LogOut, UserCheck, Bot,
-  Coins, Loader2
+  Coins, Loader2, Globe
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -120,6 +122,35 @@ function TierBadge({ tier }: { tier: PlayerTier }) {
       <span>{emoji}</span>
       <span>{label}</span>
     </span>
+  );
+}
+// Contador global de jogadores cadastrados - visível para todos
+function UniversePlayerCounter() {
+  const { data: count } = useQuery({
+    queryKey: ['universe-player-count'],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .neq('player_tier', 'master_admin');
+      return count || 0;
+    },
+    staleTime: 30_000,
+  });
+
+  return (
+    <div className="flex items-center justify-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5">
+      <Globe className="w-4 h-4 text-purple-400" />
+      <span className="text-sm text-white/70">Jogadores no Universo:</span>
+      <motion.span
+        key={count}
+        initial={{ scale: 1.3, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="text-lg font-bold text-purple-300"
+      >
+        {count ?? '...'}
+      </motion.span>
+    </div>
   );
 }
 
@@ -386,8 +417,18 @@ export function SkemaLobby({
             </div>
           </motion.div>
 
+          {/* Contador global de jogadores */}
+          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.09 }} className="mx-4 mt-4">
+            <UniversePlayerCounter />
+          </motion.section>
+
+          {/* Descendência (Criador+) */}
+          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mx-4 mt-3">
+            <CreatorDescendancyPanel playerId={player.id} playerTier={player.playerTier} />
+          </motion.section>
+
           {/* Convites */}
-          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mx-4 mt-4">
+          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.11 }} className="mx-4 mt-3">
             <ReferralHistoryPanel
               playerId={player.id}
               inviteCode={player.inviteCode}
@@ -395,11 +436,6 @@ export function SkemaLobby({
               onProcessRewards={onProcessReferralRewards}
               onRefreshProfile={onRefreshProfile}
             />
-          </motion.section>
-
-          {/* Descendência */}
-          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.11 }} className="mx-4 mt-3">
-            <CreatorDescendancyPanel playerId={player.id} playerTier={player.playerTier} />
           </motion.section>
 
           {/* Transferências */}
