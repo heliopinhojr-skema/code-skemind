@@ -3,18 +3,20 @@
  * Cards clicáveis para navegar entre tabs
  */
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { useDashboardStats, useReferralTree } from '@/hooks/useGuardianData';
 import { useSupabasePlayer } from '@/hooks/useSupabasePlayer';
 import { useInviteCodes } from '@/hooks/useInviteCodes';
-import { Users, Zap, Box, Gift, Trophy, TrendingUp, Copy, Check, Share2, Link, ArrowDownRight, Dna, TreePine } from 'lucide-react';
+import { Users, Zap, Box, Gift, Trophy, TrendingUp, Copy, Check, Share2, Link, ArrowDownRight, Dna, TreePine, Heart, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { calculateBalanceBreakdown, formatEnergy as formatEnergyUtil } from '@/lib/tierEconomy';
+import { supabase } from '@/integrations/supabase/client';
 
 interface GuardianDashboardProps {
   onNavigateTab?: (tab: string) => void;
@@ -26,6 +28,55 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
   const { player } = useSupabasePlayer();
   const { codes, isLoading: isLoadingCodes, isAutoGenerating, unusedCount, usedCount } = useInviteCodes(player?.id || null, player?.playerTier || null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [showDonate, setShowDonate] = useState(false);
+  const [donateAmount, setDonateAmount] = useState('');
+  const [isDonating, setIsDonating] = useState(false);
+
+  const botCount = stats?.botTreasuryBotCount || 99;
+
+  const handleDonateToBots = useCallback(async () => {
+    const totalAmount = parseFloat(donateAmount);
+    if (!totalAmount || totalAmount <= 0 || !player?.id) return;
+    
+    if ((player.energy || 0) < totalAmount) {
+      toast.error('Saldo insuficiente');
+      return;
+    }
+
+    setIsDonating(true);
+    try {
+      // 1. Debit from admin
+      const { error: debitErr } = await supabase.rpc('update_player_energy', {
+        p_player_id: player.id,
+        p_amount: -totalAmount,
+      });
+      if (debitErr) throw debitErr;
+
+      // 2. Credit to Bot Treasury
+      const { error: creditErr } = await supabase.rpc('update_bot_treasury', {
+        p_amount: totalAmount,
+        p_description: `Doação HX: k$ ${totalAmount.toFixed(2)} (${(totalAmount / botCount).toFixed(4)}/bot)`,
+      });
+      if (creditErr) throw creditErr;
+
+      // 3. Update balance_per_bot
+      const newBalance = (stats?.botTreasuryBalance || 0) + totalAmount;
+      const perBot = Math.round((newBalance / botCount) * 100) / 100;
+      await supabase.from('bot_treasury').update({ 
+        balance_per_bot: perBot 
+      }).eq('id', '00000000-0000-0000-0000-000000000002');
+
+      toast.success(`Doado k$ ${totalAmount.toFixed(2)} para ${botCount} bots (k$ ${(totalAmount / botCount).toFixed(4)}/bot)`);
+      setDonateAmount('');
+      setShowDonate(false);
+      // Refresh data
+      window.location.reload();
+    } catch (e: any) {
+      toast.error('Erro ao doar: ' + (e.message || 'desconhecido'));
+    } finally {
+      setIsDonating(false);
+    }
+  }, [donateAmount, player, botCount, stats]);
 
   // Calculate total locked and available from all non-HX players
   const { totalLocked, totalAvailable } = (() => {
@@ -144,6 +195,7 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
           {isLoading ? (
             <Skeleton className="h-20 w-full" />
           ) : (
+            <>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <div className="bg-background/60 rounded-lg p-3 border border-border/40">
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -168,6 +220,18 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
                 <p className="text-lg font-bold text-foreground">
                   {formatEnergyUtil(stats?.botTreasuryBalance || 0)}
                 </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {formatEnergyUtil((stats?.botTreasuryBalance || 0) / botCount)}/bot
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 w-full h-7 text-xs gap-1"
+                  onClick={() => setShowDonate(!showDonate)}
+                >
+                  <Heart className="h-3 w-3" />
+                  Doar
+                </Button>
               </div>
               <div className="bg-background/60 rounded-lg p-3 border border-border/40">
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -186,6 +250,41 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
                 </p>
               </div>
             </div>
+
+            {/* Painel de Doação para Bots */}
+            {showDonate && (
+              <div className="mt-3 bg-background/60 rounded-lg p-3 border border-border/40 space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Doar de HX → Bot Treasury (valor total, dividido por {botCount} bots)
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    placeholder="Valor total k$"
+                    value={donateAmount}
+                    onChange={e => setDonateAmount(e.target.value)}
+                    className="h-8 text-sm"
+                    min="0"
+                    step="0.01"
+                  />
+                  <Button
+                    size="sm"
+                    className="h-8 gap-1"
+                    onClick={handleDonateToBots}
+                    disabled={isDonating || !donateAmount || parseFloat(donateAmount) <= 0}
+                  >
+                    {isDonating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Heart className="h-3 w-3" />}
+                    Doar
+                  </Button>
+                </div>
+                {donateAmount && parseFloat(donateAmount) > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    = {formatEnergyUtil(parseFloat(donateAmount) / botCount)} por bot
+                  </p>
+                )}
+              </div>
+            )}
+            </>
           )}
         </CardContent>
       </Card>

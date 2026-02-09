@@ -14,6 +14,7 @@ export interface DashboardStats {
   playersEnergy: number;
   skemaBoxBalance: number;
   botTreasuryBalance: number;
+  botTreasuryBotCount: number;
   totalReferrals: number;
   creditedReferrals: number;
   totalDistributed: number;
@@ -169,7 +170,7 @@ export function useDashboardStats() {
       // Buscar saldo do Bot Treasury
       const { data: botTreasury, error: botTreasuryError } = await supabase
         .from('bot_treasury')
-        .select('balance')
+        .select('balance, bot_count')
         .eq('id', '00000000-0000-0000-0000-000000000002')
         .single();
       
@@ -178,6 +179,7 @@ export function useDashboardStats() {
       }
       
       const botTreasuryBalance = Number(botTreasury?.balance) || 0;
+      const botTreasuryBotCount = Number(botTreasury?.bot_count) || 99;
       
       // System total = HX + players + skema box + bot treasury (should always equal initial 10M)
       const systemTotal = hxEnergy + playersEnergy + skemaBoxBalance + botTreasuryBalance;
@@ -207,6 +209,7 @@ export function useDashboardStats() {
         playersEnergy,
         skemaBoxBalance,
         botTreasuryBalance,
+        botTreasuryBotCount,
         totalReferrals,
         creditedReferrals,
         totalDistributed,
