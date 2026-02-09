@@ -262,7 +262,7 @@ export default function Auth() {
               transition={{ delay: 0.3, duration: 1.2, ease: 'easeOut' }}
               className="text-7xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-purple-200 to-purple-400 drop-shadow-2xl"
             >
-              skema
+              s<span className="text-transparent bg-clip-text bg-gradient-to-b from-orange-400 via-orange-500 to-red-600">k</span>ema
             </motion.h1>
 
             {/* Divider */}
@@ -314,7 +314,7 @@ export default function Auth() {
                 transition={{ duration: 1.5, ease: 'easeOut' }}
                 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-purple-200 to-purple-400"
               >
-                skema
+                s<span className="text-transparent bg-clip-text bg-gradient-to-b from-orange-400 via-orange-500 to-red-600">k</span>ema
               </motion.h1>
               <motion.p 
                 initial={{ opacity: 0 }}
