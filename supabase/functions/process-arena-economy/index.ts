@@ -39,6 +39,8 @@ interface FinishPayload {
   score: number
   time_remaining: number | null
   won: boolean
+  arena_buy_in?: number
+  arena_pool?: number
 }
 
 type Payload = EnterPayload | FinishPayload
@@ -217,7 +219,7 @@ Deno.serve(async (req) => {
 
     // ======================== FINISH ========================
     if (payload.action === 'finish') {
-      const { player_rank, player_prize, bot_prizes_total, attempts, score, time_remaining, won } = payload as FinishPayload
+      const { player_rank, player_prize, bot_prizes_total, attempts, score, time_remaining, won, arena_buy_in, arena_pool } = payload as FinishPayload
 
       // 1. Credit player prize (if any)
       if (player_prize > 0) {
@@ -253,7 +255,7 @@ Deno.serve(async (req) => {
         console.log(`[arena-economy] ✅ Bot treasury credited: +k$${bot_prizes_total.toFixed(2)} (new balance: k$${newBotBalance})`)
       }
 
-      // 3. Save to game_history
+      // 3. Save to game_history (with rank and prize for player statement)
       const { error: historyError } = await admin
         .from('game_history')
         .insert({
@@ -263,6 +265,10 @@ Deno.serve(async (req) => {
           attempts,
           score,
           time_remaining,
+          rank: player_rank,
+          prize_won: player_prize,
+          arena_buy_in: arena_buy_in ?? null,
+          arena_pool: arena_pool ?? null,
         })
       if (historyError) {
         console.warn('[arena-economy] Game history save failed (non-critical):', historyError)
