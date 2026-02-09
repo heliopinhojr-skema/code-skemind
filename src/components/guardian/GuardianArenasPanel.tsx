@@ -24,9 +24,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useArenaListings, useCreateArena, useCloseArena } from '@/hooks/useArenaListings';
 import { useSupabasePlayer } from '@/hooks/useSupabasePlayer';
 import {
-  ARENA_BUY_IN_OPTIONS, ARENA_BOT_OPTIONS,
+  ARENA_BOT_OPTIONS,
   calculateArenaPool, calculateTotalRake, getScaledArenaPrize,
 } from '@/lib/arenaPayouts';
+import { RAKE_RATE, computeBuyInAndRake } from '@/lib/arenaPayouts';
 import { formatEnergy } from '@/lib/tierEconomy';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -51,24 +52,27 @@ export function GuardianArenasPanel() {
   const closeArena = useCloseArena();
   const { player } = useSupabasePlayer();
   const [isCreating, setIsCreating] = useState(false);
-  const [selectedBuyIn, setSelectedBuyIn] = useState(ARENA_BUY_IN_OPTIONS[0]);
+  const [customBuyInInput, setCustomBuyInInput] = useState('0.55');
   const [selectedBots, setSelectedBots] = useState(99);
   const [arenaName, setArenaName] = useState('');
 
-  const pool = calculateArenaPool(selectedBuyIn.buyIn, selectedBuyIn.rakeFee, selectedBots);
-  const totalRake = calculateTotalRake(selectedBuyIn.rakeFee, selectedBots);
+  const parsedBuyIn = parseFloat(customBuyInInput) || 0;
+  const { buyIn, rakeFee } = computeBuyInAndRake(parsedBuyIn);
+  const pool = calculateArenaPool(buyIn, rakeFee, selectedBots);
+  const totalRake = calculateTotalRake(rakeFee, selectedBots);
   const first = getScaledArenaPrize(1, pool);
   const minCash = getScaledArenaPrize(25, pool);
+  const isValidBuyIn = parsedBuyIn >= 0.11; // mínimo k$ 0,11
 
   const handleCreate = async () => {
-    if (!player?.id || !arenaName.trim()) return;
+    if (!player?.id || !arenaName.trim() || !isValidBuyIn) return;
 
     try {
       await createArena.mutateAsync({
         creator_id: player.id,
         name: arenaName.trim(),
-        buy_in: selectedBuyIn.buyIn,
-        rake_fee: selectedBuyIn.rakeFee,
+        buy_in: buyIn,
+        rake_fee: rakeFee,
         bot_count: selectedBots,
       });
 
@@ -135,25 +139,18 @@ export function GuardianArenasPanel() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label>Buy-in (Entrada)</Label>
-                      <Select
-                        value={String(selectedBuyIn.buyIn)}
-                        onValueChange={(v) => {
-                          const opt = ARENA_BUY_IN_OPTIONS.find(o => String(o.buyIn) === v);
-                          if (opt) setSelectedBuyIn(opt);
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {ARENA_BUY_IN_OPTIONS.map((opt) => (
-                            <SelectItem key={opt.buyIn} value={String(opt.buyIn)}>
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Label>Buy-in Total (k$)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0.11"
+                        value={customBuyInInput}
+                        onChange={(e) => setCustomBuyInInput(e.target.value)}
+                        placeholder="Ex: 1.10"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Rake fixo: {(RAKE_RATE * 100).toFixed(2)}% → k$ {formatEnergy(rakeFee)}/entrada
+                      </p>
                     </div>
 
                     <div className="grid gap-2">
@@ -184,7 +181,7 @@ export function GuardianArenasPanel() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Rake (Skema Box)</span>
-                      <span className="font-mono text-purple-400">{formatEnergy(selectedBuyIn.rakeFee)} × {selectedBots + 1} = {formatEnergy(totalRake)}</span>
+                      <span className="font-mono text-primary/80">{formatEnergy(rakeFee)} × {selectedBots + 1} = {formatEnergy(totalRake)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Pool total</span>
@@ -205,7 +202,7 @@ export function GuardianArenasPanel() {
                   <Button variant="outline" onClick={() => setIsCreating(false)}>Cancelar</Button>
                   <Button
                     onClick={handleCreate}
-                    disabled={!arenaName.trim() || createArena.isPending}
+                    disabled={!arenaName.trim() || !isValidBuyIn || createArena.isPending}
                   >
                     {createArena.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
                     Criar Arena
