@@ -451,6 +451,7 @@ export function SkemaLobby({
             <ReferralHistoryPanel
               playerId={player.id}
               inviteCode={player.inviteCode}
+              playerTier={player.playerTier}
               onProcessRewards={onProcessReferralRewards}
               onRefreshProfile={onRefreshProfile}
             />
