@@ -94,18 +94,34 @@ export function useInviteCodes(profileId: string | null, playerTier: string | nu
 
     if (maxInvites <= 0) return; // Ploft/jogador can't invite
 
-    // Count referrals already made (some may have been via master code, not SKINV)
-    const { count: referralCount } = await supabase
-      .from('referrals')
-      .select('id', { count: 'exact', head: true })
-      .eq('inviter_id', profileId);
+    // Count referrals that match the expected invited tier for this slot type
+    // e.g. master_admin slots are for Criadores only, not Plofts
+    const expectedTier = config.invitedTierLabel;
+    let extraReferrals = 0;
 
-    const existingReferrals = referralCount || 0;
-    const usedCodes = currentCodes.filter(c => !!c.usedById).length;
-    // Referrals not accounted for by used SKINV codes
-    const extraReferrals = Math.max(0, existingReferrals - usedCodes);
+    if (expectedTier) {
+      // Count referrals where the invited player has the expected tier
+      const { data: tierReferrals } = await supabase
+        .from('referrals')
+        .select('invited_id')
+        .eq('inviter_id', profileId);
+
+      if (tierReferrals && tierReferrals.length > 0) {
+        const invitedIds = tierReferrals.map(r => r.invited_id);
+        const { count: matchingCount } = await supabase
+          .from('profiles')
+          .select('id', { count: 'exact', head: true })
+          .in('id', invitedIds)
+          .eq('player_tier', expectedTier);
+
+        const totalMatchingReferrals = matchingCount || 0;
+        const usedCodes = currentCodes.filter(c => !!c.usedById).length;
+        // Referrals of matching tier not accounted for by used SKINV codes
+        extraReferrals = Math.max(0, totalMatchingReferrals - usedCodes);
+      }
+    }
+
     const effectiveMax = Math.max(0, maxInvites - extraReferrals);
-
     const totalCodes = currentCodes.length;
     const missing = effectiveMax - totalCodes;
 
