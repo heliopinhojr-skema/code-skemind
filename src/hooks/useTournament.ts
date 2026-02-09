@@ -286,27 +286,31 @@ export function useTournament() {
   }, [humanPlayerId, humanSecretCode]);
   
   // Finaliza torneio, calcula ranking, e processa economia
-  const finishTournament = useCallback(async () => {
+  // RECEBE dados do humano diretamente para evitar bugs de batching do React 18
+  const finishTournament = useCallback(async (humanGameData: {
+    status: 'won' | 'lost';
+    attempts: number;
+    score: number;
+    timeRemaining: number;
+  }) => {
     if (revealIntervalRef.current) {
       clearInterval(revealIntervalRef.current);
     }
 
-    // ── Computar ranking SINCRONAMENTE fora do state updater ──
-    // Recolhe o resultado humano atualizado + todos os bots simulados
+    // ── Computar ranking SINCRONAMENTE ──
     const allResultsMap = new Map<string, TournamentResult>();
 
-    // Pega resultado humano do state atual (via ref-like read)
-    // NOTE: usamos um setResults funcional apenas para LER o state corrente
-    let currentHumanResult: TournamentResult | undefined;
-    setResults(prev => {
-      currentHumanResult = prev.get(humanPlayerId);
-      return prev; // sem alteração
-    });
-
-    // Adiciona resultado humano
-    if (currentHumanResult) {
-      allResultsMap.set(humanPlayerId, currentHumanResult);
-    }
+    // Resultado humano construído com dados passados diretamente (não do state!)
+    const humanTournamentResult: TournamentResult = {
+      playerId: humanPlayerId,
+      rank: 0,
+      status: humanGameData.status,
+      attempts: humanGameData.attempts,
+      score: humanGameData.score,
+      finishTime: humanGameData.timeRemaining,
+      secretCode: humanSecretCode,
+    };
+    allResultsMap.set(humanPlayerId, humanTournamentResult);
 
     // Adiciona todos os resultados dos bots (da simulação pré-computada)
     botSimulationRef.current.forEach(result => {
@@ -330,32 +334,32 @@ export function useTournament() {
       allResultsMap.set(result.playerId, result);
     });
 
-    // Agora atualiza o state de uma vez com todos os rankings
+    // Atualiza o state de uma vez com todos os rankings
     setResults(new Map(allResultsMap));
     setStatus('finished');
 
     // ── Processa economia via Edge Function ──
     const pool = arenaPool;
-    const humanResult = rankedResults.find(r => r.playerId === humanPlayerId);
-    const humanPrize = humanResult && isITM(humanResult.rank)
+    const humanResult = rankedResults.find(r => r.playerId === humanPlayerId)!;
+    const humanPrize = isITM(humanResult.rank)
       ? getScaledArenaPrize(humanResult.rank, pool)
       : 0;
 
     const botPrizesTotal = calculateBotPrizesTotal(rankedResults, pool);
 
-    console.log(`[TOURNAMENT] Finishing - Player rank: #${humanResult?.rank}, prize: k$${humanPrize.toFixed(2)}, bot prizes total: k$${botPrizesTotal.toFixed(2)}, pool: k$${pool.toFixed(2)}`);
+    console.log(`[TOURNAMENT] Finishing - Player rank: #${humanResult.rank}, prize: k$${humanPrize.toFixed(2)}, bot prizes total: k$${botPrizesTotal.toFixed(2)}, pool: k$${pool.toFixed(2)}`);
 
     try {
       const { data, error } = await supabase.functions.invoke('process-arena-economy', {
         body: {
           action: 'finish',
-          player_rank: humanResult?.rank || 0,
+          player_rank: humanResult.rank,
           player_prize: humanPrize,
           bot_prizes_total: botPrizesTotal,
-          attempts: humanResult?.attempts || 0,
-          score: humanResult?.score || 0,
-          time_remaining: humanResult?.finishTime || null,
-          won: humanResult?.status === 'won',
+          attempts: humanResult.attempts,
+          score: humanResult.score,
+          time_remaining: humanResult.finishTime || null,
+          won: humanResult.status === 'won',
         },
       });
 
@@ -367,7 +371,7 @@ export function useTournament() {
     } catch (e) {
       console.error('[TOURNAMENT] Finish error:', e);
     }
-  }, [humanPlayerId, arenaPool, calculateBotPrizesTotal]);
+  }, [humanPlayerId, humanSecretCode, arenaPool, calculateBotPrizesTotal]);
   
   const returnToLobby = useCallback(() => {
     initializeLobby();

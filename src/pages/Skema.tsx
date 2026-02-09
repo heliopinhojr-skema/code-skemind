@@ -106,7 +106,12 @@ export default function Skema() {
           game.state.score,
           game.state.timeRemaining
         );
-        tournament.actions.finishTournament();
+        tournament.actions.finishTournament({
+          status: game.state.status,
+          attempts: game.state.attempts,
+          score: game.state.score,
+          timeRemaining: game.state.timeRemaining,
+        });
       }
     }
   }, [game.state.status, currentView, gameMode, tournament.state.status, tournament.actions]);
