@@ -26,6 +26,7 @@ import { useOpenArenas, ArenaListing } from '@/hooks/useArenaListings';
 import { calculateArenaPool, getScaledArenaPrize } from '@/lib/arenaPayouts';
 import { OnlinePlayer } from '@/hooks/useOnlinePlayers';
 import { ReferralHistoryPanel } from './ReferralHistoryPanel';
+import { getColorConfig } from './GenerationColorPicker';
 import { CreatorDescendancyPanel } from './CreatorDescendancyPanel';
 import { TransferPanel } from './TransferPanel';
 import { PlayerGameHistory } from './PlayerGameHistory';
@@ -315,9 +316,19 @@ export function SkemaLobby({
         >
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-2xl">
-                {player.emoji}
-              </div>
+              {(() => {
+                const genColor = getColorConfig(player.generationColor);
+                return (
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl ${
+                    genColor 
+                      ? `${genColor.bg} ${genColor.glow}` 
+                      : 'bg-gradient-to-br from-primary to-purple-500'
+                  }`}>
+                    {player.emoji}
+                  </div>
+                );
+              })()}
+
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-lg font-bold text-white">{player.name}</h1>
