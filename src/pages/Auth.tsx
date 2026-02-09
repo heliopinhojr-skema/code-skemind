@@ -9,7 +9,7 @@
  * Guarda ascendência (invited_by) e descendência (referrals table).
  */
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowRight, AlertCircle, Sparkles, LogIn, UserPlus } from 'lucide-react';
@@ -18,9 +18,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { supabase } from '@/integrations/supabase/client';
-import universeBg from '@/assets/universe-bg.jpg';
+import skemaOrbit from '@/assets/skema-orbit.jpeg';
+import { SplashScreen } from '@/components/SplashScreen';
 
-// ==================== HELPERS ====================
+const SPLASH_SHOWN_KEY = 'skema_splash_shown';
+
 
 const makeAuthEmail = (nickname: string): string => {
   const safe = nickname.toLowerCase().trim()
@@ -57,8 +59,18 @@ export default function Auth() {
   // Shared
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Splash screen - show once per session
+  const [showSplash, setShowSplash] = useState(() => {
+    const shown = sessionStorage.getItem(SPLASH_SHOWN_KEY);
+    return !shown;
+  });
+  
+  const handleSplashComplete = useCallback(() => {
+    setShowSplash(false);
+    sessionStorage.setItem(SPLASH_SHOWN_KEY, '1');
+  }, []);
 
-  // ==================== AUTO-REDIRECT IF LOGGED IN ====================
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
@@ -209,19 +221,40 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen relative flex items-center justify-center">
-      {/* Background */}
-      <div className="fixed inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${universeBg})` }} />
-      <div className="fixed inset-0 bg-black/80" />
+      {/* Splash screen */}
+      {showSplash && <SplashScreen onComplete={handleSplashComplete} />}
+      {/* Cosmic background */}
+      <div className="fixed inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${skemaOrbit})` }} />
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-[1px]" />
+      
+      {/* Radial glow effect */}
+      <div className="fixed inset-0 bg-radial-gradient pointer-events-none" 
+        style={{ background: 'radial-gradient(ellipse at center, rgba(139,92,246,0.08) 0%, transparent 70%)' }} 
+      />
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="relative z-10 w-full max-w-sm mx-4"
       >
-        {/* Logo */}
+        {/* Logo + Tagline */}
         <div className="text-center mb-6">
-          <h1 className="text-4xl font-black text-primary">SKEMA</h1>
-          <p className="text-muted-foreground text-sm mt-1">Entre no universo competitivo</p>
+          <motion.h1 
+            initial={{ letterSpacing: '0.3em' }}
+            animate={{ letterSpacing: '0.15em' }}
+            transition={{ duration: 1.5, ease: 'easeOut' }}
+            className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-purple-200 to-purple-400"
+          >
+            SKEMA
+          </motion.h1>
+          <motion.p 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5, duration: 1 }}
+            className="text-purple-300/60 text-xs mt-2 tracking-[0.15em] uppercase font-light"
+          >
+            Cada escolha uma renúncia, uma consequência...
+          </motion.p>
         </div>
 
         {/* Mode Toggle */}

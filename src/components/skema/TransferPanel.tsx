@@ -102,7 +102,6 @@ export function TransferPanel({
         setNickname('');
         setAmount('');
         onTransferComplete();
-        onTransferComplete();
       }
     } catch (err: any) {
       setLastResult({ success: false, message: err.message || 'Erro desconhecido' });

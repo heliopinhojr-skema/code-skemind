@@ -27,6 +27,7 @@ import { ReferralHistoryPanel } from './ReferralHistoryPanel';
 import { TransferPanel } from './TransferPanel';
 import { PlayerGameHistory } from './PlayerGameHistory';
 import universeBg from '@/assets/universe-bg.jpg';
+import skemaNebula from '@/assets/skema-nebula.jpeg';
 
 // Type for online presence passed from parent
 interface OnlinePresenceData {
@@ -362,6 +363,28 @@ export function SkemaLobby({
 
         {/* Conteúdo rolável */}
         <div className="flex-1 overflow-y-auto pb-6">
+          {/* Banner SKEMA */}
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.05 }}
+            className="relative mx-4 mt-4 rounded-xl overflow-hidden h-28"
+          >
+            <div 
+              className="absolute inset-0 bg-cover bg-center" 
+              style={{ backgroundImage: `url(${skemaNebula})` }} 
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-black/70" />
+            <div className="relative z-10 h-full flex flex-col items-center justify-center text-center px-4">
+              <h2 className="text-2xl font-black tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-white to-purple-300">
+                SKEMA
+              </h2>
+              <p className="text-[10px] tracking-[0.12em] uppercase text-purple-200/70 font-light mt-1">
+                Cada escolha uma renúncia, uma consequência...
+              </p>
+            </div>
+          </motion.div>
+
           {/* Convites */}
           <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mx-4 mt-4">
             <ReferralHistoryPanel
