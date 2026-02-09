@@ -62,7 +62,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
               transition={{ delay: 0.5, duration: 1.2, ease: 'easeOut' }}
               className="text-6xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-purple-200 to-purple-400 drop-shadow-2xl"
             >
-              SKEMA
+              skema
             </motion.h1>
 
             {/* Divider line */}
