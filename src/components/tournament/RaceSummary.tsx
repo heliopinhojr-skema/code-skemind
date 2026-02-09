@@ -22,7 +22,7 @@ interface RaceSummaryProps {
   players: TournamentPlayer[];
   results: Map<string, TournamentResult>;
   symbolsById: Map<string, GameSymbol>;
-  prizeAmount: number;
+  prizeAmount?: number; // deprecated: computed internally from arenaPool
   totalPlayers: number;
   arenaPool?: number;
 }
@@ -40,6 +40,9 @@ export function RaceSummary({
   const [showFullTable, setShowFullTable] = useState(false);
   const didWin = humanResult.status === 'won';
   const rank = humanResult.rank;
+  
+  // Compute prize from arenaPool directly to avoid stale-state inconsistencies
+  const computedPrize = isITM(rank) ? getScaledArenaPrize(rank, arenaPool) : 0;
   
   // Posição visual
   const getRankDisplay = () => {
@@ -169,7 +172,7 @@ export function RaceSummary({
       )}
 
       {/* Prêmio */}
-      {prizeAmount > 0 && (
+      {computedPrize > 0 && (
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
@@ -177,7 +180,7 @@ export function RaceSummary({
           className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 rounded-xl p-4 border border-yellow-500/30 text-center"
         >
           <div className="text-sm text-yellow-400/80 mb-1">Prêmio Creditado ✅</div>
-          <div className="text-4xl font-black text-yellow-400">+k$ {prizeAmount.toFixed(2)}</div>
+          <div className="text-4xl font-black text-yellow-400">+k$ {computedPrize.toFixed(2)}</div>
           <div className="text-xs text-muted-foreground mt-1">
             Já adicionado à sua conta
           </div>

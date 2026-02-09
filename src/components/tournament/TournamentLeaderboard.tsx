@@ -10,7 +10,7 @@ import { Trophy, Clock, Target, Loader2, Crown, Eye, DollarSign } from 'lucide-r
 import { TournamentPlayer, TournamentResult } from '@/hooks/useTournament';
 import { Symbol } from '@/components/game/Symbol';
 import type { GameSymbol } from '@/hooks/useGame';
-import { isITM, getArenaPrize, ITM_POSITIONS } from '@/lib/arenaPayouts';
+import { isITM, getScaledArenaPrize, ITM_POSITIONS } from '@/lib/arenaPayouts';
 
 interface TournamentLeaderboardProps {
   players: TournamentPlayer[];
@@ -18,6 +18,7 @@ interface TournamentLeaderboardProps {
   humanPlayerId: string;
   isFinished: boolean;
   symbolsById?: Map<string, GameSymbol>;
+  arenaPool?: number;
 }
 
 export function TournamentLeaderboard({
@@ -26,6 +27,7 @@ export function TournamentLeaderboard({
   humanPlayerId,
   isFinished,
   symbolsById,
+  arenaPool = 50,
 }: TournamentLeaderboardProps) {
   // Ordena jogadores por resultado
   const sortedPlayers = [...players].sort((a, b) => {
@@ -78,7 +80,7 @@ export function TournamentLeaderboard({
             const isPlaying = result?.status === 'playing';
             const rank = isFinished && result?.rank ? result.rank : (isWaiting || isPlaying ? '-' : index + 1);
             const itmPosition = typeof rank === 'number' && isITM(rank);
-            const prize = typeof rank === 'number' ? getArenaPrize(rank) : 0;
+            const prize = typeof rank === 'number' ? getScaledArenaPrize(rank, arenaPool) : 0;
             return (
               <motion.div
                 key={player.id}
