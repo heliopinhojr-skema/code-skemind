@@ -19,6 +19,7 @@ import { TournamentPlayer } from '@/hooks/useTournament';
 import { useOpenArenas, ArenaListing } from '@/hooks/useArenaListings';
 import { calculateArenaPool } from '@/lib/arenaPayouts';
 import { formatEnergy } from '@/lib/tierEconomy';
+import { toast } from 'sonner';
 import universeBg from '@/assets/universe-bg.jpg';
 
 export interface ArenaConfig {
@@ -178,6 +179,9 @@ export function TournamentLobby({
       onStart(selectedArenaConfig || undefined).then(result => {
         if (!result.success && result.error) {
           console.error(result.error);
+          toast.error('Falha ao entrar na arena', {
+            description: result.error,
+          });
           setIsStarting(false);
           setCountdown(null);
           setSelectedArenaConfig(null);

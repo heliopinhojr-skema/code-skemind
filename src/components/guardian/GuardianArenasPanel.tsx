@@ -21,7 +21,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useArenaListings, useCreateArena, useCloseArena } from '@/hooks/useArenaListings';
+import { useArenaListings, useCreateArena, useCloseArena, useBotTreasuryBalance } from '@/hooks/useArenaListings';
 import { useSupabasePlayer } from '@/hooks/useSupabasePlayer';
 import {
   ARENA_BOT_OPTIONS,
@@ -51,6 +51,7 @@ export function GuardianArenasPanel() {
   const createArena = useCreateArena();
   const closeArena = useCloseArena();
   const { player } = useSupabasePlayer();
+  const { data: botTreasuryBalance } = useBotTreasuryBalance();
   const [isCreating, setIsCreating] = useState(false);
   const [customBuyInInput, setCustomBuyInInput] = useState('0.55');
   const [selectedBots, setSelectedBots] = useState(99);
@@ -63,6 +64,9 @@ export function GuardianArenasPanel() {
   const first = getScaledArenaPrize(1, pool);
   const minCash = getScaledArenaPrize(25, pool);
   const isValidBuyIn = parsedBuyIn >= 0.11; // mínimo k$ 0,11
+  const botTotalNeeded = selectedBots * parsedBuyIn;
+  const treasurySufficient = (botTreasuryBalance ?? 0) >= botTotalNeeded;
+  const maxBuyInSupported = selectedBots > 0 ? Math.floor(((botTreasuryBalance ?? 0) / selectedBots) * 100) / 100 : 0;
 
   const handleCreate = async () => {
     if (!player?.id || !arenaName.trim() || !isValidBuyIn) return;
@@ -195,6 +199,23 @@ export function GuardianArenasPanel() {
                       <span className="text-muted-foreground">Min-cash (25º)</span>
                       <span className="font-mono">{formatEnergy(minCash)}</span>
                     </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Bot Treasury</span>
+                      <span className={`font-mono ${treasurySufficient ? 'text-green-400' : 'text-destructive font-bold'}`}>
+                        {formatEnergy(botTreasuryBalance ?? 0)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Bots precisam</span>
+                      <span className={`font-mono ${treasurySufficient ? '' : 'text-destructive font-bold'}`}>
+                        {formatEnergy(botTotalNeeded)}
+                      </span>
+                    </div>
+                    {!treasurySufficient && isValidBuyIn && (
+                      <div className="mt-2 p-2 rounded bg-destructive/10 border border-destructive/30 text-destructive text-xs">
+                        ⚠️ Bot Treasury insuficiente! Máx buy-in suportado: <strong>k$ {formatEnergy(maxBuyInSupported)}</strong>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -202,7 +223,7 @@ export function GuardianArenasPanel() {
                   <Button variant="outline" onClick={() => setIsCreating(false)}>Cancelar</Button>
                   <Button
                     onClick={handleCreate}
-                    disabled={!arenaName.trim() || !isValidBuyIn || createArena.isPending}
+                    disabled={!arenaName.trim() || !isValidBuyIn || !treasurySufficient || createArena.isPending}
                   >
                     {createArena.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
                     Criar Arena
