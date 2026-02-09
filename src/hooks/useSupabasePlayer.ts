@@ -166,7 +166,8 @@ export function useSupabasePlayer() {
           stats_wins,
           stats_races,
           stats_best_time,
-          player_tier
+          player_tier,
+          generation_color
         `)
         .eq('user_id', userId)
         .maybeSingle();
