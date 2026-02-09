@@ -1,11 +1,10 @@
 /**
- * SkemaLobby - Hub principal do jogador SKEMA
+ * SkemaLobby - Hub principal do jogador SKEMA (PokerStars-style)
  * 
- * Mostra:
- * - Emoji, nome, Ano/Dia Skema, energia
- * - Modos: Treinar, Treinar x Bots, Corridas Oficiais
- * - Missão de convites
- * - Taxa de transferência
+ * Layout:
+ * - Header com perfil e saldo
+ * - Tabs: Sit & Go (arenas) | Torneios (corridas agendadas) | Treinar
+ * - Tabela de mesas/arenas com buy-in, jogadores, pool, ação
  */
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
@@ -13,16 +12,17 @@ import { formatEnergy, calculateBalanceBreakdown } from '@/lib/tierEconomy';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Zap, Trophy, Users, Clock, Brain, Swords, Target,
-  Rocket, Sparkles, Calendar, Crown, AlertCircle, LogOut, UserCheck, PartyPopper, Bot
+  Rocket, Sparkles, Calendar, Crown, AlertCircle, LogOut, UserCheck, Bot,
+  Coins, Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { SkemaPlayer, getSkemaHour, PlayerTier } from '@/hooks/useSupabasePlayer';
 import { useOfficialRace } from '@/hooks/useOfficialRace';
 import { useOpenArenas, ArenaListing } from '@/hooks/useArenaListings';
 import { calculateArenaPool, getScaledArenaPrize } from '@/lib/arenaPayouts';
 import { OnlinePlayer } from '@/hooks/useOnlinePlayers';
-import { RegisteredPlayersPanel } from './RegisteredPlayersPanel';
 import { ReferralHistoryPanel } from './ReferralHistoryPanel';
 import { OnlinePlayersPanel } from './OnlinePlayersPanel';
 import { PlayerGameHistory } from './PlayerGameHistory';
@@ -55,7 +55,6 @@ interface SkemaLobbyProps {
   onStartTraining: () => void;
   onStartBotRace: (buyIn: number, fee: number, botCount?: number) => Promise<{ success: boolean; error?: string }>;
   onStartOfficialRace: (raceId: string, buyIn: number, fee: number) => Promise<{ success: boolean; error?: string }>;
-  onStartParty: () => void;
   onDeductEnergy: (amount: number) => boolean;
   onAddEnergy: (amount: number) => void;
   onLogout: () => void;
@@ -65,61 +64,49 @@ interface SkemaLobbyProps {
   skemaBox: SkemaBoxData;
 }
 
-type GameMode = 'training' | 'bots' | 'official' | 'party';
-
 const COUNTDOWN_SECONDS = 10;
 
 // Helper component to display player tier badge
 function TierBadge({ tier }: { tier: PlayerTier }) {
   const config: Record<string, { emoji: string; label: string; className: string }> = {
     master_admin: { 
-      emoji: '🔴', 
-      label: 'CD HX', 
+      emoji: '🔴', label: 'CD HX', 
       className: 'bg-gradient-to-r from-red-500/30 to-rose-500/30 border-red-500/50 text-red-300' 
     },
     'Criador': { 
-      emoji: '⭐', 
-      label: 'Criador', 
+      emoji: '⭐', label: 'Criador', 
       className: 'bg-gradient-to-r from-amber-500/30 to-yellow-500/30 border-amber-500/50 text-amber-300' 
     },
     guardiao: { 
-      emoji: '⭐', 
-      label: 'Criador', 
+      emoji: '⭐', label: 'Criador', 
       className: 'bg-gradient-to-r from-amber-500/30 to-yellow-500/30 border-amber-500/50 text-amber-300' 
     },
     'Grão Mestre': { 
-      emoji: '👑', 
-      label: 'Grão Mestre', 
+      emoji: '👑', label: 'Grão Mestre', 
       className: 'bg-gradient-to-r from-purple-500/30 to-pink-500/30 border-purple-500/50 text-purple-300' 
     },
     grao_mestre: { 
-      emoji: '👑', 
-      label: 'Grão Mestre', 
+      emoji: '👑', label: 'Grão Mestre', 
       className: 'bg-gradient-to-r from-purple-500/30 to-pink-500/30 border-purple-500/50 text-purple-300' 
     },
     'Mestre': { 
-      emoji: '⚔️', 
-      label: 'Mestre', 
+      emoji: '⚔️', label: 'Mestre', 
       className: 'bg-gradient-to-r from-blue-500/30 to-cyan-500/30 border-blue-500/50 text-blue-300' 
     },
     mestre: { 
-      emoji: '⚔️', 
-      label: 'Mestre', 
+      emoji: '⚔️', label: 'Mestre', 
       className: 'bg-gradient-to-r from-blue-500/30 to-cyan-500/30 border-blue-500/50 text-blue-300' 
     },
     'Boom': { 
-      emoji: '🚀', 
-      label: 'Boom', 
+      emoji: '🚀', label: 'Boom', 
       className: 'bg-gradient-to-r from-green-500/30 to-emerald-500/30 border-green-500/50 text-green-300' 
     },
     'Ploft': { 
-      emoji: '🎮', 
-      label: 'Ploft', 
+      emoji: '🎮', label: 'Ploft', 
       className: 'bg-gradient-to-r from-slate-500/30 to-gray-500/30 border-slate-500/50 text-slate-300' 
     },
     jogador: { 
-      emoji: '🎮', 
-      label: 'Ploft', 
+      emoji: '🎮', label: 'Ploft', 
       className: 'bg-gradient-to-r from-slate-500/30 to-gray-500/30 border-slate-500/50 text-slate-300' 
     },
   };
@@ -143,7 +130,6 @@ export function SkemaLobby({
   onStartTraining,
   onStartBotRace,
   onStartOfficialRace,
-  onStartParty,
   onDeductEnergy,
   onAddEnergy,
   onLogout,
@@ -153,15 +139,15 @@ export function SkemaLobby({
   skemaBox,
 }: SkemaLobbyProps) {
   const officialRace = useOfficialRace();
-  const { data: openArenas } = useOpenArenas();
+  const { data: openArenas, isLoading: arenasLoading } = useOpenArenas();
   const { onlinePlayers, isConnected, updateStatus, onlineCount } = onlinePresence;
   const skemaHour = getSkemaHour();
   
-  const [selectedMode, setSelectedMode] = useState<GameMode | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('sitgo');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pendingArenaConfig, setPendingArenaConfig] = useState<{ buyIn: number; rakeFee: number; botCount: number } | null>(null);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
 
   // Estrelas animadas
   const stars = useMemo(() => 
@@ -174,51 +160,24 @@ export function SkemaLobby({
     })), []
   );
 
-  // Espera corrida carregar para mostrar lobby completo
   const canAffordOfficial = officialRace.isLoaded ? Math.round(player.energy * 100) >= Math.round(officialRace.constants.entryFee * 100) : false;
   const isPlayerRegisteredInRace = officialRace.race ? officialRace.actions.isPlayerRegistered(player.id) : false;
 
-  const handleSelectMode = useCallback((mode: GameMode) => {
-    setSelectedMode(mode);
-    setError(null);
-  }, []);
+  // Default arena (k$0.55)
+  const DEFAULT_ENTRY_CENTS = 55;
+  const canAffordDefaultArena = Math.round(player.energy * 100) >= DEFAULT_ENTRY_CENTS;
 
-  // Constantes do Arena x Bots (centavos → k$)
-  const ARENA_ENTRY_FEE_CENTS = 55; // 50 pool + 5 rake
-  const ARENA_ENTRY_FEE = ARENA_ENTRY_FEE_CENTS / 100; // 0.55
-  const canAffordArena = Math.round(player.energy * 100) >= ARENA_ENTRY_FEE_CENTS;
-
-  const handleStartCountdown = useCallback(() => {
+  const handleStartCountdownForAction = useCallback((action: () => void) => {
     if (isStarting) return;
-    
-    if (selectedMode === 'training') {
-      setIsStarting(true);
-      setCountdown(COUNTDOWN_SECONDS);
-    } else if (selectedMode === 'bots') {
-      if (!canAffordArena) {
-        setError('Energia insuficiente (k$0.55)');
-        return;
-      }
-      setIsStarting(true);
-      setCountdown(COUNTDOWN_SECONDS);
-    } else if (selectedMode === 'official') {
-      if (!canAffordOfficial) {
-        setError('Energia insuficiente');
-        return;
-      }
-      setIsStarting(true);
-      setCountdown(COUNTDOWN_SECONDS);
-    } else if (selectedMode === 'party') {
-      // Modo Festa: vai direto para setup sem countdown
-      onStartParty();
-      return;
-    }
-  }, [selectedMode, isStarting, canAffordOfficial, canAffordArena, onStartParty]);
+    setIsStarting(true);
+    setPendingAction(() => action);
+    setCountdown(COUNTDOWN_SECONDS);
+  }, [isStarting]);
 
   const handleCancelCountdown = useCallback(() => {
     setIsStarting(false);
     setCountdown(null);
-    setPendingArenaConfig(null);
+    setPendingAction(null);
   }, []);
 
   // Countdown timer
@@ -226,37 +185,12 @@ export function SkemaLobby({
     if (countdown === null || countdown < 0) return;
     
     if (countdown === 0) {
-      // Update presence status to 'playing' when game starts
       updateStatus('playing');
-      
-      if (selectedMode === 'training') {
-        onStartTraining();
-      } else if (selectedMode === 'bots') {
-        // Use pending arena config if available (custom arena), otherwise default
-        const buyIn = pendingArenaConfig ? pendingArenaConfig.buyIn : 50 / 100;
-        const fee = pendingArenaConfig ? pendingArenaConfig.rakeFee : 5 / 100;
-        const botCount = pendingArenaConfig ? pendingArenaConfig.botCount : undefined;
-        
-        onStartBotRace(buyIn, fee, botCount).then(result => {
-          if (!result.success) {
-            setError(result.error || 'Erro ao iniciar');
-            setIsStarting(false);
-            setCountdown(null);
-            setPendingArenaConfig(null);
-            updateStatus('online');
-          }
-        });
-      } else if (selectedMode === 'official') {
-        const { entryFee, prizePerPlayer, skemaBoxFee } = officialRace.constants;
-        onStartOfficialRace('official-race-2026-03-03', prizePerPlayer, skemaBoxFee).then(result => {
-          if (!result.success) {
-            setError(result.error || 'Erro ao iniciar');
-            setIsStarting(false);
-            setCountdown(null);
-            updateStatus('online');
-          }
-        });
+      if (pendingAction) {
+        pendingAction();
       }
+      setIsStarting(false);
+      setPendingAction(null);
       return;
     }
     
@@ -265,15 +199,36 @@ export function SkemaLobby({
     }, 1000);
     
     return () => clearTimeout(timer);
-  }, [countdown, selectedMode, onStartTraining, onStartBotRace, onStartOfficialRace, officialRace.constants, updateStatus, pendingArenaConfig]);
+  }, [countdown, pendingAction, updateStatus]);
+
+  // Handle arena click (custom or default)
+  const handleJoinArena = useCallback((buyIn: number, rakeFee: number, botCount: number) => {
+    const canAfford = Math.round(player.energy * 100) >= Math.round(buyIn * 100);
+    if (!canAfford) {
+      setError('Saldo insuficiente');
+      return;
+    }
+    handleStartCountdownForAction(() => {
+      onStartBotRace(buyIn, rakeFee, botCount).then(result => {
+        if (!result.success) {
+          setError(result.error || 'Erro ao iniciar');
+          updateStatus('online');
+        }
+      });
+    });
+  }, [player.energy, handleStartCountdownForAction, onStartBotRace, updateStatus]);
+
+  // Handle training
+  const handleTraining = useCallback(() => {
+    handleStartCountdownForAction(() => {
+      onStartTraining();
+    });
+  }, [handleStartCountdownForAction, onStartTraining]);
 
   return (
     <div className="min-h-screen relative overflow-x-hidden">
       {/* Background */}
-      <div 
-        className="fixed inset-0 bg-cover bg-center"
-        style={{ backgroundImage: `url(${universeBg})` }}
-      />
+      <div className="fixed inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${universeBg})` }} />
       <div className="fixed inset-0 bg-black/70" />
       
       {/* Estrelas */}
@@ -282,21 +237,9 @@ export function SkemaLobby({
           <motion.div
             key={star.id}
             className="absolute rounded-full bg-white"
-            style={{
-              left: `${star.x}%`,
-              top: `${star.y}%`,
-              width: star.size,
-              height: star.size,
-            }}
-            animate={{
-              opacity: [0.2, 1, 0.2],
-              scale: [1, 1.5, 1],
-            }}
-            transition={{
-              duration: 2 + Math.random() * 2,
-              repeat: Infinity,
-              delay: star.delay,
-            }}
+            style={{ left: `${star.x}%`, top: `${star.y}%`, width: star.size, height: star.size }}
+            animate={{ opacity: [0.2, 1, 0.2], scale: [1, 1.5, 1] }}
+            transition={{ duration: 2 + Math.random() * 2, repeat: Infinity, delay: star.delay }}
           />
         ))}
       </div>
@@ -310,57 +253,37 @@ export function SkemaLobby({
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 bg-black/90 backdrop-blur-lg flex flex-col items-center justify-center"
           >
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              className="text-center"
-            >
-              <Rocket className="w-16 h-16 text-primary mx-auto mb-4 animate-bounce" />
-              <div className="text-2xl text-muted-foreground mb-4">LANÇAMENTO EM</div>
-            </motion.div>
-            
+            <Rocket className="w-16 h-16 text-primary mx-auto mb-4 animate-bounce" />
+            <div className="text-2xl text-muted-foreground mb-4">LANÇAMENTO EM</div>
             <motion.div
               key={countdown}
               initial={{ scale: 2, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-              className="relative"
             >
               <div className="text-9xl font-black text-transparent bg-clip-text bg-gradient-to-b from-primary to-purple-500 tabular-nums">
                 {countdown}
               </div>
             </motion.div>
-            
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-              className="mt-8"
-            >
-              <Button
-                variant="ghost"
-                onClick={handleCancelCountdown}
-                className="text-muted-foreground hover:text-white"
-              >
-                Cancelar
-              </Button>
-            </motion.div>
+            <Button variant="ghost" onClick={handleCancelCountdown} className="mt-8 text-muted-foreground hover:text-white">
+              Cancelar
+            </Button>
           </motion.div>
         )}
       </AnimatePresence>
       
       {/* Conteúdo */}
       <div className="relative z-10 min-h-screen flex flex-col">
-        {/* Header - Perfil do jogador */}
+        {/* Header - Perfil */}
         <motion.header
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="p-4 border-b border-white/10 backdrop-blur-sm bg-black/30"
         >
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-3xl">
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-2xl">
                 {player.emoji}
               </div>
               <div>
@@ -386,9 +309,7 @@ export function SkemaLobby({
                 whileHover={{ scale: 1.05 }}
               >
                 <Zap className="w-5 h-5 text-yellow-400" />
-                <span className="font-bold text-yellow-400">
-                  {formatEnergy(player.energy)}
-                </span>
+                <span className="font-bold text-yellow-400">{formatEnergy(player.energy)}</span>
               </motion.div>
               {(() => {
                 const bal = calculateBalanceBreakdown(player.energy, player.playerTier, player.referrals.length);
@@ -399,20 +320,14 @@ export function SkemaLobby({
                   </div>
                 ) : null;
               })()}
-              
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onLogout}
-                className="text-white/50 hover:text-white"
-              >
+              <Button variant="ghost" size="icon" onClick={onLogout} className="text-white/50 hover:text-white">
                 <LogOut className="w-5 h-5" />
               </Button>
             </div>
           </div>
           
           {/* Stats rápidos */}
-          <div className={`grid gap-2 ${player.id === 'guardian-skema-universe' ? 'grid-cols-4' : 'grid-cols-3'}`}>
+          <div className={`grid gap-2 ${player.playerTier === 'master_admin' ? 'grid-cols-4' : 'grid-cols-3'}`}>
             <div className="bg-white/5 rounded-lg p-2 text-center">
               <div className="text-lg font-bold text-green-400">{player.stats.wins}</div>
               <div className="text-xs text-white/50">Vitórias</div>
@@ -427,12 +342,8 @@ export function SkemaLobby({
               </div>
               <div className="text-xs text-white/50">Melhor</div>
             </div>
-            {/* Skema Box - só master_admin vê */}
             {player.playerTier === 'master_admin' && (
-              <div 
-                className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-lg p-2 text-center border border-yellow-500/30 cursor-pointer hover:border-yellow-500/50 transition-colors"
-                title="Skema Box (Cloud)"
-              >
+              <div className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-lg p-2 text-center border border-yellow-500/30">
                 <div className="text-lg font-bold text-yellow-400">k${skemaBox.balance.toFixed(2)}</div>
                 <div className="text-xs text-yellow-400/70">Skema Box</div>
               </div>
@@ -441,14 +352,9 @@ export function SkemaLobby({
         </motion.header>
 
         {/* Conteúdo rolável */}
-        <div className="flex-1 overflow-y-auto pb-28">
-          {/* Painel de Convites */}
-          <motion.section
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="mx-4 mt-4"
-          >
+        <div className="flex-1 overflow-y-auto pb-6">
+          {/* Convites */}
+          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mx-4 mt-4">
             <ReferralHistoryPanel
               playerId={player.id}
               inviteCode={player.inviteCode}
@@ -458,434 +364,314 @@ export function SkemaLobby({
             />
           </motion.section>
 
-          {/* Extrato de Jogos */}
-          <motion.section
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.12 }}
-            className="mx-4 mt-3"
-          >
+          {/* Extrato */}
+          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} className="mx-4 mt-3">
             <PlayerGameHistory playerId={player.id} />
           </motion.section>
           
-          {/* Taxa de transferência */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            className="mx-4 mt-3 flex items-center gap-2 text-xs text-white/40"
-          >
+          {/* Taxa */}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }} className="mx-4 mt-3 flex items-center gap-2 text-xs text-white/40">
             <AlertCircle className="w-3 h-3" />
-            <span>Taxa de transferência entre jogadores: {(transferTax * 100).toFixed(2)}%</span>
+            <span>Taxa de transferência: {(transferTax * 100).toFixed(2)}%</span>
           </motion.div>
           
-          {/* Jogadores Online */}
-          <motion.section
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.17 }}
-            className="mx-4 mt-4"
-          >
-            <OnlinePlayersPanel 
-              players={onlinePlayers} 
-              currentPlayerId={player.id}
-              isConnected={isConnected}
-            />
+          {/* Online */}
+          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.17 }} className="mx-4 mt-4">
+            <OnlinePlayersPanel players={onlinePlayers} currentPlayerId={player.id} isConnected={isConnected} />
           </motion.section>
           
-          {/* Modos de Jogo */}
+          {/* ═══════════════════════════════════════════
+              LOBBY POKERSTARS-STYLE — Tabs
+              ═══════════════════════════════════════════ */}
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
             className="mx-4 mt-6"
           >
-            <div className="flex items-center gap-2 mb-4">
-              <Sparkles className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium text-white/80">Escolha seu Modo</span>
-            </div>
-            
-            <div className="space-y-3">
-              {/* Treinar (Solo) */}
-              <motion.button
-                whileHover={{ scale: 1.01 }}
-                onClick={() => handleSelectMode('training')}
-                className={`
-                  w-full text-left p-4 rounded-2xl border transition-all
-                  ${selectedMode === 'training' 
-                    ? 'bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border-primary/50 ring-2 ring-primary/30' 
-                    : 'bg-white/5 border-white/10 hover:bg-white/10'
-                  }
-                `}
-              >
-                <div className="flex items-start gap-4">
-                  <div className="p-3 rounded-xl bg-black/30 text-blue-400">
-                    <Brain className="w-6 h-6" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-bold text-white">Treinar</h3>
-                      <span className="text-sm font-medium text-green-400">Grátis</span>
-                    </div>
-                    <p className="text-sm text-white/60 mt-1">Pratique sozinho, sem gastar energia</p>
-                    <div className="flex items-center gap-4 mt-2 text-xs text-white/50">
-                      <span><Users className="w-3 h-3 inline mr-1" />Solo</span>
-                      <span><Clock className="w-3 h-3 inline mr-1" />24h disponível</span>
-                    </div>
-                  </div>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="w-full bg-white/5 border border-white/10 h-11">
+                <TabsTrigger value="sitgo" className="flex-1 gap-1.5 data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
+                  <Swords className="w-4 h-4" />
+                  Sit & Go
+                </TabsTrigger>
+                <TabsTrigger value="tournaments" className="flex-1 gap-1.5 data-[state=active]:bg-yellow-500/20 data-[state=active]:text-yellow-400">
+                  <Crown className="w-4 h-4" />
+                  Torneios
+                </TabsTrigger>
+                <TabsTrigger value="practice" className="flex-1 gap-1.5 data-[state=active]:bg-blue-500/20 data-[state=active]:text-blue-400">
+                  <Brain className="w-4 h-4" />
+                  Treinar
+                </TabsTrigger>
+              </TabsList>
+
+              {/* ─── Sit & Go (Arenas) ─── */}
+              <TabsContent value="sitgo" className="mt-3 space-y-2">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-white/50">Mesas disponíveis</span>
+                  <span className="text-xs text-white/30">25 ITM • Poker-Style Payouts</span>
                 </div>
-              </motion.button>
-              
-              {/* Treinar x Bots (Pago) */}
-              <motion.button
-                whileHover={{ scale: 1.01 }}
-                onClick={() => handleSelectMode('bots')}
-                className={`
-                  w-full text-left p-4 rounded-2xl border transition-all
-                  ${selectedMode === 'bots' 
-                    ? 'bg-gradient-to-br from-orange-500/20 to-red-500/20 border-primary/50 ring-2 ring-primary/30' 
-                    : 'bg-white/5 border-white/10 hover:bg-white/10'
-                  }
-                `}
-              >
-                <div className="flex items-start gap-4">
-                  <div className="p-3 rounded-xl bg-black/30 text-orange-400">
-                    <Swords className="w-6 h-6" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-bold text-white">Arena x Bots</h3>
-                      <span className="text-sm font-medium text-yellow-400">k$0.55</span>
-                    </div>
-                    <p className="text-sm text-white/60 mt-1">Enfrente 99 bots IA • 25 ITM</p>
-                    <div className="flex items-center gap-4 mt-2 text-xs text-white/50">
-                      <span><Users className="w-3 h-3 inline mr-1" />100 jogadores</span>
-                      <span><Trophy className="w-3 h-3 inline mr-1" />ITM 25%: 1º k$13.50 • 2º k$8 • 3º k$5</span>
-                    </div>
-                    <div className="flex items-center gap-3 mt-2 text-xs">
-                      <span className="text-green-400">Pool: k$50.00</span>
-                      <span className="text-purple-400">Rake: k$5.00</span>
-                      <span className="text-blue-400">Min-cash: k$0.55</span>
-                    </div>
-                  </div>
+
+                {/* Header da tabela */}
+                <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 px-3 py-1.5 text-[10px] text-white/40 uppercase tracking-wider border-b border-white/10">
+                  <span>Mesa</span>
+                  <span className="text-right w-16">Buy-in</span>
+                  <span className="text-right w-14">Bots</span>
+                  <span className="text-right w-20">Pool</span>
+                  <span className="w-16"></span>
                 </div>
-              </motion.button>
-              
-              {/* Corrida Oficial Agendada */}
-              <motion.button
-                whileHover={{ scale: 1.01 }}
-                onClick={() => handleSelectMode('official')}
-                className={`
-                  w-full text-left p-4 rounded-2xl border transition-all
-                  ${selectedMode === 'official' 
-                    ? 'bg-gradient-to-br from-yellow-500/20 to-orange-500/20 border-primary/50 ring-2 ring-primary/30' 
-                    : 'bg-white/5 border-white/10 hover:bg-white/10'
-                  }
-                `}
-              >
-                <div className="flex items-start gap-4">
-                  <div className="p-3 rounded-xl bg-black/30 text-yellow-400">
-                    <Crown className="w-6 h-6" />
+
+                {/* Arena padrão k$0.55 */}
+                <motion.div
+                  whileHover={{ scale: 1.005 }}
+                  className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 items-center px-3 py-2.5 rounded-lg bg-white/5 border border-white/10 hover:border-primary/30 transition-colors"
+                >
+                  <div>
+                    <span className="text-sm font-medium text-white">🎯 Arena Padrão</span>
+                    <div className="text-[10px] text-white/40 mt-0.5">1º {formatEnergy(getScaledArenaPrize(1, 50))}</div>
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-bold text-white">Corrida Oficial</h3>
-                      <span className="text-sm font-medium text-yellow-400">
-                        k${officialRace.constants.entryFee.toFixed(2)}
-                      </span>
-                    </div>
-                    <p className="text-sm text-white/60 mt-1">
-                      {officialRace.race?.name || 'Corrida Inaugural SKEMA'}
-                    </p>
-                    <div className="flex items-center gap-4 mt-2 text-xs text-white/50">
-                      <span><Calendar className="w-3 h-3 inline mr-1" />{officialRace.formattedDate}</span>
-                      <span><Users className="w-3 h-3 inline mr-1" />{officialRace.race?.registeredPlayers.length || 0} inscritos</span>
-                    </div>
-                    {isPlayerRegisteredInRace && (
-                      <div className="mt-2 flex items-center gap-1 text-xs text-green-400">
-                        <UserCheck className="w-3 h-3" />
-                        Você está inscrito!
-                      </div>
-                    )}
+                  <div className="text-right w-16">
+                    <span className="text-xs font-bold text-yellow-400">k$ 0,55</span>
                   </div>
-                </div>
-              </motion.button>
-              
-              {/* Modo Festa (Party) */}
-              <motion.button
-                whileHover={{ scale: 1.01 }}
-                onClick={() => handleSelectMode('party')}
-                className={`
-                  w-full text-left p-4 rounded-2xl border transition-all
-                  ${selectedMode === 'party' 
-                    ? 'bg-gradient-to-br from-pink-500/20 to-purple-500/20 border-primary/50 ring-2 ring-primary/30' 
-                    : 'bg-white/5 border-white/10 hover:bg-white/10'
-                  }
-                `}
-              >
-                <div className="flex items-start gap-4">
-                  <div className="p-3 rounded-xl bg-black/30 text-pink-400">
-                    <PartyPopper className="w-6 h-6" />
+                  <div className="text-right w-14">
+                    <span className="text-xs text-white/60">99</span>
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-bold text-white">Modo Festa</h3>
-                      <span className="text-sm font-medium text-yellow-400">k$1.10</span>
-                    </div>
-                    <p className="text-sm text-white/60 mt-1">Torneio presencial com amigos!</p>
-                    <div className="flex items-center gap-4 mt-2 text-xs text-white/50">
-                      <span><Users className="w-3 h-3 inline mr-1" />Até 10 jogadores</span>
-                      <span><Trophy className="w-3 h-3 inline mr-1" />Top 4 premiam</span>
-                    </div>
-                    <div className="mt-2 text-xs text-pink-300">
-                      🎯 Cada um joga no seu celular
-                    </div>
+                  <div className="text-right w-20">
+                    <span className="text-xs text-green-400 font-medium">{formatEnergy(50)}</span>
                   </div>
-                </div>
-              </motion.button>
-            </div>
-          </motion.section>
-          
-          {/* Arenas Abertas */}
-          {openArenas && openArenas.length > 0 && (
-            <motion.section
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.25 }}
-              className="mx-4 mt-6"
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <Bot className="w-4 h-4 text-orange-400" />
-                <span className="text-sm font-medium text-white/80">Arenas Abertas</span>
-                <Badge variant="outline" className="text-[10px] border-orange-400/30 text-orange-400">
-                  {openArenas.length}
-                </Badge>
-              </div>
-              <div className="space-y-2">
-                {openArenas.map((arena) => {
-                  const pool = calculateArenaPool(Number(arena.buy_in), Number(arena.rake_fee), arena.bot_count);
-                  const first = getScaledArenaPrize(1, pool);
-                  const canAfford = Math.round(player.energy * 100) >= Math.round(Number(arena.buy_in) * 100);
-                  return (
-                    <motion.div
-                      key={arena.id}
-                      whileHover={{ scale: 1.01 }}
-                      className="p-3 rounded-xl bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/20"
+                  <div className="w-16">
+                    <Button
+                      size="sm"
+                      onClick={() => handleJoinArena(0.55, 0.05, 99)}
+                      disabled={!canAffordDefaultArena || isStarting}
+                      className="h-7 w-full text-xs"
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex-1">
-                          <span className="font-bold text-white text-sm">{arena.creator_emoji} {arena.name}</span>
-                          <div className="flex items-center gap-3 text-[10px] text-white/50 mt-1">
-                            <span><Bot className="w-3 h-3 inline mr-0.5" />{arena.bot_count} bots</span>
-                            <span><Trophy className="w-3 h-3 inline mr-0.5" />Pool: {formatEnergy(pool)}</span>
-                            <span>1º: {formatEnergy(first)}</span>
-                          </div>
-                          <div className="text-[10px] text-white/30 mt-0.5">por {arena.creator_name}</div>
+                      Jogar
+                    </Button>
+                  </div>
+                </motion.div>
+
+                {/* Arenas customizadas do banco */}
+                {arenasLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="w-5 h-5 animate-spin text-white/30" />
+                  </div>
+                ) : (
+                  openArenas?.map((arena) => {
+                    const pool = calculateArenaPool(Number(arena.buy_in), Number(arena.rake_fee), arena.bot_count);
+                    const first = getScaledArenaPrize(1, pool);
+                    const canAfford = Math.round(player.energy * 100) >= Math.round(Number(arena.buy_in) * 100);
+                    return (
+                      <motion.div
+                        key={arena.id}
+                        whileHover={{ scale: 1.005 }}
+                        className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 items-center px-3 py-2.5 rounded-lg bg-gradient-to-r from-orange-500/5 to-red-500/5 border border-orange-500/20 hover:border-orange-500/40 transition-colors"
+                      >
+                        <div>
+                          <span className="text-sm font-medium text-white">{arena.creator_emoji} {arena.name}</span>
+                          <div className="text-[10px] text-white/40 mt-0.5">1º {formatEnergy(first)} • por {arena.creator_name}</div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <div className="text-right">
-                            <span className="text-xs text-yellow-400 font-bold">
-                              k${Number(arena.buy_in).toFixed(2)}
-                            </span>
-                          </div>
+                        <div className="text-right w-16">
+                          <span className="text-xs font-bold text-yellow-400">{formatEnergy(Number(arena.buy_in))}</span>
+                        </div>
+                        <div className="text-right w-14">
+                          <span className="text-xs text-white/60">{arena.bot_count}</span>
+                        </div>
+                        <div className="text-right w-20">
+                          <span className="text-xs text-green-400 font-medium">{formatEnergy(pool)}</span>
+                        </div>
+                        <div className="w-16">
                           <Button
                             size="sm"
-                            onClick={() => {
-                              if (!canAfford || isStarting) return;
-                              setPendingArenaConfig({
-                                buyIn: Number(arena.buy_in),
-                                rakeFee: Number(arena.rake_fee),
-                                botCount: arena.bot_count,
-                              });
-                              setSelectedMode('bots');
-                              setIsStarting(true);
-                              setCountdown(COUNTDOWN_SECONDS);
-                            }}
+                            onClick={() => handleJoinArena(Number(arena.buy_in), Number(arena.rake_fee), arena.bot_count)}
                             disabled={!canAfford || isStarting}
-                            className="h-8 px-3"
+                            className="h-7 w-full text-xs"
                           >
-                            <Swords className="w-3 h-3 mr-1" />
                             Jogar
                           </Button>
                         </div>
+                      </motion.div>
+                    );
+                  })
+                )}
+
+                {!arenasLoading && (!openArenas || openArenas.length === 0) && (
+                  <div className="text-center py-3 text-xs text-white/30">
+                    Nenhuma arena customizada aberta
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* ─── Torneios (Corridas Oficiais) ─── */}
+              <TabsContent value="tournaments" className="mt-3 space-y-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-white/50">Torneios agendados</span>
+                  <span className="text-xs text-white/30">Multiplayer</span>
+                </div>
+
+                {officialRace.race ? (
+                  <div className="rounded-xl bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 p-4 space-y-4">
+                    {/* Info */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-lg font-bold text-white flex items-center gap-2">
+                          <Crown className="w-5 h-5 text-yellow-400" />
+                          {officialRace.race.name}
+                        </div>
+                        <div className="text-sm text-white/60">{officialRace.formattedDate}</div>
                       </div>
-                      {!canAfford && (
-                        <div className="text-[10px] text-red-400 mt-1">⚠️ Saldo insuficiente</div>
-                      )}
-                    </motion.div>
-                  );
-                })}
-              </div>
-            </motion.section>
-          )}
-          
-          {/* Painel de Jogadores Registrados - sempre visível */}
-          {officialRace.race && (
-            <RegisteredPlayersPanel
-              tournamentPlayers={officialRace.race.registeredPlayers}
-              currentPlayerId={player.id}
-              maxPlayers={officialRace.constants.maxPlayers}
-            />
-          )}
-          
-          {/* Detalhes da Corrida Oficial */}
-          <AnimatePresence>
-            {selectedMode === 'official' && officialRace.race && (
-              <motion.section
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="mx-4 mt-4 overflow-hidden"
-              >
-                <div className="bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-4">
-                  {/* Info da corrida */}
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <div className="text-lg font-bold text-white">{officialRace.race.name}</div>
-                      <div className="text-sm text-white/60">{officialRace.formattedDate}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xs text-white/50">Tempo restante</div>
-                      <div className="text-lg font-bold text-yellow-400">{officialRace.timeUntilRace}</div>
-                    </div>
-                  </div>
-                  
-                  {/* Economia */}
-                  <div className="grid grid-cols-3 gap-2 mb-4">
-                    <div className="bg-black/30 rounded-lg p-2 text-center">
-                      <div className="text-xs text-white/50">Entrada</div>
-                      <div className="font-bold text-white">k${officialRace.constants.entryFee.toFixed(2)}</div>
-                    </div>
-                    <div className="bg-black/30 rounded-lg p-2 text-center">
-                      <div className="text-xs text-white/50">Prêmio/Player</div>
-                      <div className="font-bold text-green-400">k${officialRace.constants.prizePerPlayer.toFixed(2)}</div>
-                    </div>
-                    <div className="bg-black/30 rounded-lg p-2 text-center">
-                      <div className="text-xs text-white/50">Caixa Skema</div>
-                      <div className="font-bold text-purple-400">k${officialRace.constants.skemaBoxFee.toFixed(2)}</div>
-                    </div>
-                  </div>
-                  
-                  {/* Pote atual */}
-                  <div className="bg-black/30 rounded-lg p-3 mb-4 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Trophy className="w-5 h-5 text-yellow-400" />
-                      <span className="text-white/80">Pote Atual</span>
-                    </div>
-                    <span className="text-xl font-bold text-yellow-400">k${officialRace.prizePool.toFixed(2)}</span>
-                  </div>
-                  
-                  {/* Lista de inscritos */}
-                  <div className="mb-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Users className="w-4 h-4 text-white/60" />
-                      <span className="text-sm text-white/80">
-                        Jogadores Inscritos ({officialRace.race.registeredPlayers.length}/{officialRace.constants.maxPlayers})
-                      </span>
+                      <div className="text-right">
+                        <div className="text-xs text-white/50">Início em</div>
+                        <div className="text-lg font-bold text-yellow-400 tabular-nums">{officialRace.timeUntilRace}</div>
+                      </div>
                     </div>
                     
-                    {officialRace.race.registeredPlayers.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {officialRace.race.registeredPlayers.map((p) => (
-                          <div 
-                            key={p.id}
-                            className={`
-                              flex items-center gap-1 px-2 py-1 rounded-full text-xs
-                              ${p.id === player.id ? 'bg-green-500/20 border border-green-500/50 text-green-400' : 'bg-white/10 text-white/80'}
-                            `}
-                          >
-                            <span>{p.emoji}</span>
-                            <span>{p.name}</span>
-                          </div>
-                        ))}
+                    {/* Economia */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="bg-black/30 rounded-lg p-2 text-center">
+                        <div className="text-xs text-white/50">Buy-in</div>
+                        <div className="font-bold text-white">k${officialRace.constants.entryFee.toFixed(2)}</div>
                       </div>
-                    ) : (
-                      <div className="text-sm text-white/40 italic">Nenhum jogador inscrito ainda</div>
-                    )}
-                  </div>
-                  
-                  {/* Botão de inscrição / cancelamento */}
-                  {!isPlayerRegisteredInRace ? (
-                    <Button
-                      onClick={async () => {
-                        if (!canAffordOfficial) {
-                          setError('Energia insuficiente para inscrição');
-                          return;
-                        }
-                        
-                        // Converte para centavos para aritmética segura
-                        const entryFeeCents = Math.round(officialRace.constants.entryFee * 100);
-                        const skemaBoxFeeCents = Math.round(officialRace.constants.skemaBoxFee * 100);
-                        const entryFee = entryFeeCents / 100;
-                        const skemaBoxFee = skemaBoxFeeCents / 100;
-                        
-                        // Deduz energia PRIMEIRO
-                        const deducted = onDeductEnergy(entryFee);
-                        if (!deducted) {
-                          setError('Falha ao deduzir energia');
-                          return;
-                        }
-                        
-                        const result = officialRace.actions.registerPlayer({
-                          id: player.id,
-                          name: player.name,
-                          emoji: player.emoji,
-                        });
-                        if (!result.success) {
-                          // Se falhou inscrição, devolve energia
-                          onAddEnergy(entryFee);
-                          setError(result.error || 'Erro ao inscrever');
-                        } else {
-                          // INSCRIÇÃO OK: credita rake no Skema Box (Cloud)
-                          const newBal = await skemaBox.addToBox(skemaBoxFee, 'official_rake');
-                          console.log(`[OFFICIAL] 💰 Rake Cloud k$${skemaBoxFee.toFixed(2)} → Skema Box: k$${(newBal ?? 0).toFixed(2)}`);
-                          if (newBal === null) {
-                            console.error('[OFFICIAL] ❌ Falha ao creditar rake no Skema Box!');
-                          }
-                        }
-                      }}
-                      disabled={!canAffordOfficial}
-                      className="w-full"
-                      variant="default"
-                    >
-                      <UserCheck className="w-4 h-4 mr-2" />
-                      Inscrever-se (k${(Math.round(officialRace.constants.entryFee * 100) / 100).toFixed(2)})
-                    </Button>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-center gap-2 p-3 bg-green-500/10 border border-green-500/30 rounded-lg text-green-400">
-                        <UserCheck className="w-5 h-5" />
-                        <span className="font-medium">Você está inscrito!</span>
+                      <div className="bg-black/30 rounded-lg p-2 text-center">
+                        <div className="text-xs text-white/50">Prêmio/Player</div>
+                        <div className="font-bold text-green-400">k${officialRace.constants.prizePerPlayer.toFixed(2)}</div>
                       </div>
+                      <div className="bg-black/30 rounded-lg p-2 text-center">
+                        <div className="text-xs text-white/50">Rake</div>
+                        <div className="font-bold text-purple-400">k${officialRace.constants.skemaBoxFee.toFixed(2)}</div>
+                      </div>
+                    </div>
+                    
+                    {/* Pool */}
+                    <div className="bg-black/30 rounded-lg p-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Trophy className="w-5 h-5 text-yellow-400" />
+                        <span className="text-white/80">Pote Atual</span>
+                      </div>
+                      <span className="text-xl font-bold text-yellow-400">k${officialRace.prizePool.toFixed(2)}</span>
+                    </div>
+                    
+                    {/* Inscritos */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Users className="w-4 h-4 text-white/60" />
+                        <span className="text-sm text-white/80">
+                          {officialRace.race.registeredPlayers.length}/{officialRace.constants.maxPlayers} inscritos
+                        </span>
+                      </div>
+                      {officialRace.race.registeredPlayers.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {officialRace.race.registeredPlayers.map((p) => (
+                            <span
+                              key={p.id}
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${
+                                p.id === player.id ? 'bg-green-500/20 border border-green-500/50 text-green-400' : 'bg-white/10 text-white/70'
+                              }`}
+                            >
+                              {p.emoji} {p.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Botão */}
+                    {!isPlayerRegisteredInRace ? (
                       <Button
                         onClick={async () => {
-                          // Centavos para aritmética segura
+                          if (!canAffordOfficial) {
+                            setError('Energia insuficiente');
+                            return;
+                          }
                           const entryFee = Math.round(officialRace.constants.entryFee * 100) / 100;
                           const skemaBoxFee = Math.round(officialRace.constants.skemaBoxFee * 100) / 100;
-                          
-                          const result = officialRace.actions.unregisterPlayer(player.id);
-                          if (result.success) {
-                            // Devolve energia ao jogador
+                          const deducted = onDeductEnergy(entryFee);
+                          if (!deducted) {
+                            setError('Falha ao deduzir energia');
+                            return;
+                          }
+                          const result = officialRace.actions.registerPlayer({
+                            id: player.id, name: player.name, emoji: player.emoji,
+                          });
+                          if (!result.success) {
                             onAddEnergy(entryFee);
-                            // Remove rake do Skema Box (Cloud)
-                            const newBal = await skemaBox.subtractFromBox(skemaBoxFee, 'official_refund');
-                            console.log(`[OFFICIAL] ↩️ Rake Cloud devolvido k$${skemaBoxFee.toFixed(2)} → Skema Box: k$${(newBal ?? 0).toFixed(2)}`);
-                            setError(null);
+                            setError(result.error || 'Erro ao inscrever');
                           } else {
-                            setError(result.error || 'Erro ao cancelar inscrição');
+                            await skemaBox.addToBox(skemaBoxFee, 'official_rake');
                           }
                         }}
-                        variant="outline"
-                        className="w-full text-red-400 border-red-500/30 hover:bg-red-500/10"
+                        disabled={!canAffordOfficial}
+                        className="w-full"
                       >
-                        Cancelar Inscrição (+k${(Math.round(officialRace.constants.entryFee * 100) / 100).toFixed(2)})
+                        <UserCheck className="w-4 h-4 mr-2" />
+                        Inscrever-se (k${officialRace.constants.entryFee.toFixed(2)})
                       </Button>
-                    </div>
-                  )}
-                </div>
-              </motion.section>
-            )}
-          </AnimatePresence>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-center gap-2 p-3 bg-green-500/10 border border-green-500/30 rounded-lg text-green-400">
+                          <UserCheck className="w-5 h-5" />
+                          <span className="font-medium">Você está inscrito!</span>
+                        </div>
+                        <Button
+                          onClick={async () => {
+                            const entryFee = Math.round(officialRace.constants.entryFee * 100) / 100;
+                            const skemaBoxFee = Math.round(officialRace.constants.skemaBoxFee * 100) / 100;
+                            const result = officialRace.actions.unregisterPlayer(player.id);
+                            if (result.success) {
+                              onAddEnergy(entryFee);
+                              await skemaBox.subtractFromBox(skemaBoxFee, 'official_refund');
+                              setError(null);
+                            } else {
+                              setError(result.error || 'Erro ao cancelar');
+                            }
+                          }}
+                          variant="outline"
+                          className="w-full text-red-400 border-red-500/30 hover:bg-red-500/10"
+                        >
+                          Cancelar Inscrição (+k${officialRace.constants.entryFee.toFixed(2)})
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-white/30">
+                    <Crown className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                    <p className="text-sm">Nenhum torneio agendado no momento</p>
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* ─── Treinar ─── */}
+              <TabsContent value="practice" className="mt-3">
+                <motion.div
+                  whileHover={{ scale: 1.01 }}
+                  className="rounded-xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/20 p-5 text-center space-y-4"
+                >
+                  <div className="w-16 h-16 rounded-2xl bg-blue-500/20 mx-auto flex items-center justify-center">
+                    <Brain className="w-8 h-8 text-blue-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white">Treino Solo</h3>
+                    <p className="text-sm text-white/60 mt-1">Pratique sem gastar energia. Sem prêmios, sem pressão.</p>
+                  </div>
+                  <div className="flex items-center justify-center gap-4 text-xs text-white/50">
+                    <span><Users className="w-3 h-3 inline mr-1" />Solo</span>
+                    <span className="text-green-400 font-medium">Grátis</span>
+                    <span><Clock className="w-3 h-3 inline mr-1" />3 min</span>
+                  </div>
+                  <Button
+                    onClick={handleTraining}
+                    disabled={isStarting}
+                    className="w-full bg-blue-600 hover:bg-blue-500"
+                    size="lg"
+                  >
+                    <Brain className="w-5 h-5 mr-2" />
+                    Iniciar Treino
+                  </Button>
+                </motion.div>
+              </TabsContent>
+            </Tabs>
+          </motion.section>
           
           {/* Erro */}
           <AnimatePresence>
@@ -901,47 +687,6 @@ export function SkemaLobby({
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
-        
-        {/* Botão fixo */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/90 to-transparent z-20">
-          <Button
-            onClick={handleStartCountdown}
-            disabled={!selectedMode || isStarting || (selectedMode === 'official' && !isPlayerRegisteredInRace)}
-            className="w-full h-14 text-lg font-bold"
-            size="lg"
-          >
-            {selectedMode === 'training' && (
-              <>
-                <Brain className="w-5 h-5 mr-2" />
-                Iniciar Treino
-              </>
-            )}
-            {selectedMode === 'bots' && (
-              <>
-                <Swords className="w-5 h-5 mr-2" />
-                Entrar na Arena
-              </>
-            )}
-            {selectedMode === 'official' && (
-              <>
-                <Crown className="w-5 h-5 mr-2" />
-                Entrar na Corrida
-              </>
-            )}
-            {selectedMode === 'party' && (
-              <>
-                <PartyPopper className="w-5 h-5 mr-2" />
-                Criar Torneio Festa
-              </>
-            )}
-            {!selectedMode && (
-              <>
-                <Target className="w-5 h-5 mr-2" />
-                Selecione um Modo
-              </>
-            )}
-          </Button>
         </div>
       </div>
     </div>
