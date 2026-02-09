@@ -262,7 +262,7 @@ export default function Auth() {
               transition={{ delay: 0.3, duration: 1.2, ease: 'easeOut' }}
               className="text-7xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-purple-200 to-purple-400 drop-shadow-2xl"
             >
-              SKEMA
+              skema
             </motion.h1>
 
             {/* Divider */}
@@ -314,7 +314,7 @@ export default function Auth() {
                 transition={{ duration: 1.5, ease: 'easeOut' }}
                 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-purple-200 to-purple-400"
               >
-                SKEMA
+                skema
               </motion.h1>
               <motion.p 
                 initial={{ opacity: 0 }}
@@ -464,11 +464,11 @@ export default function Auth() {
                       disabled={inviteCode.length < 4 || name.trim().length < 2 || pin.length !== 4 || isLoading}
                       className="w-full h-12"
                     >
-                      {isLoading ? <Sparkles className="w-5 h-5 animate-spin" /> : <>Entrar no SKEMA <ArrowRight className="w-4 h-4 ml-2" /></>}
+                      {isLoading ? <Sparkles className="w-5 h-5 animate-spin" /> : <>Entrar no skema <ArrowRight className="w-4 h-4 ml-2" /></>}
                     </Button>
 
                     <p className="text-xs text-muted-foreground text-center">
-                      Não tem código? Peça a um amigo que já está no SKEMA!
+                      Não tem código? Peça a um amigo que já está no skema!
                     </p>
                   </motion.div>
                 )}
