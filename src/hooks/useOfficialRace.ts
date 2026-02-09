@@ -1,16 +1,11 @@
 /**
- * useOfficialRace - Sistema de corridas oficiais agendadas
- * 
- * Corrida fixa: 03/03/2026 às 12:00 (horário local)
- * Entry: k$1.10 (k$1 prêmio + k$0.10 caixa skema)
- * 
- * IMPORTANTE: Todos os valores monetários usam aritmética em centavos
- * para evitar erros de floating-point.
+ * useOfficialRace - Corridas oficiais do banco de dados (official_races)
+ * Busca TODAS as corridas com status 'registration' e suas inscrições
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-
-// ==================== TIPOS ====================
+import { useState, useCallback, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface OfficialRacePlayer {
   id: string;
@@ -23,271 +18,140 @@ export interface OfficialRace {
   id: string;
   name: string;
   scheduledDate: Date;
-  entryFee: number;      // Total a pagar (1.10)
-  prizePerPlayer: number; // Vai pro pote (1.00)
-  skemaBoxFee: number;    // Vai pro caixa (0.10)
+  entryFee: number;
+  prizePerPlayer: number;
+  skemaBoxFee: number;
   minPlayers: number;
   maxPlayers: number;
   registeredPlayers: OfficialRacePlayer[];
-  status: 'registration' | 'starting' | 'running' | 'finished' | 'cancelled';
-  creatorId: string;
-  creatorName: string;
+  status: string;
 }
-
-// ==================== CONSTANTES ====================
-
-const STORAGE_KEY = 'skema_official_races';
-const REGISTRATIONS_KEY = 'skema_race_registrations';
-
-// Corrida fixa - 03/03/2026 às 12:00
-const FIXED_RACE_DATE = new Date('2026-03-03T12:00:00');
-
-// Valores em CENTAVOS para evitar floating-point
-const ENTRY_FEE_CENTS = 110;        // k$1.10
-const PRIZE_PER_PLAYER_CENTS = 100; // k$1.00
-const SKEMA_BOX_FEE_CENTS = 10;     // k$0.10
-
-// Valores em k$ derivados de centavos (sem float drift)
-const ENTRY_FEE = ENTRY_FEE_CENTS / 100;               // 1.1
-const PRIZE_PER_PLAYER = PRIZE_PER_PLAYER_CENTS / 100;  // 1
-const SKEMA_BOX_FEE = SKEMA_BOX_FEE_CENTS / 100;       // 0.1
-
-const MIN_PLAYERS = 2;
-const MAX_PLAYERS = 16;
-
-// Criador do universo - Guardião
-const UNIVERSE_CREATOR = {
-  id: 'guardian-skema-universe',
-  name: 'skema',
-  emoji: '🌌',
-};
-
-// ==================== HELPERS ====================
 
 function formatTimeUntil(target: Date): string {
   const now = new Date();
   const diff = target.getTime() - now.getTime();
-  
   if (diff <= 0) return 'Iniciando...';
-  
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  
-  if (days > 0) {
-    return `${days}d ${hours}h`;
-  }
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`;
-  }
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
   return `${minutes}m`;
 }
 
 function formatRaceDate(date: Date): string {
   return date.toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
   });
 }
 
-// ==================== HOOK ====================
+export function useOfficialRaces() {
+  const queryClient = useQueryClient();
 
+  const { data: races, isLoading } = useQuery({
+    queryKey: ['official-races-lobby'],
+    queryFn: async () => {
+      // Fetch races with status registration or starting
+      const { data: racesData, error: racesError } = await supabase
+        .from('official_races')
+        .select('*')
+        .in('status', ['registration', 'starting', 'running'])
+        .order('scheduled_date', { ascending: true });
+
+      if (racesError) throw racesError;
+      if (!racesData || racesData.length === 0) return [];
+
+      // Fetch all registrations for these races
+      const raceIds = racesData.map(r => r.id);
+      const { data: regsData, error: regsError } = await supabase
+        .from('race_registrations')
+        .select('race_id, player_id, registered_at, profiles(id, name, emoji)')
+        .in('race_id', raceIds);
+
+      if (regsError) throw regsError;
+
+      // Map registrations per race
+      const regsByRace = new Map<string, OfficialRacePlayer[]>();
+      (regsData || []).forEach((r: any) => {
+        const list = regsByRace.get(r.race_id) || [];
+        list.push({
+          id: r.profiles?.id || r.player_id,
+          name: r.profiles?.name || 'Unknown',
+          emoji: r.profiles?.emoji || '🎮',
+          registeredAt: r.registered_at,
+        });
+        regsByRace.set(r.race_id, list);
+      });
+
+      return racesData.map(r => ({
+        id: r.id,
+        name: r.name,
+        scheduledDate: new Date(r.scheduled_date),
+        entryFee: Number(r.entry_fee),
+        prizePerPlayer: Number(r.prize_per_player),
+        skemaBoxFee: Number(r.skema_box_fee),
+        minPlayers: r.min_players,
+        maxPlayers: r.max_players,
+        registeredPlayers: regsByRace.get(r.id) || [],
+        status: r.status,
+      })) as OfficialRace[];
+    },
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+  });
+
+  const refresh = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['official-races-lobby'] });
+  }, [queryClient]);
+
+  return { races: races || [], isLoading, refresh };
+}
+
+// Backward-compatible single-race hook (returns first race)
 export function useOfficialRace() {
-  const [race, setRace] = useState<OfficialRace | null>(null);
-  const [timeUntilRace, setTimeUntilRace] = useState('');
-  const [isLoaded, setIsLoaded] = useState(false);
+  const { races, isLoading, refresh } = useOfficialRaces();
+  const race = races.length > 0 ? races[0] : null;
 
-  // Inicializa corrida fixa - SEMPRE cria se não existir
-  useEffect(() => {
-    const loadOrCreateRace = () => {
-      try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        
-        if (stored) {
-          const parsed = JSON.parse(stored) as OfficialRace;
-          parsed.scheduledDate = new Date(parsed.scheduledDate);
-          
-          // Remove duplicatas de nome (mantém primeira ocorrência)
-          const seenNames = new Set<string>();
-          parsed.registeredPlayers = parsed.registeredPlayers.filter(p => {
-            const normalizedName = p.name.trim().toLowerCase();
-            if (seenNames.has(normalizedName)) {
-              console.log('[OFFICIAL RACE] Removendo duplicata:', p.name);
-              return false;
-            }
-            seenNames.add(normalizedName);
-            return true;
-          });
-          
-          // Garante que o Guardião esteja inscrito
-          const guardianRegistered = parsed.registeredPlayers.some(p => p.id === UNIVERSE_CREATOR.id);
-          if (!guardianRegistered) {
-            parsed.registeredPlayers.unshift({
-              id: UNIVERSE_CREATOR.id,
-              name: UNIVERSE_CREATOR.name,
-              emoji: UNIVERSE_CREATOR.emoji,
-              registeredAt: '2024-01-01T00:00:00.000Z',
-            });
-            console.log('[OFFICIAL RACE] Guardião inscrito na corrida');
-          }
-          
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-          console.log('[OFFICIAL RACE] Corrida carregada:', parsed.name, '- Inscritos:', parsed.registeredPlayers.length);
-          setRace(parsed);
-        } else {
-          // Cria corrida inicial com Guardião já inscrito
-          const initialRace: OfficialRace = {
-            id: 'official-race-2026-03-03',
-            name: 'Corrida Inaugural SKEMA',
-            scheduledDate: FIXED_RACE_DATE,
-            entryFee: ENTRY_FEE,
-            prizePerPlayer: PRIZE_PER_PLAYER,
-            skemaBoxFee: SKEMA_BOX_FEE,
-            minPlayers: MIN_PLAYERS,
-            maxPlayers: MAX_PLAYERS,
-            registeredPlayers: [{
-              id: UNIVERSE_CREATOR.id,
-              name: UNIVERSE_CREATOR.name,
-              emoji: UNIVERSE_CREATOR.emoji,
-              registeredAt: '2024-01-01T00:00:00.000Z',
-            }],
-            status: 'registration',
-            creatorId: UNIVERSE_CREATOR.id,
-            creatorName: UNIVERSE_CREATOR.name,
-          };
-          
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(initialRace));
-          console.log('[OFFICIAL RACE] Corrida criada com Guardião:', initialRace.name);
-          setRace(initialRace);
-        }
-      } catch (e) {
-        console.error('[OFFICIAL RACE] Erro ao carregar corrida:', e);
-        // Recria corrida em caso de erro
-        const initialRace: OfficialRace = {
-          id: 'official-race-2026-03-03',
-          name: 'Corrida Inaugural SKEMA',
-          scheduledDate: FIXED_RACE_DATE,
-          entryFee: ENTRY_FEE,
-          prizePerPlayer: PRIZE_PER_PLAYER,
-          skemaBoxFee: SKEMA_BOX_FEE,
-          minPlayers: MIN_PLAYERS,
-          maxPlayers: MAX_PLAYERS,
-          registeredPlayers: [],
-          status: 'registration',
-          creatorId: UNIVERSE_CREATOR.id,
-          creatorName: UNIVERSE_CREATOR.name,
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(initialRace));
-        setRace(initialRace);
-      }
-      
-      setIsLoaded(true);
-    };
-    
-    loadOrCreateRace();
-  }, []);
-
-  // Atualiza countdown
-  useEffect(() => {
-    if (!race) return;
-    
-    const update = () => {
-      setTimeUntilRace(formatTimeUntil(race.scheduledDate));
-    };
-    
-    update();
-    const interval = setInterval(update, 60000); // Atualiza a cada minuto
-    return () => clearInterval(interval);
-  }, [race]);
-
-  // Verifica se jogador está inscrito
   const isPlayerRegistered = useCallback((playerId: string): boolean => {
     if (!race) return false;
     return race.registeredPlayers.some(p => p.id === playerId);
   }, [race]);
 
-  // Verifica se nome já está em uso na corrida
-  const isNameTaken = useCallback((name: string): boolean => {
-    if (!race) return false;
-    const normalizedName = name.trim().toLowerCase();
-    return race.registeredPlayers.some(p => p.name.trim().toLowerCase() === normalizedName);
-  }, [race]);
-
-  // Inscreve jogador
-  const registerPlayer = useCallback((player: { id: string; name: string; emoji: string }): { success: boolean; error?: string } => {
+  const registerPlayer = useCallback(async (player: { id: string; name: string; emoji: string }): Promise<{ success: boolean; error?: string }> => {
     if (!race) return { success: false, error: 'Corrida não encontrada' };
     
-    if (race.status !== 'registration') {
-      return { success: false, error: 'Inscrições encerradas' };
+    const { error } = await supabase
+      .from('race_registrations')
+      .insert({ race_id: race.id, player_id: player.id });
+    
+    if (error) {
+      if (error.code === '23505') return { success: false, error: 'Você já está inscrito' };
+      return { success: false, error: error.message };
     }
     
-    if (race.registeredPlayers.length >= race.maxPlayers) {
-      return { success: false, error: 'Corrida lotada' };
-    }
-    
-    if (isPlayerRegistered(player.id)) {
-      return { success: false, error: 'Você já está inscrito' };
-    }
-    
-    // Bloqueia nomes duplicados
-    if (isNameTaken(player.name)) {
-      return { success: false, error: 'Nome já em uso nesta corrida' };
-    }
-    
-    const updatedRace: OfficialRace = {
-      ...race,
-      registeredPlayers: [
-        ...race.registeredPlayers,
-        {
-          id: player.id,
-          name: player.name,
-          emoji: player.emoji,
-          registeredAt: new Date().toISOString(),
-        },
-      ],
-    };
-    
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedRace));
-    setRace(updatedRace);
-    
+    refresh();
     return { success: true };
-  }, [race, isPlayerRegistered, isNameTaken]);
+  }, [race, refresh]);
 
-  // Cancela inscrição
-  const unregisterPlayer = useCallback((playerId: string): { success: boolean; error?: string } => {
+  const unregisterPlayer = useCallback(async (playerId: string): Promise<{ success: boolean; error?: string }> => {
     if (!race) return { success: false, error: 'Corrida não encontrada' };
     
-    if (race.status !== 'registration') {
-      return { success: false, error: 'Não é possível cancelar inscrição' };
-    }
+    const { error } = await supabase
+      .from('race_registrations')
+      .delete()
+      .eq('race_id', race.id)
+      .eq('player_id', playerId);
     
-    if (!isPlayerRegistered(playerId)) {
-      return { success: false, error: 'Você não está inscrito' };
-    }
+    if (error) return { success: false, error: error.message };
     
-    const updatedRace: OfficialRace = {
-      ...race,
-      registeredPlayers: race.registeredPlayers.filter(p => p.id !== playerId),
-    };
-    
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedRace));
-    setRace(updatedRace);
-    
+    refresh();
     return { success: true };
-  }, [race, isPlayerRegistered]);
+  }, [race, refresh]);
 
-  // Dados calculados
   const prizePool = useMemo(() => {
     if (!race) return 0;
-    return race.registeredPlayers.length * PRIZE_PER_PLAYER;
-  }, [race]);
-
-  const skemaBoxTotal = useMemo(() => {
-    if (!race) return 0;
-    return race.registeredPlayers.length * SKEMA_BOX_FEE;
+    return race.registeredPlayers.length * race.prizePerPlayer;
   }, [race]);
 
   const formattedDate = useMemo(() => {
@@ -295,29 +159,26 @@ export function useOfficialRace() {
     return formatRaceDate(race.scheduledDate);
   }, [race]);
 
-  const canStartRace = useMemo(() => {
-    if (!race) return false;
-    const now = new Date();
-    return now >= race.scheduledDate && 
-           race.registeredPlayers.length >= race.minPlayers &&
-           race.status === 'registration';
+  const timeUntilRace = useMemo(() => {
+    if (!race) return '';
+    return formatTimeUntil(race.scheduledDate);
   }, [race]);
 
   return {
     race,
-    isLoaded,
+    isLoaded: !isLoading,
     timeUntilRace,
     formattedDate,
     prizePool,
-    skemaBoxTotal,
-    canStartRace,
+    skemaBoxTotal: race ? race.registeredPlayers.length * race.skemaBoxFee : 0,
+    canStartRace: race ? new Date() >= race.scheduledDate && race.registeredPlayers.length >= race.minPlayers && race.status === 'registration' : false,
     constants: {
-      entryFee: ENTRY_FEE,
-      prizePerPlayer: PRIZE_PER_PLAYER,
-      skemaBoxFee: SKEMA_BOX_FEE,
-      minPlayers: MIN_PLAYERS,
-      maxPlayers: MAX_PLAYERS,
-      scheduledDate: FIXED_RACE_DATE,
+      entryFee: race?.entryFee ?? 1.1,
+      prizePerPlayer: race?.prizePerPlayer ?? 1,
+      skemaBoxFee: race?.skemaBoxFee ?? 0.1,
+      minPlayers: race?.minPlayers ?? 2,
+      maxPlayers: race?.maxPlayers ?? 16,
+      scheduledDate: race?.scheduledDate ?? new Date(),
     },
     actions: {
       isPlayerRegistered,
