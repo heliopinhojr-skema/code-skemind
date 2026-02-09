@@ -124,7 +124,7 @@ function TierBadge({ tier }: { tier: PlayerTier }) {
     </span>
   );
 }
-// Contador global de jogadores cadastrados - visível para todos
+// Contador global compacto para o grid de stats
 function UniversePlayerCounter() {
   const { data: count } = useQuery({
     queryKey: ['universe-player-count'],
@@ -139,18 +139,17 @@ function UniversePlayerCounter() {
   });
 
   return (
-    <div className="flex items-center justify-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5">
-      <Globe className="w-4 h-4 text-purple-400" />
-      <span className="text-sm text-white/70">Jogadores no Universo:</span>
-      <motion.span
+    <>
+      <motion.div
         key={count}
-        initial={{ scale: 1.3, opacity: 0 }}
+        initial={{ scale: 1.2, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         className="text-lg font-bold text-purple-300"
       >
         {count ?? '...'}
-      </motion.span>
-    </div>
+      </motion.div>
+      <div className="text-[10px] text-purple-300/60">Universo</div>
+    </>
   );
 }
 
@@ -368,8 +367,8 @@ export function SkemaLobby({
             </div>
           </div>
           
-          {/* Stats rápidos */}
-          <div className={`grid gap-2 ${player.playerTier === 'master_admin' ? 'grid-cols-4' : 'grid-cols-3'}`}>
+          {/* Stats rápidos + contador universo */}
+          <div className="grid grid-cols-4 gap-2">
             <div className="bg-white/5 rounded-lg p-2 text-center">
               <div className="text-lg font-bold text-green-400">{player.stats.wins}</div>
               <div className="text-xs text-white/50">Vitórias</div>
@@ -384,13 +383,16 @@ export function SkemaLobby({
               </div>
               <div className="text-xs text-white/50">Melhor</div>
             </div>
-            {player.playerTier === 'master_admin' && (
-              <div className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-lg p-2 text-center border border-yellow-500/30">
-                <div className="text-lg font-bold text-yellow-400">k${skemaBox.balance.toFixed(2)}</div>
-                <div className="text-xs text-yellow-400/70">Skema Box</div>
-              </div>
-            )}
+            <div className="bg-gradient-to-br from-purple-500/15 to-indigo-500/15 rounded-lg p-2 text-center border border-purple-500/20">
+              <UniversePlayerCounter />
+            </div>
           </div>
+          {player.playerTier === 'master_admin' && (
+            <div className="mt-2 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-lg p-2 text-center border border-yellow-500/30">
+              <div className="text-lg font-bold text-yellow-400">k${skemaBox.balance.toFixed(2)}</div>
+              <div className="text-xs text-yellow-400/70">Skema Box</div>
+            </div>
+          )}
         </motion.header>
 
         {/* Conteúdo rolável */}
@@ -416,11 +418,6 @@ export function SkemaLobby({
               </p>
             </div>
           </motion.div>
-
-          {/* Contador global de jogadores */}
-          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.09 }} className="mx-4 mt-4">
-            <UniversePlayerCounter />
-          </motion.section>
 
           {/* Descendência (Criador+) */}
           <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mx-4 mt-3">
