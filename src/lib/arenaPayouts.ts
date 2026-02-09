@@ -136,15 +136,27 @@ export function getPayoutSummary(pool: number = DEFAULT_POOL): Array<{
 }
 
 /**
- * Pre-defined arena buy-in options for Grão Mestre+ to create.
- * buy_in = total entry fee (includes rake)
- * rake_fee ≈ 9.09% of buy_in (same ratio as k$0.05/k$0.55)
+ * Taxa fixa de rake: 9.09% (1/11 do buy-in total).
+ * Isso garante: rake = buy_in × (1/11) ≈ 9.09%
+ */
+export const RAKE_RATE = 1 / 11;
+
+/**
+ * Calcula buy-in e rake a partir de um valor total de entrada digitado pelo Guardian.
+ * rake = arredondado(buyIn × RAKE_RATE, 2 casas)
+ */
+export function computeBuyInAndRake(totalEntry: number): { buyIn: number; rakeFee: number } {
+  const rakeFee = Math.round(totalEntry * RAKE_RATE * 100) / 100;
+  return { buyIn: totalEntry, rakeFee };
+}
+
+/**
+ * Pre-defined arena buy-in options (backward compat / quick-select).
  */
 export const ARENA_BUY_IN_OPTIONS = [
   { buyIn: 0.55,  rakeFee: 0.05,  label: 'k$ 0,55' },
   { buyIn: 1.10,  rakeFee: 0.10,  label: 'k$ 1,10' },
   { buyIn: 2.20,  rakeFee: 0.20,  label: 'k$ 2,20' },
-  { buyIn: 3.30,  rakeFee: 0.30,  label: 'k$ 3,30' },
   { buyIn: 5.50,  rakeFee: 0.50,  label: 'k$ 5,50' },
   { buyIn: 11.00, rakeFee: 1.00,  label: 'k$ 11,00' },
 ];

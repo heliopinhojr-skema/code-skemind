@@ -7,9 +7,11 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import { useDashboardStats, useReferralTree } from '@/hooks/useGuardianData';
 import { useSupabasePlayer } from '@/hooks/useSupabasePlayer';
-import { Users, Zap, Box, Gift, Trophy, TrendingUp, Copy, Check, Share2, Link, ArrowDownRight } from 'lucide-react';
+import { useInviteCodes } from '@/hooks/useInviteCodes';
+import { Users, Zap, Box, Gift, Trophy, TrendingUp, Copy, Check, Share2, Link, ArrowDownRight, Dna } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { calculateBalanceBreakdown, formatEnergy as formatEnergyUtil } from '@/lib/tierEconomy';
@@ -22,7 +24,8 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
   const { data: stats, isLoading, error } = useDashboardStats();
   const { data: referralNodes } = useReferralTree();
   const { player } = useSupabasePlayer();
-  const [copied, setCopied] = useState<'code' | 'link' | null>(null);
+  const { codes, isLoading: isLoadingCodes, isAutoGenerating, unusedCount, usedCount } = useInviteCodes(player?.id || null, player?.playerTier || null);
+  const [copied, setCopied] = useState<string | null>(null);
 
   // Calculate total locked and available from all non-HX players
   const { totalLocked, totalAvailable } = (() => {
@@ -36,15 +39,23 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
     return { totalLocked: locked, totalAvailable: available };
   })();
 
-  const inviteCode = player?.inviteCode || '';
-  const inviteLink = inviteCode ? `${window.location.origin}/?convite=${inviteCode}` : '';
-
-  const handleCopy = async (type: 'code' | 'link') => {
-    const textToCopy = type === 'code' ? inviteCode : inviteLink;
+  const handleCopyCode = async (code: string) => {
     try {
-      await navigator.clipboard.writeText(textToCopy);
-      setCopied(type);
-      toast.success(type === 'code' ? 'Código copiado!' : 'Link copiado!');
+      await navigator.clipboard.writeText(code);
+      setCopied(code);
+      toast.success('Código copiado!');
+      setTimeout(() => setCopied(null), 2000);
+    } catch {
+      toast.error('Erro ao copiar');
+    }
+  };
+
+  const handleCopyLink = async (code: string) => {
+    const link = `${window.location.origin}/?convite=${code}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(`link-${code}`);
+      toast.success('Link copiado!');
       setTimeout(() => setCopied(null), 2000);
     } catch {
       toast.error('Erro ao copiar');
@@ -179,66 +190,97 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
         </CardContent>
       </Card>
 
-      {/* Seção de Código de Convite do Guardian */}
+      {/* Seção de Códigos DNA Únicos */}
       <Card className="bg-gradient-to-r from-primary/20 to-primary/5 border-primary/30">
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
-            <Share2 className="h-5 w-5 text-primary" />
-            Seu Código de Convite
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+              <Dna className="h-5 w-5 text-primary" />
+              Códigos DNA de Convite
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              {isAutoGenerating && (
+                <Badge variant="outline" className="text-xs animate-pulse border-primary/40 text-primary">
+                  Gerando...
+                </Badge>
+              )}
+              <Badge variant="secondary" className="text-xs">
+                {unusedCount} livres / {codes.length} total
+              </Badge>
+            </div>
+          </div>
           <p className="text-sm text-muted-foreground">
-            Compartilhe para convidar novos jogadores à sua árvore
+            Cada código é único e de uso único — compartilhe individualmente
           </p>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {player ? (
-            <>
-              {/* Código de convite */}
-              <div className="flex items-center gap-3">
-                <div className="flex-1 bg-background/80 border border-border rounded-lg px-4 py-3 font-mono text-xl font-bold text-primary tracking-wider">
-                  {inviteCode}
-                </div>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => handleCopy('code')}
-                  className="h-12 w-12 shrink-0"
-                >
-                  {copied === 'code' ? (
-                    <Check className="h-5 w-5 text-primary" />
-                  ) : (
-                    <Copy className="h-5 w-5" />
-                  )}
-                </Button>
-              </div>
-
-              {/* Link de convite */}
-              <div className="flex items-center gap-3">
-                <div className="flex-1 bg-background/80 border border-border rounded-lg px-4 py-2 text-sm text-muted-foreground truncate">
-                  <Link className="h-4 w-4 inline mr-2 text-primary" />
-                  {inviteLink}
-                </div>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => handleCopy('link')}
-                  className="h-10 w-10 shrink-0"
-                >
-                  {copied === 'link' ? (
-                    <Check className="h-4 w-4 text-primary" />
-                  ) : (
-                    <Copy className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-
-              <p className="text-xs text-muted-foreground bg-muted/50 rounded-md p-2">
-                🌌 Convidados recebem tier e saldo automaticamente baseado no seu nível na hierarquia SKEMA.
-              </p>
-            </>
+        <CardContent className="space-y-3">
+          {isLoadingCodes ? (
+            <Skeleton className="h-20 w-full" />
+          ) : codes.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              Nenhum código disponível para seu tier
+            </p>
           ) : (
-            <Skeleton className="h-16 w-full" />
+            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+              {codes.map((code) => {
+                const isUsed = !!code.usedById;
+                return (
+                  <div
+                    key={code.id}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2 border transition-colors",
+                      isUsed
+                        ? "bg-muted/30 border-border/30 opacity-60"
+                        : "bg-background/80 border-primary/20 hover:border-primary/40"
+                    )}
+                  >
+                    <div className="flex-1 font-mono text-sm font-bold tracking-wider">
+                      <span className={isUsed ? "text-muted-foreground line-through" : "text-primary"}>
+                        {code.code}
+                      </span>
+                    </div>
+                    {isUsed ? (
+                      <Badge variant="outline" className="text-xs border-muted text-muted-foreground">
+                        ✓ {code.usedByName || 'usado'}
+                      </Badge>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleCopyCode(code.code)}
+                          title="Copiar código"
+                        >
+                          {copied === code.code ? (
+                            <Check className="h-3.5 w-3.5 text-primary" />
+                          ) : (
+                            <Copy className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleCopyLink(code.code)}
+                          title="Copiar link"
+                        >
+                          {copied === `link-${code.code}` ? (
+                            <Check className="h-3.5 w-3.5 text-primary" />
+                          ) : (
+                            <Link className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
+          <p className="text-xs text-muted-foreground bg-muted/50 rounded-md p-2">
+            🧬 Cada código DNA é exclusivo do seu perfil. Convidados herdam tier e saldo baseado na hierarquia SKEMA.
+          </p>
         </CardContent>
       </Card>
 
