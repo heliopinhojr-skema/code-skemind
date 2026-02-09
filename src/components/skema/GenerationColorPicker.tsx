@@ -36,7 +36,7 @@ export function getColorConfig(colorId: string | null) {
 }
 
 // Planet face SVG (smiling closed-eyes face like the reference)
-function PlanetFace({ className }: { className?: string }) {
+export function PlanetFace({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 40 40" className={`w-8 h-8 ${className}`} fill="currentColor">
       {/* Left eye - closed arc */}
