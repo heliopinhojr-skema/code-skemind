@@ -85,7 +85,7 @@ export function useInviteCodes(profileId: string | null, playerTier: string | nu
     }
   }, [profileId]);
 
-  // Auto-generate missing codes based on tier
+  // Auto-generate missing codes based on tier, discounting existing referrals
   const autoGenerateCodes = useCallback(async (currentCodes: InviteCode[]) => {
     if (!profileId || !playerTier) return;
 
@@ -94,8 +94,20 @@ export function useInviteCodes(profileId: string | null, playerTier: string | nu
 
     if (maxInvites <= 0) return; // Ploft/jogador can't invite
 
+    // Count referrals already made (some may have been via master code, not SKINV)
+    const { count: referralCount } = await supabase
+      .from('referrals')
+      .select('id', { count: 'exact', head: true })
+      .eq('inviter_id', profileId);
+
+    const existingReferrals = referralCount || 0;
+    const usedCodes = currentCodes.filter(c => !!c.usedById).length;
+    // Referrals not accounted for by used SKINV codes
+    const extraReferrals = Math.max(0, existingReferrals - usedCodes);
+    const effectiveMax = Math.max(0, maxInvites - extraReferrals);
+
     const totalCodes = currentCodes.length;
-    const missing = maxInvites - totalCodes;
+    const missing = effectiveMax - totalCodes;
 
     if (missing <= 0) return; // Already have all codes
 
