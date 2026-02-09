@@ -287,58 +287,64 @@ export function useTournament() {
   
   // Finaliza torneio, calcula ranking, e processa economia
   const finishTournament = useCallback(async () => {
-    // Revela todos os bots restantes
-    botSimulationRef.current.forEach(result => {
-      setResults(prev => {
-        const next = new Map(prev);
-        next.set(result.playerId, result);
-        return next;
-      });
-    });
-    
     if (revealIntervalRef.current) {
       clearInterval(revealIntervalRef.current);
     }
-    
-    // Calcula ranking
-    let rankedResults: TournamentResult[] = [];
-    
+
+    // ── Computar ranking SINCRONAMENTE fora do state updater ──
+    // Recolhe o resultado humano atualizado + todos os bots simulados
+    const allResultsMap = new Map<string, TournamentResult>();
+
+    // Pega resultado humano do state atual (via ref-like read)
+    // NOTE: usamos um setResults funcional apenas para LER o state corrente
+    let currentHumanResult: TournamentResult | undefined;
     setResults(prev => {
-      const next = new Map(prev);
-      const allResults = Array.from(next.values());
-      
-      allResults.sort((a, b) => {
-        if (a.status === 'won' && b.status !== 'won') return -1;
-        if (b.status === 'won' && a.status !== 'won') return 1;
-        if (a.status === 'won' && b.status === 'won') {
-          if (a.attempts !== b.attempts) return a.attempts - b.attempts;
-        }
-        if (a.score !== b.score) return b.score - a.score;
-        return (b.finishTime || 0) - (a.finishTime || 0);
-      });
-      
-      allResults.forEach((result, index) => {
-        result.rank = index + 1;
-        next.set(result.playerId, result);
-      });
-      
-      rankedResults = allResults;
-      return next;
+      currentHumanResult = prev.get(humanPlayerId);
+      return prev; // sem alteração
     });
-    
+
+    // Adiciona resultado humano
+    if (currentHumanResult) {
+      allResultsMap.set(humanPlayerId, currentHumanResult);
+    }
+
+    // Adiciona todos os resultados dos bots (da simulação pré-computada)
+    botSimulationRef.current.forEach(result => {
+      allResultsMap.set(result.playerId, result);
+    });
+
+    // Ordena e atribui rankings
+    const rankedResults = Array.from(allResultsMap.values());
+    rankedResults.sort((a, b) => {
+      if (a.status === 'won' && b.status !== 'won') return -1;
+      if (b.status === 'won' && a.status !== 'won') return 1;
+      if (a.status === 'won' && b.status === 'won') {
+        if (a.attempts !== b.attempts) return a.attempts - b.attempts;
+      }
+      if (a.score !== b.score) return b.score - a.score;
+      return (b.finishTime || 0) - (a.finishTime || 0);
+    });
+
+    rankedResults.forEach((result, index) => {
+      result.rank = index + 1;
+      allResultsMap.set(result.playerId, result);
+    });
+
+    // Agora atualiza o state de uma vez com todos os rankings
+    setResults(new Map(allResultsMap));
     setStatus('finished');
-    
-    // Processa economia via Edge Function
+
+    // ── Processa economia via Edge Function ──
     const pool = arenaPool;
     const humanResult = rankedResults.find(r => r.playerId === humanPlayerId);
     const humanPrize = humanResult && isITM(humanResult.rank)
       ? getScaledArenaPrize(humanResult.rank, pool)
       : 0;
-    
+
     const botPrizesTotal = calculateBotPrizesTotal(rankedResults, pool);
-    
-    console.log(`[TOURNAMENT] Finishing - Player rank: #${humanResult?.rank}, prize: k$${humanPrize.toFixed(2)}, bot prizes total: k$${botPrizesTotal.toFixed(2)}`);
-    
+
+    console.log(`[TOURNAMENT] Finishing - Player rank: #${humanResult?.rank}, prize: k$${humanPrize.toFixed(2)}, bot prizes total: k$${botPrizesTotal.toFixed(2)}, pool: k$${pool.toFixed(2)}`);
+
     try {
       const { data, error } = await supabase.functions.invoke('process-arena-economy', {
         body: {
