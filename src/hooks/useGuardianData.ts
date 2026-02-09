@@ -241,24 +241,41 @@ export function usePlayersList() {
 }
 
 // Hook para árvore de convites (hierarquia baseada em invite_code)
+// Normaliza códigos SKINV para o invite_code do perfil do criador
 export function useReferralTree() {
   return useQuery({
     queryKey: ['guardian-referral-tree'],
     queryFn: async () => {
-      // Buscar todos os profiles com tier e saldo
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, name, emoji, invite_code, invited_by, invited_by_name, player_tier, energy, created_at')
-        .order('created_at', { ascending: true });
+      // Buscar todos os profiles, referrals e invite_codes em paralelo
+      const [profilesRes, referralsRes, inviteCodesRes] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('id, name, emoji, invite_code, invited_by, invited_by_name, player_tier, energy, created_at')
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('referrals')
+          .select('inviter_id, reward_credited, reward_amount'),
+        supabase
+          .from('invite_codes')
+          .select('code, creator_id'),
+      ]);
       
-      if (profilesError) throw profilesError;
+      if (profilesRes.error) throw profilesRes.error;
+      if (referralsRes.error) throw referralsRes.error;
       
-      // Buscar referrals com amounts
-      const { data: referrals, error: referralsError } = await supabase
-        .from('referrals')
-        .select('inviter_id, reward_credited, reward_amount');
+      const profiles = profilesRes.data;
+      const referrals = referralsRes.data;
+      const inviteCodes = inviteCodesRes.data || [];
       
-      if (referralsError) throw referralsError;
+      // Build SKINV code → creator's profile invite_code map
+      const profileById = new Map(profiles?.map(p => [p.id, p]) || []);
+      const skinvToProfileCode = new Map<string, string>();
+      inviteCodes.forEach(ic => {
+        const creator = profileById.get(ic.creator_id);
+        if (creator) {
+          skinvToProfileCode.set(ic.code, creator.invite_code);
+        }
+      });
       
       // Agregar dados de referral por inviter
       const referralCounts = new Map<string, { total: number; credited: number; totalTransferred: number }>();
@@ -272,13 +289,16 @@ export function useReferralTree() {
       
       return profiles?.map(p => {
         const refData = referralCounts.get(p.id);
+        // Normalize invited_by: if it's a SKINV code, resolve to creator's profile invite_code
+        const normalizedInvitedBy = p.invited_by 
+          ? (skinvToProfileCode.get(p.invited_by) || p.invited_by)
+          : p.invited_by;
         return {
           id: p.id,
           name: p.name,
           emoji: p.emoji,
           invite_code: p.invite_code,
-          // invited_by stores the invite_code of the inviter (not the profile id)
-          invited_by: p.invited_by,
+          invited_by: normalizedInvitedBy,
           inviter_name: p.invited_by_name,
           player_tier: p.player_tier,
           energy: Number(p.energy) || 0,
