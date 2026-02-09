@@ -25,6 +25,7 @@ import { calculateArenaPool, getScaledArenaPrize } from '@/lib/arenaPayouts';
 import { OnlinePlayer } from '@/hooks/useOnlinePlayers';
 import { ReferralHistoryPanel } from './ReferralHistoryPanel';
 import { OnlinePlayersPanel } from './OnlinePlayersPanel';
+import { TransferPanel } from './TransferPanel';
 import { PlayerGameHistory } from './PlayerGameHistory';
 import universeBg from '@/assets/universe-bg.jpg';
 
@@ -364,13 +365,25 @@ export function SkemaLobby({
             />
           </motion.section>
 
-          {/* Extrato */}
+          {/* Transferências */}
           <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} className="mx-4 mt-3">
+            <TransferPanel
+              playerId={player.id}
+              playerName={player.name}
+              playerTier={player.playerTier}
+              energy={player.energy}
+              referralsCount={player.referrals.length}
+              onTransferComplete={onRefreshProfile}
+            />
+          </motion.section>
+
+          {/* Extrato */}
+          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.14 }} className="mx-4 mt-3">
             <PlayerGameHistory playerId={player.id} />
           </motion.section>
           
           {/* Taxa */}
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }} className="mx-4 mt-3 flex items-center gap-2 text-xs text-white/40">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.16 }} className="mx-4 mt-3 flex items-center gap-2 text-xs text-white/40">
             <AlertCircle className="w-3 h-3" />
             <span>Taxa de transferência: {(transferTax * 100).toFixed(2)}%</span>
           </motion.div>
