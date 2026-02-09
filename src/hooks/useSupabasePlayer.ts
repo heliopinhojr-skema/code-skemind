@@ -30,6 +30,7 @@ export interface SkemaPlayer {
   referrals: string[];
   playerTier: PlayerTier;
   isKeeper: boolean;
+  generationColor: string | null;
   stats: {
     wins: number;
     races: number;
@@ -217,6 +218,7 @@ export function useSupabasePlayer() {
         referrals: Array(referralsCount || 0).fill(''), // Just for count
         playerTier,
         isKeeper,
+        generationColor: (profile as any).generation_color || null,
         stats: {
           wins: profile.stats_wins || 0,
           races: profile.stats_races || 0,
