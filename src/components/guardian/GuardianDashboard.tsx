@@ -67,21 +67,27 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
 
   // Real-time online player count via presence
   const [onlineCount, setOnlineCount] = useState(0);
+  const [onlinePlayersList, setOnlinePlayersList] = useState<{ id: string; name: string; emoji: string; status: string }[]>([]);
   const channelRef = useRef<any>(null);
 
   useEffect(() => {
-    const channel = supabase.channel('guardian-presence-monitor', {
+    const channel = supabase.channel('skema-lobby', {
       config: { presence: { key: 'guardian-watcher' } },
     });
     channelRef.current = channel;
 
     channel.on('presence', { event: 'sync' }, () => {
       const state = channel.presenceState();
-      const uniqueIds = new Set<string>();
+      const uniquePlayers = new Map<string, { id: string; name: string; emoji: string; status: string }>();
       Object.values(state).forEach((presences: any) => {
-        presences.forEach((p: any) => { if (p.id) uniqueIds.add(p.id); });
+        presences.forEach((p: any) => {
+          if (p.id && p.id !== 'guardian' && p.name) {
+            uniquePlayers.set(p.id, { id: p.id, name: p.name, emoji: p.emoji || '🎮', status: p.status || 'online' });
+          }
+        });
       });
-      setOnlineCount(uniqueIds.size);
+      setOnlineCount(uniquePlayers.size);
+      setOnlinePlayersList(Array.from(uniquePlayers.values()));
     });
 
     channel.subscribe(async (status: string) => {
@@ -395,16 +401,36 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
       <div className="grid grid-cols-3 gap-3">
         {/* Online agora */}
         <Card className="bg-card/90 backdrop-blur-sm border-border/60">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="relative">
-              <Radio className="h-5 w-5 text-emerald-400" />
-              <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full animate-ping" />
-              <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full" />
+          <CardContent className="p-3">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="relative">
+                <Radio className="h-5 w-5 text-primary" />
+                <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-primary rounded-full animate-ping" />
+                <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-primary rounded-full" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{onlineCount}</p>
+                <p className="text-[10px] text-muted-foreground">online agora</p>
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-foreground">{onlineCount}</p>
-              <p className="text-[10px] text-muted-foreground">online agora</p>
-            </div>
+            {onlinePlayersList.length > 0 ? (
+              <div className="space-y-0.5 max-h-24 overflow-y-auto">
+                {onlinePlayersList.map((p) => (
+                  <div key={p.id} className="flex items-center gap-1 text-[10px]">
+                    <span>{p.emoji}</span>
+                    <span className="text-foreground truncate">{p.name}</span>
+                    <Badge variant="outline" className={cn(
+                      "text-[8px] px-1 py-0 h-3.5 shrink-0",
+                      p.status === 'playing' ? 'border-primary text-primary' : 'border-muted-foreground'
+                    )}>
+                      {p.status === 'playing' ? '🎮' : '🟢'}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[10px] text-muted-foreground">Ninguém no lobby</p>
+            )}
           </CardContent>
         </Card>
 
