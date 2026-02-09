@@ -24,6 +24,7 @@ import { useOpenArenas, ArenaListing } from '@/hooks/useArenaListings';
 import { calculateArenaPool, getScaledArenaPrize } from '@/lib/arenaPayouts';
 import { OnlinePlayer } from '@/hooks/useOnlinePlayers';
 import { ReferralHistoryPanel } from './ReferralHistoryPanel';
+import { CreatorDescendancyPanel } from './CreatorDescendancyPanel';
 import { TransferPanel } from './TransferPanel';
 import { PlayerGameHistory } from './PlayerGameHistory';
 import universeBg from '@/assets/universe-bg.jpg';
@@ -394,6 +395,11 @@ export function SkemaLobby({
               onProcessRewards={onProcessReferralRewards}
               onRefreshProfile={onRefreshProfile}
             />
+          </motion.section>
+
+          {/* Descendência */}
+          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.11 }} className="mx-4 mt-3">
+            <CreatorDescendancyPanel playerId={player.id} playerTier={player.playerTier} />
           </motion.section>
 
           {/* Transferências */}
