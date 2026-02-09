@@ -1,12 +1,14 @@
 /**
  * useInviteCodes - Gerencia códigos de convite únicos (one-time-use)
  * 
- * Cada código SKINV... é gerado individualmente e só pode ser usado uma vez.
- * Após uso, fica marcado com used_by_id e used_at.
+ * Códigos SKINV... são gerados AUTOMATICAMENTE pelo universo com base no tier.
+ * Ao carregar, o hook gera todos os códigos faltantes até o máximo do tier.
+ * Cada código só pode ser usado uma vez. Após uso, fica marcado com used_by_id e used_at.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { getTierEconomy } from '@/lib/tierEconomy';
 
 export interface InviteCode {
   id: string;
@@ -21,19 +23,19 @@ export interface InviteCode {
 interface UseInviteCodesResult {
   codes: InviteCode[];
   isLoading: boolean;
-  isGenerating: boolean;
+  isAutoGenerating: boolean;
   error: string | null;
   unusedCount: number;
   usedCount: number;
-  generateCode: () => Promise<string | null>;
   refetch: () => Promise<void>;
 }
 
-export function useInviteCodes(profileId: string | null): UseInviteCodesResult {
+export function useInviteCodes(profileId: string | null, playerTier: string | null): UseInviteCodesResult {
   const [codes, setCodes] = useState<InviteCode[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [isAutoGenerating, setIsAutoGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const autoGenTriggered = useRef(false);
 
   const fetchCodes = useCallback(async () => {
     if (!profileId) {
@@ -56,7 +58,7 @@ export function useInviteCodes(profileId: string | null): UseInviteCodesResult {
           used_by:profiles!invite_codes_used_by_id_fkey(name)
         `)
         .eq('creator_id', profileId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: true });
 
       if (fetchError) {
         console.error('[INVITE_CODES] Fetch error:', fetchError);
@@ -74,6 +76,7 @@ export function useInviteCodes(profileId: string | null): UseInviteCodesResult {
       }));
 
       setCodes(entries);
+      return entries;
     } catch (e) {
       console.error('[INVITE_CODES] Unexpected error:', e);
       setError('Erro inesperado');
@@ -82,55 +85,116 @@ export function useInviteCodes(profileId: string | null): UseInviteCodesResult {
     }
   }, [profileId]);
 
-  // Fetch on mount
-  useEffect(() => {
-    fetchCodes();
-  }, [fetchCodes]);
+  // Auto-generate missing codes based on tier
+  const autoGenerateCodes = useCallback(async (currentCodes: InviteCode[]) => {
+    if (!profileId || !playerTier) return;
 
-  const generateCode = useCallback(async (): Promise<string | null> => {
-    if (!profileId || isGenerating) return null;
+    const config = getTierEconomy(playerTier);
+    const maxInvites = config.maxInvites;
 
-    setIsGenerating(true);
-    setError(null);
+    if (maxInvites <= 0) return; // Ploft/jogador can't invite
+
+    const totalCodes = currentCodes.length;
+    const missing = maxInvites - totalCodes;
+
+    if (missing <= 0) return; // Already have all codes
+
+    console.log(`[INVITE_CODES] Auto-generating ${missing} codes for tier ${playerTier} (has ${totalCodes}/${maxInvites})`);
+    setIsAutoGenerating(true);
 
     try {
-      const { data, error: genError } = await supabase.rpc('generate_invite_code', {
-        p_creator_profile_id: profileId,
-      });
+      // Generate all missing codes in sequence (each RPC generates one)
+      for (let i = 0; i < missing; i++) {
+        const { error: genError } = await supabase.rpc('generate_invite_code', {
+          p_creator_profile_id: profileId,
+        });
 
-      if (genError) {
-        console.error('[INVITE_CODES] Generate error:', genError);
-        setError('Erro ao gerar código');
-        return null;
+        if (genError) {
+          console.error(`[INVITE_CODES] Auto-generate error (${i + 1}/${missing}):`, genError);
+          break; // Stop on first error
+        }
       }
 
-      const newCode = data as string;
-      console.log('[INVITE_CODES] Generated:', newCode);
-
-      // Refetch to get the full entry
+      console.log(`[INVITE_CODES] Auto-generation complete`);
+      // Refetch to get all the new codes
       await fetchCodes();
-
-      return newCode;
     } catch (e) {
-      console.error('[INVITE_CODES] Generate unexpected error:', e);
-      setError('Erro inesperado');
-      return null;
+      console.error('[INVITE_CODES] Auto-generate unexpected error:', e);
     } finally {
-      setIsGenerating(false);
+      setIsAutoGenerating(false);
     }
-  }, [profileId, isGenerating, fetchCodes]);
+  }, [profileId, playerTier, fetchCodes]);
+
+  // Fetch on mount, then auto-generate if needed
+  useEffect(() => {
+    if (!profileId) return;
+    autoGenTriggered.current = false;
+
+    const init = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const { data, error: fetchError } = await supabase
+          .from('invite_codes')
+          .select(`
+            id,
+            code,
+            created_at,
+            used_by_id,
+            used_at,
+            used_by:profiles!invite_codes_used_by_id_fkey(name)
+          `)
+          .eq('creator_id', profileId)
+          .order('created_at', { ascending: true });
+
+        if (fetchError) {
+          console.error('[INVITE_CODES] Fetch error:', fetchError);
+          setError('Erro ao carregar códigos');
+          return;
+        }
+
+        const entries: InviteCode[] = (data || []).map((row) => ({
+          id: row.id,
+          code: row.code,
+          createdAt: row.created_at,
+          usedById: row.used_by_id,
+          usedAt: row.used_at,
+          usedByName: row.used_by?.name || undefined,
+        }));
+
+        setCodes(entries);
+
+        // Auto-generate missing codes (only once per mount)
+        if (!autoGenTriggered.current) {
+          autoGenTriggered.current = true;
+          await autoGenerateCodes(entries);
+        }
+      } catch (e) {
+        console.error('[INVITE_CODES] Unexpected error:', e);
+        setError('Erro inesperado');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    init();
+  }, [profileId, playerTier]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const unusedCount = codes.filter((c) => !c.usedById).length;
   const usedCount = codes.filter((c) => !!c.usedById).length;
 
+  const refetch = useCallback(async () => {
+    await fetchCodes();
+  }, [fetchCodes]);
+
   return {
     codes,
     isLoading,
-    isGenerating,
+    isAutoGenerating: isAutoGenerating,
     error,
     unusedCount,
     usedCount,
-    generateCode,
-    refetch: fetchCodes,
+    refetch,
   };
 }

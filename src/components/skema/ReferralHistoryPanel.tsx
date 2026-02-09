@@ -1,25 +1,25 @@
 /**
- * ReferralHistoryPanel - Painel de convites com códigos únicos
+ * ReferralHistoryPanel - Painel de convites com códigos DNA únicos
  * 
- * Cada código SKINV... é gerado individualmente e só pode ser usado uma vez.
- * Mostra lista de códigos gerados (usados/livres) e botão para gerar novos.
+ * Códigos SKINV... são gerados automaticamente pelo universo com base no tier.
+ * Cada código é único e só pode ser usado uma vez.
  */
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Gift, Copy, Check, Clock, Coins, ChevronDown, ChevronUp, Users, Loader2, Share2, Plus, Ticket } from 'lucide-react';
+import { Gift, Copy, Check, Clock, Coins, ChevronDown, ChevronUp, Users, Loader2, Share2, Ticket, Dna, Lock, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ReferralEntry, useReferralHistory } from '@/hooks/useReferralHistory';
 import { useInviteCodes, InviteCode } from '@/hooks/useInviteCodes';
+import { getTierEconomy, formatEnergy } from '@/lib/tierEconomy';
 import { toast } from '@/components/ui/use-toast';
-
-const MAX_REFERRAL_REWARDS = 10;
 
 interface ReferralHistoryPanelProps {
   playerId: string;
   inviteCode: string;
+  playerTier: string;
   onProcessRewards: () => Promise<{ processed: number; total_reward: number }>;
   onRefreshProfile: () => void;
 }
@@ -27,18 +27,23 @@ interface ReferralHistoryPanelProps {
 export function ReferralHistoryPanel({
   playerId,
   inviteCode,
+  playerTier,
   onProcessRewards,
   onRefreshProfile,
 }: ReferralHistoryPanelProps) {
   const { referrals, isLoading: referralsLoading, error: referralsError, pendingRewardsCount, pendingRewardsTotal, refetch: refetchReferrals } = useReferralHistory(playerId);
-  const { codes, isLoading: codesLoading, isGenerating, error: codesError, unusedCount, generateCode, refetch: refetchCodes } = useInviteCodes(playerId);
+  const { codes, isLoading: codesLoading, isAutoGenerating, error: codesError, unusedCount, usedCount, refetch: refetchCodes } = useInviteCodes(playerId, playerTier);
   
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [isCardExpanded, setIsCardExpanded] = useState(false);
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const usedCount = referrals.length;
+  const tierConfig = getTierEconomy(playerTier);
+  const maxInvites = tierConfig.maxInvites;
+  const costPerInvite = tierConfig.costPerInvite;
+  const invitedTierLabel = tierConfig.invitedTierLabel;
+  const canInvite = maxInvites > 0;
 
   const handleCopyCode = async (code: string) => {
     try {
@@ -66,16 +71,6 @@ export function ReferralHistoryPanel({
       setTimeout(() => setCopiedCode(null), 2000);
     } catch (e) {
       console.error('Erro ao copiar:', e);
-    }
-  };
-
-  const handleGenerateCode = async () => {
-    const code = await generateCode();
-    if (code) {
-      toast({
-        title: '🎟️ Código gerado!',
-        description: `${code} — copie e envie para seu convidado.`,
-      });
     }
   };
 
@@ -120,36 +115,60 @@ export function ReferralHistoryPanel({
     }
   };
 
+  // Ploft/jogador sem convites
+  if (!canInvite) {
+    return (
+      <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+        <div className="flex items-center gap-2 text-white/40">
+          <Lock className="w-4 h-4" />
+          <span className="text-sm">Convites não disponíveis para seu tier</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20 rounded-xl overflow-hidden">
+    <div className="bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl overflow-hidden backdrop-blur-sm">
       {/* Header Compacto */}
       <button
         onClick={() => setIsCardExpanded(!isCardExpanded)}
-        className="w-full p-3 flex items-center justify-between hover:bg-primary/5 transition-colors"
+        className="w-full p-3 flex items-center justify-between hover:bg-white/5 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <Gift className="w-4 h-4 text-primary" />
-          <span className="font-medium text-foreground text-sm">Meus Convites</span>
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500/30 to-pink-500/30 flex items-center justify-center">
+            <Dna className="w-3.5 h-3.5 text-purple-300" />
+          </div>
+          <div className="text-left">
+            <span className="font-medium text-white text-sm">Códigos DNA</span>
+            <div className="text-[10px] text-white/40">
+              Gera {invitedTierLabel} • {formatEnergy(costPerInvite)}/cada
+            </div>
+          </div>
         </div>
         
         <div className="flex items-center gap-2">
-          {unusedCount > 0 && (
-            <span className="px-1.5 py-0.5 bg-green-500/20 text-green-300 text-xs rounded-full">
-              {unusedCount} livre{unusedCount > 1 ? 's' : ''}
-            </span>
+          {isAutoGenerating && (
+            <Loader2 className="w-3 h-3 text-purple-400 animate-spin" />
           )}
-          <span className="text-xs text-muted-foreground">
-            {usedCount}/{MAX_REFERRAL_REWARDS}
-          </span>
+          <div className="flex items-center gap-1">
+            {unusedCount > 0 && (
+              <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 text-xs rounded-full font-medium">
+                {unusedCount} ✦
+              </span>
+            )}
+            <span className="text-xs text-white/40 font-mono">
+              {usedCount}/{maxInvites}
+            </span>
+          </div>
           {pendingRewardsCount > 0 && (
-            <span className="px-1.5 py-0.5 bg-accent/20 text-accent-foreground text-xs rounded-full animate-pulse">
-              {pendingRewardsCount} 💰
+            <span className="px-1.5 py-0.5 bg-yellow-500/20 text-yellow-300 text-xs rounded-full animate-pulse font-medium">
+              💰 {pendingRewardsCount}
             </span>
           )}
           {isCardExpanded ? (
-            <ChevronUp className="w-4 h-4 text-muted-foreground" />
+            <ChevronUp className="w-4 h-4 text-white/30" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            <ChevronDown className="w-4 h-4 text-white/30" />
           )}
         </div>
       </button>
@@ -162,35 +181,33 @@ export function ReferralHistoryPanel({
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="border-t border-border overflow-hidden"
+            className="border-t border-white/10 overflow-hidden"
           >
-            <div className="p-4 space-y-3">
-              {/* Botão Gerar Novo Código */}
-              <Button
-                onClick={handleGenerateCode}
-                disabled={isGenerating}
-                variant="default"
-                className="w-full gap-2"
-              >
-                {isGenerating ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Plus className="w-4 h-4" />
-                )}
-                Gerar Código de Convite
-              </Button>
+            <div className="p-3 space-y-2">
+              {/* Tier info strip */}
+              <div className="flex items-center justify-between bg-white/5 rounded-lg px-3 py-2 text-xs">
+                <span className="text-white/50">Cada código gera um</span>
+                <span className="text-purple-300 font-medium flex items-center gap-1">
+                  <Sparkles className="w-3 h-3" />
+                  {invitedTierLabel} • {formatEnergy(costPerInvite)}
+                </span>
+              </div>
 
-              {/* Lista de códigos gerados */}
-              {codesLoading ? (
-                <div className="flex items-center justify-center py-3">
-                  <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
+              {/* Lista de códigos DNA */}
+              {codesLoading || isAutoGenerating ? (
+                <div className="flex flex-col items-center justify-center py-6 gap-2">
+                  <Loader2 className="w-5 h-5 text-purple-400 animate-spin" />
+                  <span className="text-xs text-white/40">
+                    {isAutoGenerating ? 'Gerando códigos DNA...' : 'Carregando...'}
+                  </span>
                 </div>
               ) : codes.length > 0 ? (
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {codes.map((code) => (
+                <div className="space-y-1.5 max-h-72 overflow-y-auto scrollbar-thin">
+                  {codes.map((code, index) => (
                     <InviteCodeItem
                       key={code.id}
                       code={code}
+                      index={index + 1}
                       copiedCode={copiedCode}
                       onCopyCode={handleCopyCode}
                       onCopyLink={handleCopyLink}
@@ -199,26 +216,26 @@ export function ReferralHistoryPanel({
                   ))}
                 </div>
               ) : (
-                <div className="bg-background/20 rounded-lg p-3 text-center">
-                  <Ticket className="w-6 h-6 text-muted-foreground mx-auto mb-1" />
-                  <p className="text-xs text-muted-foreground">
-                    Nenhum código gerado ainda. Clique acima para criar!
+                <div className="bg-white/5 rounded-lg p-4 text-center">
+                  <Ticket className="w-6 h-6 text-white/20 mx-auto mb-1" />
+                  <p className="text-xs text-white/40">
+                    Nenhum código disponível para seu tier.
                   </p>
                 </div>
               )}
 
               {codesError && (
-                <div className="text-xs text-destructive text-center">{codesError}</div>
+                <div className="text-xs text-red-400 text-center">{codesError}</div>
               )}
 
               {/* Expandir histórico de convidados */}
               {usedCount > 0 && (
                 <button
                   onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
-                  className="w-full flex items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors py-2"
+                  className="w-full flex items-center justify-center gap-1 text-xs text-white/40 hover:text-white/70 transition-colors py-1.5 border-t border-white/5"
                 >
                   <Users className="w-3 h-3" />
-                  <span>Convidados ({usedCount})</span>
+                  <span>Árvore de Convidados ({usedCount})</span>
                   {isHistoryExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                 </button>
               )}
@@ -230,22 +247,22 @@ export function ReferralHistoryPanel({
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
-                    className="space-y-2 max-h-48 overflow-y-auto"
+                    className="space-y-1.5 max-h-48 overflow-y-auto"
                   >
                     {referralsLoading ? (
                       <div className="flex items-center justify-center py-4">
-                        <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
+                        <Loader2 className="w-5 h-5 text-white/30 animate-spin" />
                       </div>
                     ) : referralsError ? (
                       <div className="text-center py-4">
-                        <p className="text-sm text-destructive">{referralsError}</p>
+                        <p className="text-sm text-red-400">{referralsError}</p>
                         <Button variant="ghost" size="sm" onClick={refetchReferrals} className="mt-2 text-xs">
                           Tentar novamente
                         </Button>
                       </div>
                     ) : referrals.length === 0 ? (
                       <div className="text-center py-4">
-                        <p className="text-sm text-muted-foreground">Nenhum convite ainda</p>
+                        <p className="text-sm text-white/40">Nenhum convidado ainda</p>
                       </div>
                     ) : (
                       referrals.map((referral) => (
@@ -261,28 +278,15 @@ export function ReferralHistoryPanel({
                 <Button
                   onClick={handleProcessRewards}
                   disabled={isProcessing}
-                  className="w-full gap-2"
-                  variant="default"
+                  className="w-full gap-2 bg-gradient-to-r from-yellow-600 to-amber-600 hover:from-yellow-500 hover:to-amber-500 text-white border-0"
                 >
                   {isProcessing ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <Coins className="w-4 h-4" />
                   )}
-                  Resgatar k${pendingRewardsTotal.toFixed(2)}
+                  Resgatar {formatEnergy(pendingRewardsTotal)}
                 </Button>
-              )}
-
-              {/* Mensagem de incentivo */}
-              {usedCount === 0 && codes.length === 0 && (
-                <div className="bg-background/20 rounded-lg p-3 text-center">
-                  <p className="text-xs text-muted-foreground">
-                    🎁 Convide amigos e ganhe <span className="text-primary font-medium">k$10</span> por cada um!
-                  </p>
-                  <p className="text-xs text-muted-foreground/70 mt-1">
-                    Limite: {MAX_REFERRAL_REWARDS} recompensas
-                  </p>
-                </div>
               )}
             </div>
           </motion.div>
@@ -292,16 +296,18 @@ export function ReferralHistoryPanel({
   );
 }
 
-// ==================== Componente de código individual ====================
+// ==================== Componente de código DNA individual ====================
 
 function InviteCodeItem({ 
   code, 
+  index,
   copiedCode, 
   onCopyCode, 
   onCopyLink,
   formatDate 
 }: { 
   code: InviteCode; 
+  index: number;
   copiedCode: string | null;
   onCopyCode: (code: string) => void;
   onCopyLink: (code: string) => void;
@@ -312,60 +318,75 @@ function InviteCodeItem({
   const isLinkCopied = copiedCode === `link-${code.code}`;
 
   return (
-    <div className={`flex items-center gap-2 rounded-lg p-2 border ${
-      isUsed 
-        ? 'bg-background/10 border-border/50 opacity-60' 
-        : 'bg-background/30 border-primary/20'
-    }`}>
+    <motion.div 
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: index * 0.03 }}
+      className={`flex items-center gap-2 rounded-lg p-2 border transition-colors ${
+        isUsed 
+          ? 'bg-white/3 border-white/5 opacity-50' 
+          : 'bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/20 hover:border-purple-500/40'
+      }`}
+    >
+      {/* Número do slot */}
+      <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+        isUsed 
+          ? 'bg-white/10 text-white/30' 
+          : 'bg-purple-500/20 text-purple-300'
+      }`}>
+        {index}
+      </div>
+
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <Ticket className={`w-3 h-3 shrink-0 ${isUsed ? 'text-muted-foreground' : 'text-primary'}`} />
-          <span className={`font-mono text-sm ${isUsed ? 'text-muted-foreground line-through' : 'text-primary'}`}>
+          <span className={`font-mono text-xs tracking-wider ${isUsed ? 'text-white/30 line-through' : 'text-purple-200'}`}>
             {code.code}
           </span>
         </div>
-        <div className="text-[10px] text-muted-foreground mt-0.5">
+        <div className="text-[10px] text-white/30 mt-0.5">
           {isUsed ? (
-            <span>✅ Usado por <span className="text-foreground">{code.usedByName || '?'}</span> • {formatDate(code.usedAt!)}</span>
+            <span>
+              ✅ <span className="text-white/50">{code.usedByName || '?'}</span> • {formatDate(code.usedAt!)}
+            </span>
           ) : (
-            <span>🟢 Livre • {formatDate(code.createdAt)}</span>
+            <span className="text-emerald-400/60">● disponível</span>
           )}
         </div>
       </div>
 
       {!isUsed && (
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-0.5 shrink-0">
           <motion.div
-            animate={isCopied ? { scale: [1, 1.2, 1] } : {}}
+            animate={isCopied ? { scale: [1, 1.3, 1] } : {}}
             transition={{ duration: 0.3 }}
           >
             <Button
               variant="ghost"
               size="icon"
               onClick={() => onCopyCode(code.code)}
-              className="h-7 w-7"
+              className="h-7 w-7 text-white/40 hover:text-white"
               title="Copiar código"
             >
-              {isCopied ? <Check className="w-3 h-3 text-primary" /> : <Copy className="w-3 h-3" />}
+              {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
             </Button>
           </motion.div>
           <motion.div
-            animate={isLinkCopied ? { scale: [1, 1.2, 1] } : {}}
+            animate={isLinkCopied ? { scale: [1, 1.3, 1] } : {}}
             transition={{ duration: 0.3 }}
           >
             <Button
               variant="ghost"
               size="icon"
               onClick={() => onCopyLink(code.code)}
-              className="h-7 w-7"
-              title="Copiar link"
+              className="h-7 w-7 text-white/40 hover:text-white"
+              title="Copiar link de convite"
             >
-              {isLinkCopied ? <Check className="w-3 h-3 text-primary" /> : <Share2 className="w-3 h-3" />}
+              {isLinkCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
             </Button>
           </motion.div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -373,24 +394,24 @@ function InviteCodeItem({
 
 function ReferralItem({ referral, formatDate }: { referral: ReferralEntry; formatDate: (d: string) => string }) {
   return (
-    <div className="flex items-center gap-3 bg-background/20 rounded-lg p-2">
-      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/30 to-secondary/30 flex items-center justify-center text-base shrink-0">
+    <div className="flex items-center gap-3 bg-white/5 rounded-lg p-2">
+      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500/30 to-pink-500/30 flex items-center justify-center text-base shrink-0">
         {referral.invitedEmoji}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-foreground truncate">{referral.invitedName}</div>
-        <div className="text-xs text-muted-foreground">{formatDate(referral.createdAt)}</div>
+        <div className="text-sm font-medium text-white truncate">{referral.invitedName}</div>
+        <div className="text-xs text-white/40">{formatDate(referral.createdAt)}</div>
       </div>
       <div className="shrink-0">
         {referral.rewardCredited ? (
-          <div className="flex items-center gap-1 text-primary text-xs">
+          <div className="flex items-center gap-1 text-emerald-400 text-xs">
             <Check className="w-3 h-3" />
-            <span>k${referral.rewardAmount}</span>
+            <span>{formatEnergy(referral.rewardAmount)}</span>
           </div>
         ) : (
-          <div className="flex items-center gap-1 text-accent-foreground text-xs">
+          <div className="flex items-center gap-1 text-yellow-400 text-xs">
             <Clock className="w-3 h-3" />
-            <span>k${referral.rewardAmount}</span>
+            <span>{formatEnergy(referral.rewardAmount)}</span>
           </div>
         )}
       </div>
