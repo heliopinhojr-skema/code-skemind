@@ -29,6 +29,7 @@ import { ReferralHistoryPanel } from './ReferralHistoryPanel';
 import { CreatorDescendancyPanel } from './CreatorDescendancyPanel';
 import { TransferPanel } from './TransferPanel';
 import { PlayerGameHistory } from './PlayerGameHistory';
+import { GenerationColorPicker } from './GenerationColorPicker';
 import universeBg from '@/assets/universe-bg.jpg';
 import skemaNebula from '@/assets/skema-nebula.jpeg';
 
@@ -724,6 +725,13 @@ export function SkemaLobby({
               </TabsContent>
             </Tabs>
           </motion.section>
+
+          {/* Cor de Geração (Criador sem cor escolhida) */}
+          {['Criador', 'guardiao'].includes(player.playerTier) && !player.generationColor && (
+            <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.24 }} className="mx-4 mt-4">
+              <GenerationColorPicker playerId={player.id} onColorChosen={() => onRefreshProfile()} />
+            </motion.section>
+          )}
 
           {/* Descendência (Criador+) */}
           <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="mx-4 mt-4">

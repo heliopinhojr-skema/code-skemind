@@ -297,6 +297,7 @@ export type Database = {
           created_at: string
           emoji: string
           energy: number
+          generation_color: string | null
           id: string
           invite_code: string
           invited_by: string | null
@@ -316,6 +317,7 @@ export type Database = {
           created_at?: string
           emoji?: string
           energy?: number
+          generation_color?: string | null
           id?: string
           invite_code: string
           invited_by?: string | null
@@ -335,6 +337,7 @@ export type Database = {
           created_at?: string
           emoji?: string
           energy?: number
+          generation_color?: string | null
           id?: string
           invite_code?: string
           invited_by?: string | null
