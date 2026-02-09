@@ -63,6 +63,8 @@ export function useTournament() {
   
   const botSimulationRef = useRef<TournamentResult[]>([]);
   const revealIntervalRef = useRef<number | null>(null);
+  // Ref para pool ativo - previne race conditions com state batching
+  const activePoolRef = useRef<number>(0);
   
   // Inicializa jogadores no lobby
   const initializeLobby = useCallback(() => {
@@ -84,16 +86,21 @@ export function useTournament() {
       };
     });
     
+    const pool = calculateArenaPool(buyIn, rakeFee, botCount);
     setPlayers([humanPlayer, ...bots]);
     setStatus('lobby');
     setResults(new Map());
     setHumanSecretCode([]);
-    setArenaPool(calculateArenaPool(buyIn, rakeFee, botCount));
+    setArenaPool(pool);
+    activePoolRef.current = pool;
   }, [humanPlayerId, botCount, buyIn, rakeFee]);
   
+  // Inicializa apenas no mount - NÃO re-executa quando deps mudam
+  // (evita race condition onde initializeLobby reseta status/pool durante o jogo)
   useEffect(() => {
     initializeLobby();
-  }, [initializeLobby]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
   // Calcula o total de prêmios dos bots a partir dos resultados
   const calculateBotPrizesTotal = useCallback((allResults: TournamentResult[], pool: number) => {
@@ -157,8 +164,10 @@ export function useTournament() {
       console.log('[TOURNAMENT] ✅ Arena entry processed:', data);
     
       const symbolIds = UI_SYMBOLS.map(s => s.id);
-      const pool = calculateArenaPool(effectiveBuyIn, effectiveRakeFee, effectiveBotCount);
+      // Usa o pool retornado pelo backend para garantir consistência
+      const pool = data.total_pool ?? calculateArenaPool(effectiveBuyIn, effectiveRakeFee, effectiveBotCount);
       setArenaPool(pool);
+      activePoolRef.current = pool;
       
       // Gera código secreto ÚNICO para o humano
       const humanSecret = generateSecret(symbolIds);
@@ -339,7 +348,8 @@ export function useTournament() {
     setStatus('finished');
 
     // ── Processa economia via Edge Function ──
-    const pool = arenaPool;
+    // Usa ref para pool ativo - imune a race conditions do React state
+    const pool = activePoolRef.current || arenaPool;
     const humanResult = rankedResults.find(r => r.playerId === humanPlayerId)!;
     const humanPrize = isITM(humanResult.rank)
       ? getScaledArenaPrize(humanResult.rank, pool)
