@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { SkemaPlayer, getSkemaHour, PlayerTier } from '@/hooks/useSupabasePlayer';
-import { useOfficialRace } from '@/hooks/useOfficialRace';
+import { useOfficialRaces } from '@/hooks/useOfficialRace';
 import { useOpenArenas, ArenaListing } from '@/hooks/useArenaListings';
 import { calculateArenaPool, getScaledArenaPrize } from '@/lib/arenaPayouts';
 import { OnlinePlayer } from '@/hooks/useOnlinePlayers';
@@ -170,7 +170,7 @@ export function SkemaLobby({
   onRefreshProfile,
   skemaBox,
 }: SkemaLobbyProps) {
-  const officialRace = useOfficialRace();
+  const { races: officialRaces, isLoading: racesLoading, refresh: refreshRaces } = useOfficialRaces();
   const { data: openArenas, isLoading: arenasLoading } = useOpenArenas();
   const { onlinePlayers, isConnected, updateStatus, onlineCount } = onlinePresence;
   const skemaHour = getSkemaHour();
@@ -192,8 +192,7 @@ export function SkemaLobby({
     })), []
   );
 
-  const canAffordOfficial = officialRace.isLoaded ? Math.round(player.energy * 100) >= Math.round(officialRace.constants.entryFee * 100) : false;
-  const isPlayerRegisteredInRace = officialRace.race ? officialRace.actions.isPlayerRegistered(player.id) : false;
+  // removed single-race vars, now handled per-race in the list
 
   // Default arena (k$0.55)
   const DEFAULT_ENTRY_CENTS = 55;
@@ -544,134 +543,148 @@ export function SkemaLobby({
               {/* ─── Torneios (Corridas Oficiais) ─── */}
               <TabsContent value="tournaments" className="mt-3 space-y-3">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-white/50">Torneios agendados</span>
+                  <span className="text-xs text-white/50">Torneios agendados ({officialRaces.length})</span>
                   <span className="text-xs text-white/30">Multiplayer</span>
                 </div>
 
-                {officialRace.race ? (
-                  <div className="rounded-xl bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 p-4 space-y-4">
-                    {/* Info */}
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-lg font-bold text-white flex items-center gap-2">
-                          <Crown className="w-5 h-5 text-yellow-400" />
-                          {officialRace.race.name}
-                        </div>
-                        <div className="text-sm text-white/60">{officialRace.formattedDate}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xs text-white/50">Início em</div>
-                        <div className="text-lg font-bold text-yellow-400 tabular-nums">{officialRace.timeUntilRace}</div>
-                      </div>
-                    </div>
-                    
-                    {/* Economia */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="bg-black/30 rounded-lg p-2 text-center">
-                        <div className="text-xs text-white/50">Buy-in</div>
-                        <div className="font-bold text-white">k${officialRace.constants.entryFee.toFixed(2)}</div>
-                      </div>
-                      <div className="bg-black/30 rounded-lg p-2 text-center">
-                        <div className="text-xs text-white/50">Prêmio/Player</div>
-                        <div className="font-bold text-green-400">k${officialRace.constants.prizePerPlayer.toFixed(2)}</div>
-                      </div>
-                      <div className="bg-black/30 rounded-lg p-2 text-center">
-                        <div className="text-xs text-white/50">Rake</div>
-                        <div className="font-bold text-purple-400">k${officialRace.constants.skemaBoxFee.toFixed(2)}</div>
-                      </div>
-                    </div>
-                    
-                    {/* Pool */}
-                    <div className="bg-black/30 rounded-lg p-3 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Trophy className="w-5 h-5 text-yellow-400" />
-                        <span className="text-white/80">Pote Atual</span>
-                      </div>
-                      <span className="text-xl font-bold text-yellow-400">k${officialRace.prizePool.toFixed(2)}</span>
-                    </div>
-                    
-                    {/* Inscritos */}
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Users className="w-4 h-4 text-white/60" />
-                        <span className="text-sm text-white/80">
-                          {officialRace.race.registeredPlayers.length}/{officialRace.constants.maxPlayers} inscritos
-                        </span>
-                      </div>
-                      {officialRace.race.registeredPlayers.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5">
-                          {officialRace.race.registeredPlayers.map((p) => (
-                            <span
-                              key={p.id}
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${
-                                p.id === player.id ? 'bg-green-500/20 border border-green-500/50 text-green-400' : 'bg-white/10 text-white/70'
-                              }`}
-                            >
-                              {p.emoji} {p.name}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Botão */}
-                    {!isPlayerRegisteredInRace ? (
-                      <Button
-                        onClick={async () => {
-                          if (!canAffordOfficial) {
-                            setError('Energia insuficiente');
-                            return;
-                          }
-                          const entryFee = Math.round(officialRace.constants.entryFee * 100) / 100;
-                          const skemaBoxFee = Math.round(officialRace.constants.skemaBoxFee * 100) / 100;
-                          const deducted = onDeductEnergy(entryFee);
-                          if (!deducted) {
-                            setError('Falha ao deduzir energia');
-                            return;
-                          }
-                          const result = officialRace.actions.registerPlayer({
-                            id: player.id, name: player.name, emoji: player.emoji,
-                          });
-                          if (!result.success) {
-                            onAddEnergy(entryFee);
-                            setError(result.error || 'Erro ao inscrever');
-                          } else {
-                            await skemaBox.addToBox(skemaBoxFee, 'official_rake');
-                          }
-                        }}
-                        disabled={!canAffordOfficial}
-                        className="w-full"
-                      >
-                        <UserCheck className="w-4 h-4 mr-2" />
-                        Inscrever-se (k${officialRace.constants.entryFee.toFixed(2)})
-                      </Button>
-                    ) : (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-center gap-2 p-3 bg-green-500/10 border border-green-500/30 rounded-lg text-green-400">
-                          <UserCheck className="w-5 h-5" />
-                          <span className="font-medium">Você está inscrito!</span>
-                        </div>
-                        <Button
-                          onClick={async () => {
-                            const entryFee = Math.round(officialRace.constants.entryFee * 100) / 100;
-                            const skemaBoxFee = Math.round(officialRace.constants.skemaBoxFee * 100) / 100;
-                            const result = officialRace.actions.unregisterPlayer(player.id);
-                            if (result.success) {
-                              onAddEnergy(entryFee);
-                              await skemaBox.subtractFromBox(skemaBoxFee, 'official_refund');
-                              setError(null);
-                            } else {
-                              setError(result.error || 'Erro ao cancelar');
-                            }
-                          }}
-                          variant="outline"
-                          className="w-full text-red-400 border-red-500/30 hover:bg-red-500/10"
-                        >
-                          Cancelar Inscrição (+k${officialRace.constants.entryFee.toFixed(2)})
-                        </Button>
-                      </div>
-                    )}
+                {racesLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-5 h-5 animate-spin text-white/30" />
                   </div>
+                ) : officialRaces.length > 0 ? (
+                  officialRaces.map((race) => {
+                    const isRegistered = race.registeredPlayers.some(p => p.id === player.id);
+                    const canAfford = Math.round(player.energy * 100) >= Math.round(race.entryFee * 100);
+                    const pool = race.registeredPlayers.length * race.prizePerPlayer;
+                    const timeUntil = (() => {
+                      const diff = race.scheduledDate.getTime() - Date.now();
+                      if (diff <= 0) return 'Iniciando...';
+                      const d = Math.floor(diff / 86400000);
+                      const h = Math.floor((diff % 86400000) / 3600000);
+                      const m = Math.floor((diff % 3600000) / 60000);
+                      if (d > 0) return `${d}d ${h}h`;
+                      if (h > 0) return `${h}h ${m}m`;
+                      return `${m}m`;
+                    })();
+
+                    return (
+                      <div key={race.id} className="rounded-xl bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-lg font-bold text-white flex items-center gap-2">
+                              <Crown className="w-5 h-5 text-yellow-400" />
+                              {race.name}
+                            </div>
+                            <div className="text-sm text-white/60">
+                              {race.scheduledDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xs text-white/50">Início em</div>
+                            <div className="text-lg font-bold text-yellow-400 tabular-nums">{timeUntil}</div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="bg-black/30 rounded-lg p-2 text-center">
+                            <div className="text-xs text-white/50">Buy-in</div>
+                            <div className="font-bold text-white">k${race.entryFee.toFixed(2)}</div>
+                          </div>
+                          <div className="bg-black/30 rounded-lg p-2 text-center">
+                            <div className="text-xs text-white/50">Prêmio/Player</div>
+                            <div className="font-bold text-green-400">k${race.prizePerPlayer.toFixed(2)}</div>
+                          </div>
+                          <div className="bg-black/30 rounded-lg p-2 text-center">
+                            <div className="text-xs text-white/50">Rake</div>
+                            <div className="font-bold text-purple-400">k${race.skemaBoxFee.toFixed(2)}</div>
+                          </div>
+                        </div>
+
+                        <div className="bg-black/30 rounded-lg p-3 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Trophy className="w-5 h-5 text-yellow-400" />
+                            <span className="text-white/80">Pote Atual</span>
+                          </div>
+                          <span className="text-xl font-bold text-yellow-400">k${pool.toFixed(2)}</span>
+                        </div>
+
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Users className="w-4 h-4 text-white/60" />
+                            <span className="text-sm text-white/80">
+                              {race.registeredPlayers.length}/{race.maxPlayers} inscritos
+                            </span>
+                          </div>
+                          {race.registeredPlayers.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                              {race.registeredPlayers.map((p) => (
+                                <span key={p.id} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${p.id === player.id ? 'bg-green-500/20 border border-green-500/50 text-green-400' : 'bg-white/10 text-white/70'}`}>
+                                  {p.emoji} {p.name}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {!isRegistered ? (
+                          <Button
+                            onClick={async () => {
+                              if (!canAfford) { setError('Energia insuficiente'); return; }
+                              const fee = Math.round(race.entryFee * 100) / 100;
+                              const sbFee = Math.round(race.skemaBoxFee * 100) / 100;
+                              const deducted = onDeductEnergy(fee);
+                              if (!deducted) { setError('Falha ao deduzir energia'); return; }
+                              const { error: regErr } = await supabase
+                                .from('race_registrations')
+                                .insert({ race_id: race.id, player_id: player.id });
+                              if (regErr) {
+                                onAddEnergy(fee);
+                                setError(regErr.message);
+                              } else {
+                                await skemaBox.addToBox(sbFee, 'official_rake');
+                                refreshRaces();
+                              }
+                            }}
+                            disabled={!canAfford}
+                            className="w-full"
+                          >
+                            <UserCheck className="w-4 h-4 mr-2" />
+                            Inscrever-se (k${race.entryFee.toFixed(2)})
+                          </Button>
+                        ) : (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-center gap-2 p-3 bg-green-500/10 border border-green-500/30 rounded-lg text-green-400">
+                              <UserCheck className="w-5 h-5" />
+                              <span className="font-medium">Você está inscrito!</span>
+                            </div>
+                            <Button
+                              onClick={async () => {
+                                const fee = Math.round(race.entryFee * 100) / 100;
+                                const sbFee = Math.round(race.skemaBoxFee * 100) / 100;
+                                const { error: delErr } = await supabase
+                                  .from('race_registrations')
+                                  .delete()
+                                  .eq('race_id', race.id)
+                                  .eq('player_id', player.id);
+                                if (!delErr) {
+                                  onAddEnergy(fee);
+                                  await skemaBox.subtractFromBox(sbFee, 'official_refund');
+                                  refreshRaces();
+                                  setError(null);
+                                } else {
+                                  setError(delErr.message || 'Erro ao cancelar');
+                                }
+                              }}
+                              variant="outline"
+                              className="w-full text-red-400 border-red-500/30 hover:bg-red-500/10"
+                            >
+                              Cancelar Inscrição (+k${race.entryFee.toFixed(2)})
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
                 ) : (
                   <div className="text-center py-8 text-white/30">
                     <Crown className="w-8 h-8 mx-auto mb-2 opacity-30" />
