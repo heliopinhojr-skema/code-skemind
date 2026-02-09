@@ -17,6 +17,7 @@ import { GameBoard } from '@/components/game/GameBoard';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trophy, Coins } from 'lucide-react';
 import { CosmicBackground } from '@/components/CosmicBackground';
+import { getScaledArenaPrize, isITM } from '@/lib/arenaPayouts';
 
 export default function Tournament() {
   const tournament = useTournament();
@@ -32,7 +33,13 @@ export default function Tournament() {
         game.state.score,
         game.state.timeRemaining
       );
-      tournament.actions.finishTournament();
+      // Passa dados diretamente para evitar bug de React 18 batching
+      tournament.actions.finishTournament({
+        status: game.state.status,
+        attempts: game.state.attempts,
+        score: game.state.score,
+        timeRemaining: game.state.timeRemaining,
+      });
     }
   }, [game.state.status, game.state.attempts, game.state.score, game.state.timeRemaining, tournament.state.status, tournament.actions]);
   
@@ -65,9 +72,8 @@ export default function Tournament() {
   
   const isFinished = tournament.state.status === 'finished';
   const humanResult = tournament.state.results.get(tournament.state.humanPlayerId);
-  const didWinPrize = isFinished && humanResult && humanResult.rank <= 4;
-  const prizeAmount = didWinPrize 
-    ? Math.floor(tournament.state.prizePool * [0.5, 0.25, 0.15, 0.1][humanResult!.rank - 1])
+  const prizeAmount = isFinished && humanResult && isITM(humanResult.rank)
+    ? getScaledArenaPrize(humanResult.rank, tournament.state.prizePool)
     : 0;
   
   // Mapa de símbolos para exibição

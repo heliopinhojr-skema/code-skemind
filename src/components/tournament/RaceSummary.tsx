@@ -9,11 +9,12 @@
  */
 
 import { motion } from 'framer-motion';
-import { Trophy, Target, Clock, Star, Users, TrendingUp, Medal, Zap, DollarSign } from 'lucide-react';
+import { Trophy, Target, Clock, Star, Users, TrendingUp, Medal, Zap, DollarSign, ChevronDown } from 'lucide-react';
 import { Symbol } from '@/components/game/Symbol';
 import type { TournamentPlayer, TournamentResult } from '@/hooks/useTournament';
 import type { GameSymbol } from '@/hooks/useGame';
-import { isITM, ITM_POSITIONS, getScaledArenaPrize } from '@/lib/arenaPayouts';
+import { isITM, ITM_POSITIONS, getScaledArenaPrize, getPayoutSummary } from '@/lib/arenaPayouts';
+import { useState } from 'react';
 
 interface RaceSummaryProps {
   humanResult: TournamentResult;
@@ -36,6 +37,7 @@ export function RaceSummary({
   totalPlayers,
   arenaPool = 50,
 }: RaceSummaryProps) {
+  const [showFullTable, setShowFullTable] = useState(false);
   const didWin = humanResult.status === 'won';
   const rank = humanResult.rank;
   
@@ -61,6 +63,9 @@ export function RaceSummary({
   const top5 = allResults
     .filter(r => r.rank <= 5)
     .sort((a, b) => a.rank - b.rank);
+
+  // Tabela de premiação completa
+  const payoutTable = getPayoutSummary(arenaPool);
 
   return (
     <motion.div
@@ -171,8 +176,11 @@ export function RaceSummary({
           transition={{ delay: 0.6, type: 'spring' }}
           className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 rounded-xl p-4 border border-yellow-500/30 text-center"
         >
-          <div className="text-sm text-yellow-400/80 mb-1">Prêmio Conquistado</div>
-          <div className="text-4xl font-black text-yellow-400">+{prizeAmount} K$</div>
+          <div className="text-sm text-yellow-400/80 mb-1">Prêmio Creditado ✅</div>
+          <div className="text-4xl font-black text-yellow-400">+k$ {prizeAmount.toFixed(2)}</div>
+          <div className="text-xs text-muted-foreground mt-1">
+            Já adicionado à sua conta
+          </div>
         </motion.div>
       )}
 
@@ -216,7 +224,7 @@ export function RaceSummary({
                   </span>
                   {prize > 0 && (
                     <div className="text-xs font-bold text-yellow-400">
-                      +k${prize.toFixed(2)}
+                      +k$ {prize.toFixed(2)}
                     </div>
                   )}
                 </div>
@@ -224,6 +232,76 @@ export function RaceSummary({
             );
           })}
         </div>
+      </motion.div>
+
+      {/* Tabela de Premiação Completa */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.9 }}
+        className="space-y-2"
+      >
+        <button
+          onClick={() => setShowFullTable(!showFullTable)}
+          className="flex items-center gap-2 text-xs text-muted-foreground hover:text-white transition-colors w-full"
+        >
+          <DollarSign className="w-3 h-3" />
+          <span>Tabela de Premiação Completa</span>
+          <span className="ml-auto text-white/40">Pool: k$ {arenaPool.toFixed(2)}</span>
+          <ChevronDown className={`w-3 h-3 transition-transform ${showFullTable ? 'rotate-180' : ''}`} />
+        </button>
+
+        {showFullTable && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            className="bg-white/5 rounded-xl border border-white/10 overflow-hidden"
+          >
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-white/10">
+                  <th className="text-left p-2 text-muted-foreground font-medium">Posição</th>
+                  <th className="text-right p-2 text-muted-foreground font-medium">Prêmio</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payoutTable.map((row, i) => {
+                  // Highlight the player's row
+                  const isPlayerRow = (
+                    (row.positions === `${rank}º`) || 
+                    (rank >= 11 && rank <= 15 && row.positions === '11º-15º') ||
+                    (rank >= 16 && rank <= 20 && row.positions === '16º-20º') ||
+                    (rank >= 21 && rank <= 25 && row.positions === '21º-25º')
+                  );
+                  
+                  return (
+                    <tr 
+                      key={i} 
+                      className={`border-b border-white/5 ${
+                        isPlayerRow ? 'bg-primary/20 font-bold' : ''
+                      }`}
+                    >
+                      <td className="p-2">
+                        {row.positions}
+                        {row.label && <span className="ml-1 text-yellow-400/70">{row.label}</span>}
+                        {isPlayerRow && <span className="ml-1 text-primary">← Você</span>}
+                      </td>
+                      <td className="p-2 text-right text-yellow-400">
+                        k$ {row.prizeEach.toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-white/20">
+                  <td className="p-2 font-bold text-muted-foreground">Total Pool</td>
+                  <td className="p-2 text-right font-bold text-yellow-400">k$ {arenaPool.toFixed(2)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </motion.div>
+        )}
       </motion.div>
     </motion.div>
   );
