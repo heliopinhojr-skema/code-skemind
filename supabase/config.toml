@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.process-arena-economy]
 verify_jwt = false
+
+[functions.transfer-energy]
+verify_jwt = false

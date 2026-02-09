@@ -8,9 +8,6 @@ import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { 
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
-} from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -209,147 +206,103 @@ export function GuardianUsersTable() {
           </TabsList>
         </Tabs>
 
-        {/* Table */}
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Jogador</TableHead>
-                <TableHead>Tier</TableHead>
-                <TableHead>Saldo Total</TableHead>
-                <TableHead className="text-orange-400">🔒 Bloqueado</TableHead>
-                <TableHead className="text-emerald-400">🔓 Disponível</TableHead>
-                <TableHead>Convites</TableHead>
-                <TableHead>Convidado por</TableHead>
-                <TableHead>Registro</TableHead>
-                {isMasterAdmin && <TableHead className="w-10"></TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}>
-                    {Array.from({ length: isMasterAdmin ? 9 : 8 }).map((_, j) => (
-                      <TableCell key={j}>
-                        <Skeleton className="h-6 w-20" />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              ) : filteredPlayers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={isMasterAdmin ? 9 : 8} className="text-center text-muted-foreground py-8">
-                    {search || tierFilter !== 'all' ? 'Nenhum usuário encontrado' : 'Nenhum usuário registrado'}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredPlayers.map((player) => {
-                  const tierConfig = getTierConfig(player.player_tier);
-                  const invitesSent = invitesSentMap.get(player.id) || 0;
-                  const balance = calculateBalanceBreakdown(Number(player.energy), player.player_tier, invitesSent);
+        {/* Compact Player Cards */}
+        <div className="space-y-1.5">
+          {isLoading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-muted/20">
+                <Skeleton className="h-8 w-8 rounded-full" />
+                <div className="flex-1 space-y-1">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-48" />
+                </div>
+              </div>
+            ))
+          ) : filteredPlayers.length === 0 ? (
+            <div className="text-center text-muted-foreground py-8 text-sm">
+              {search || tierFilter !== 'all' ? 'Nenhum usuário encontrado' : 'Nenhum usuário registrado'}
+            </div>
+          ) : (
+            filteredPlayers.map((player) => {
+              const tierConfig = getTierConfig(player.player_tier);
+              const invitesSent = invitesSentMap.get(player.id) || 0;
+              const balance = calculateBalanceBreakdown(Number(player.energy), player.player_tier, invitesSent);
+              
+              return (
+                <div
+                  key={player.id}
+                  className="flex items-center gap-3 p-2.5 rounded-lg border border-border/40 bg-card/50 hover:bg-primary/5 cursor-pointer transition-colors"
+                  onClick={() => {
+                    setSelectedPlayerId(player.id);
+                    setDrawerOpen(true);
+                  }}
+                >
+                  {/* Avatar */}
+                  <span className="text-xl flex-shrink-0">{player.emoji}</span>
                   
-                  return (
-                    <TableRow
-                      key={player.id}
-                      className="cursor-pointer hover:bg-primary/5"
-                      onClick={() => {
-                        setSelectedPlayerId(player.id);
-                        setDrawerOpen(true);
+                  {/* Info principal - nome + tier na mesma linha */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-medium text-sm truncate">{player.name}</span>
+                      <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-4 border ${tierConfig.color}`}>
+                        <span className="flex items-center gap-0.5">
+                          {tierConfig.icon}
+                          {tierConfig.label}
+                        </span>
+                      </Badge>
+                      {player.invited_by_name && (
+                        <span className="text-[10px] text-muted-foreground truncate">
+                          ← {player.invited_by_name}
+                        </span>
+                      )}
+                    </div>
+                    {/* Saldos + convites na segunda linha */}
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <span className="font-mono text-xs text-foreground/80 flex items-center gap-0.5">
+                        <Zap className="h-3 w-3 text-yellow-500" />
+                        {formatEnergy(balance.total)}
+                      </span>
+                      {balance.locked > 0 && (
+                        <>
+                          <span className="font-mono text-[10px] text-orange-400 flex items-center gap-0.5">
+                            <Lock className="h-2.5 w-2.5" />
+                            {formatEnergy(balance.locked)}
+                          </span>
+                          <span className="font-mono text-[10px] text-emerald-400 flex items-center gap-0.5">
+                            <Unlock className="h-2.5 w-2.5" />
+                            {formatEnergy(balance.available)}
+                          </span>
+                        </>
+                      )}
+                      {balance.maxInvites > 0 && (
+                        <span className="text-[10px] text-muted-foreground">
+                          📨 {balance.invitesSent}/{balance.maxInvites}
+                        </span>
+                      )}
+                      <span className="text-[10px] text-muted-foreground/60 ml-auto">
+                        {format(new Date(player.created_at), "dd/MM/yy", { locale: ptBR })}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Delete button */}
+                  {isMasterAdmin && player.player_tier !== 'master_admin' && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 flex-shrink-0 text-destructive/60 hover:text-destructive hover:bg-destructive/10"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteTarget({ id: player.id, name: player.name });
                       }}
                     >
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xl">{player.emoji}</span>
-                          <div>
-                            <span className="font-medium">{player.name}</span>
-                            <code className="text-[10px] bg-muted px-1 py-0.5 rounded text-muted-foreground ml-2">
-                              {player.invite_code}
-                            </code>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={`text-xs border ${tierConfig.color}`}>
-                          <span className="flex items-center gap-1">
-                            {tierConfig.icon}
-                            {tierConfig.label}
-                          </span>
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="font-mono">
-                          <Zap className="h-3 w-3 mr-1" />
-                          {formatEnergy(balance.total)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {balance.locked > 0 ? (
-                          <Badge variant="outline" className="font-mono text-orange-400 border-orange-400/30 bg-orange-400/5">
-                            <Lock className="h-3 w-3 mr-1" />
-                            {formatEnergy(balance.locked)}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground/50 text-xs">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="font-mono text-emerald-400 border-emerald-400/30 bg-emerald-400/5">
-                          <Unlock className="h-3 w-3 mr-1" />
-                          {formatEnergy(balance.available)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {balance.maxInvites > 0 ? (
-                          <div className="text-xs">
-                            <span className="font-medium">{balance.invitesSent}/{balance.maxInvites}</span>
-                            <div className="text-muted-foreground text-[10px]">
-                              {balance.slotsRemaining > 0 
-                                ? `${balance.slotsRemaining} slots × ${formatEnergy(balance.costPerInvite)}`
-                                : 'Todos usados'}
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground/50 text-xs">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {player.invited_by_name ? (
-                          <span className="text-muted-foreground text-xs">
-                            {player.invited_by_name}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground/50">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-xs text-muted-foreground">
-                          {format(new Date(player.created_at), "dd/MM/yy", { locale: ptBR })}
-                        </span>
-                      </TableCell>
-                      {isMasterAdmin && player.player_tier !== 'master_admin' && (
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-destructive/60 hover:text-destructive hover:bg-destructive/10"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeleteTarget({ id: player.id, name: player.name });
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      )}
-                      {isMasterAdmin && player.player_tier === 'master_admin' && (
-                        <TableCell />
-                      )}
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
       </CardContent>
     </Card>
