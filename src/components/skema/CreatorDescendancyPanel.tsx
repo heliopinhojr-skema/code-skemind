@@ -17,6 +17,8 @@ interface CreatorDescendancyPanelProps {
 }
 
 const TIER_CONFIG: Record<string, { label: string; emoji: string; color: string; mission: string }> = {
+  'Criador': { label: 'Criador', emoji: '🌟', color: 'text-amber-300', mission: 'Expandir o universo recrutando Grão Mestres estratégicos' },
+  'guardiao': { label: 'Criador', emoji: '🌟', color: 'text-amber-300', mission: 'Expandir o universo recrutando Grão Mestres estratégicos' },
   'Grão Mestre': { label: 'Grão Mestre', emoji: '👑', color: 'text-purple-300', mission: 'Recrutar Mestres que formem jogadores ativos e competitivos' },
   'grao_mestre': { label: 'Grão Mestre', emoji: '👑', color: 'text-purple-300', mission: 'Recrutar Mestres que formem jogadores ativos e competitivos' },
   'Mestre': { label: 'Mestre', emoji: '⚔️', color: 'text-blue-300', mission: 'Formar Booms que tragam Plofts engajados ao universo' },
@@ -155,7 +157,7 @@ export function CreatorDescendancyPanel({ playerId, playerTier }: CreatorDescend
 
   if (!isCreatorOrAbove) return null;
 
-  const tierDisplayOrder = ['Grão Mestre', 'Mestre', 'Boom', 'Ploft'];
+  const tierDisplayOrder = ['Criador', 'Grão Mestre', 'Mestre', 'Boom', 'Ploft'];
 
   return (
     <div className="bg-gradient-to-br from-amber-500/10 via-yellow-500/5 to-orange-500/10 border border-amber-500/20 rounded-xl overflow-hidden backdrop-blur-sm">
