@@ -1,7 +1,8 @@
 /**
  * Auth - Página de autenticação SKEMA (simplificada)
  * 
- * Dois fluxos:
+ * Três fases:
+ * 0. Welcome: tela cósmica com "toque para entrar"
  * 1. Novo Jogador: código convite → nome → PIN 4 dígitos → registrado
  * 2. Entrar: nickname + PIN 4 dígitos → logado
  * 
@@ -9,20 +10,20 @@
  * Guarda ascendência (invited_by) e descendência (referrals table).
  */
 
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { ArrowRight, AlertCircle, Sparkles, LogIn, UserPlus } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowRight, AlertCircle, Sparkles, LogIn, UserPlus, ShieldAlert } from 'lucide-react';
 import { REGEXP_ONLY_DIGITS } from 'input-otp';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { supabase } from '@/integrations/supabase/client';
 import skemaOrbit from '@/assets/skema-orbit.jpeg';
+import skemaGenesis from '@/assets/skema-genesis.jpeg';
 import { SplashScreen } from '@/components/SplashScreen';
 
 const SPLASH_SHOWN_KEY = 'skema_splash_shown';
-
 
 const makeAuthEmail = (nickname: string): string => {
   const safe = nickname.toLowerCase().trim()
@@ -45,6 +46,8 @@ export default function Auth() {
   const initialInvite = searchParams.get('convite') || searchParams.get('invite') || '';
   const savedNickname = useMemo(() => localStorage.getItem(NICKNAME_STORAGE_KEY) || '', []);
 
+  // Phase: 'welcome' → 'auth'
+  const [phase, setPhase] = useState<'welcome' | 'auth'>(initialInvite ? 'auth' : 'welcome');
   const [mode, setMode] = useState<'login' | 'register'>(initialInvite ? 'register' : 'login');
 
   // Register fields
@@ -70,7 +73,6 @@ export default function Auth() {
     setShowSplash(false);
     sessionStorage.setItem(SPLASH_SHOWN_KEY, '1');
   }, []);
-
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
@@ -147,7 +149,6 @@ export default function Auth() {
 
     setIsLoading(true);
     try {
-      // 1. Validate invite code
       const { data: validation, error: valErr } = await supabase.rpc('validate_invite_code', { p_code: code });
       if (valErr || !validation) {
         setError('Código de convite inválido');
@@ -166,7 +167,6 @@ export default function Auth() {
         return;
       }
 
-      // 2. Create auth user
       const { data: authData, error: signUpErr } = await supabase.auth.signUp({
         email: makeAuthEmail(name),
         password: makePinPassword(pin),
@@ -187,7 +187,6 @@ export default function Auth() {
         return;
       }
 
-      // 3. Create profile + referral (ascendência/descendência)
       const { error: profileErr } = await supabase.rpc('register_player', {
         p_name: name.trim(),
         p_emoji: '🎮',
@@ -203,10 +202,8 @@ export default function Auth() {
         return;
       }
 
-      // 4. Save PIN reference
       await supabase.from('profiles').update({ pin }).eq('user_id', authData.user.id);
 
-      // 5. Done
       localStorage.setItem(NICKNAME_STORAGE_KEY, name.trim());
       navigate('/', { replace: true });
     } catch {
@@ -219,163 +216,267 @@ export default function Auth() {
 
   const inputClass = "bg-card/80 border-border text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:ring-primary/20";
 
+  // Background image based on mode
+  const bgImage = mode === 'register' ? skemaGenesis : skemaOrbit;
+
   return (
     <div className="min-h-screen relative flex items-center justify-center">
       {/* Splash screen */}
       {showSplash && <SplashScreen onComplete={handleSplashComplete} />}
-      {/* Cosmic background */}
-      <div className="fixed inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${skemaOrbit})` }} />
-      <div className="fixed inset-0 bg-black/70 backdrop-blur-[1px]" />
+
+      {/* Cosmic background - switches based on mode */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={phase === 'welcome' ? 'welcome-bg' : mode}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.8 }}
+          className="fixed inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${phase === 'welcome' ? skemaOrbit : bgImage})` }}
+        />
+      </AnimatePresence>
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-[1px]" />
       
-      {/* Radial glow effect */}
-      <div className="fixed inset-0 bg-radial-gradient pointer-events-none" 
+      {/* Radial glow */}
+      <div className="fixed inset-0 pointer-events-none" 
         style={{ background: 'radial-gradient(ellipse at center, rgba(139,92,246,0.08) 0%, transparent 70%)' }} 
       />
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative z-10 w-full max-w-sm mx-4"
-      >
-        {/* Logo + Tagline */}
-        <div className="text-center mb-6">
-          <motion.h1 
-            initial={{ letterSpacing: '0.3em' }}
-            animate={{ letterSpacing: '0.15em' }}
-            transition={{ duration: 1.5, ease: 'easeOut' }}
-            className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-purple-200 to-purple-400"
-          >
-            SKEMA
-          </motion.h1>
-          <motion.p 
+      <AnimatePresence mode="wait">
+        {/* ========== WELCOME PHASE ========== */}
+        {phase === 'welcome' && (
+          <motion.div
+            key="welcome"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.5, duration: 1 }}
-            className="text-purple-300/60 text-xs mt-2 tracking-[0.15em] uppercase font-light"
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.5 }}
+            onClick={() => setPhase('auth')}
+            className="relative z-10 flex flex-col items-center justify-center text-center cursor-pointer select-none px-8"
           >
-            Cada escolha uma renúncia, uma consequência...
-          </motion.p>
-        </div>
+            {/* SKEMA title */}
+            <motion.h1
+              initial={{ opacity: 0, y: -30, letterSpacing: '0.5em' }}
+              animate={{ opacity: 1, y: 0, letterSpacing: '0.2em' }}
+              transition={{ delay: 0.3, duration: 1.2, ease: 'easeOut' }}
+              className="text-7xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-purple-200 to-purple-400 drop-shadow-2xl"
+            >
+              SKEMA
+            </motion.h1>
 
-        {/* Mode Toggle */}
-        <div className="flex gap-2 mb-4">
-          <Button
-            variant={mode === 'login' ? 'default' : 'outline'}
-            onClick={() => { setMode('login'); setError(null); }}
-            className="flex-1"
+            {/* Divider */}
+            <motion.div
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: 1 }}
+              transition={{ delay: 1, duration: 0.8, ease: 'easeInOut' }}
+              className="w-48 h-px bg-gradient-to-r from-transparent via-purple-400 to-transparent mt-4 mb-6"
+            />
+
+            {/* Tagline */}
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.4, duration: 1 }}
+              className="text-sm md:text-base tracking-[0.12em] uppercase text-purple-200/70 font-light max-w-sm"
+            >
+              Cada escolha uma renúncia,
+              <br />
+              uma consequência...
+            </motion.p>
+
+            {/* Tap to continue */}
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 0.7, 0] }}
+              transition={{ delay: 2.5, duration: 2, repeat: Infinity }}
+              className="mt-16 text-xs text-white/40 tracking-[0.2em] uppercase"
+            >
+              Toque para entrar
+            </motion.p>
+          </motion.div>
+        )}
+
+        {/* ========== AUTH PHASE ========== */}
+        {phase === 'auth' && (
+          <motion.div
+            key="auth"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="relative z-10 w-full max-w-sm mx-4"
           >
-            <LogIn className="w-4 h-4 mr-2" />
-            Entrar
-          </Button>
-          <Button
-            variant={mode === 'register' ? 'default' : 'outline'}
-            onClick={() => { setMode('register'); setError(null); }}
-            className="flex-1"
-          >
-            <UserPlus className="w-4 h-4 mr-2" />
-            Novo
-          </Button>
-        </div>
-
-        {/* Card */}
-        <div className="bg-card/60 backdrop-blur-xl border border-border/50 rounded-2xl p-6 space-y-4">
-          {mode === 'login' ? (
-            <>
-              <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Nickname</label>
-                <Input
-                  placeholder="Seu nickname"
-                  value={loginNickname}
-                  onChange={(e) => setLoginNickname(e.target.value)}
-                  className={inputClass}
-                  maxLength={15}
-                  autoComplete="username"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm text-muted-foreground mb-2 block">PIN (4 dígitos)</label>
-                <div className="flex justify-center">
-                  <InputOTP maxLength={4} pattern={REGEXP_ONLY_DIGITS} value={loginPin} onChange={setLoginPin}>
-                    <InputOTPGroup>
-                      {[0, 1, 2, 3].map(i => (
-                        <InputOTPSlot key={i} index={i} className="w-12 h-14 text-xl border-border bg-card/80" />
-                      ))}
-                    </InputOTPGroup>
-                  </InputOTP>
-                </div>
-              </div>
-
-              {error && <ErrorBox message={error} />}
-
-              <Button
-                onClick={handleLogin}
-                disabled={!loginNickname.trim() || loginPin.length !== 4 || isLoading}
-                className="w-full h-12"
+            {/* Logo + Tagline */}
+            <div className="text-center mb-6">
+              <motion.h1 
+                initial={{ letterSpacing: '0.3em' }}
+                animate={{ letterSpacing: '0.15em' }}
+                transition={{ duration: 1.5, ease: 'easeOut' }}
+                className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-purple-200 to-purple-400"
               >
-                {isLoading ? <Sparkles className="w-5 h-5 animate-spin" /> : <>Entrar <ArrowRight className="w-4 h-4 ml-2" /></>}
-              </Button>
-            </>
-          ) : (
-            <>
-              <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Código de Convite</label>
-                <Input
-                  placeholder="Ex: SKINV1A2B3C"
-                  value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                  className={`${inputClass} text-center tracking-wider`}
-                  maxLength={15}
-                  autoFocus
-                />
-              </div>
-
-              <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Escolha seu Nickname</label>
-                <Input
-                  placeholder="Seu nickname único"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className={inputClass}
-                  maxLength={15}
-                  autoComplete="off"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm text-muted-foreground mb-2 block">Crie um PIN (4 dígitos)</label>
-                <div className="flex justify-center">
-                  <InputOTP maxLength={4} pattern={REGEXP_ONLY_DIGITS} value={pin} onChange={setPin}>
-                    <InputOTPGroup>
-                      {[0, 1, 2, 3].map(i => (
-                        <InputOTPSlot key={i} index={i} className="w-12 h-14 text-xl border-border bg-card/80" />
-                      ))}
-                    </InputOTPGroup>
-                  </InputOTP>
-                </div>
-              </div>
-
-              <p className="text-xs text-muted-foreground text-center">
-                Lembre do nickname e PIN — é só isso pra voltar!
-              </p>
-
-              {error && <ErrorBox message={error} />}
-
-              <Button
-                onClick={handleRegister}
-                disabled={inviteCode.length < 4 || name.trim().length < 2 || pin.length !== 4 || isLoading}
-                className="w-full h-12"
+                SKEMA
+              </motion.h1>
+              <motion.p 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.5, duration: 1 }}
+                className="text-purple-300/60 text-xs mt-2 tracking-[0.15em] uppercase font-light"
               >
-                {isLoading ? <Sparkles className="w-5 h-5 animate-spin" /> : <>Entrar no SKEMA <ArrowRight className="w-4 h-4 ml-2" /></>}
-              </Button>
+                Cada escolha uma renúncia, uma consequência...
+              </motion.p>
+            </div>
 
-              <p className="text-xs text-muted-foreground text-center">
-                Não tem código? Peça a um amigo que já está no SKEMA!
-              </p>
-            </>
-          )}
-        </div>
-      </motion.div>
+            {/* Mode Toggle */}
+            <div className="flex gap-2 mb-4">
+              <Button
+                variant={mode === 'login' ? 'default' : 'outline'}
+                onClick={() => { setMode('login'); setError(null); }}
+                className="flex-1"
+              >
+                <LogIn className="w-4 h-4 mr-2" />
+                Entrar
+              </Button>
+              <Button
+                variant={mode === 'register' ? 'default' : 'outline'}
+                onClick={() => { setMode('register'); setError(null); }}
+                className="flex-1"
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                Novo
+              </Button>
+            </div>
+
+            {/* Card */}
+            <div className="bg-card/60 backdrop-blur-xl border border-border/50 rounded-2xl p-6 space-y-4">
+              <AnimatePresence mode="wait">
+                {mode === 'login' ? (
+                  <motion.div
+                    key="login-form"
+                    initial={{ opacity: 0, x: -15 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 15 }}
+                    transition={{ duration: 0.25 }}
+                    className="space-y-4"
+                  >
+                    <div>
+                      <label className="text-sm text-muted-foreground mb-1 block">Nickname</label>
+                      <Input
+                        placeholder="Seu nickname"
+                        value={loginNickname}
+                        onChange={(e) => setLoginNickname(e.target.value)}
+                        className={inputClass}
+                        maxLength={15}
+                        autoComplete="username"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm text-muted-foreground mb-2 block">PIN (4 dígitos)</label>
+                      <div className="flex justify-center">
+                        <InputOTP maxLength={4} pattern={REGEXP_ONLY_DIGITS} value={loginPin} onChange={setLoginPin}>
+                          <InputOTPGroup>
+                            {[0, 1, 2, 3].map(i => (
+                              <InputOTPSlot key={i} index={i} className="w-12 h-14 text-xl border-border bg-card/80" />
+                            ))}
+                          </InputOTPGroup>
+                        </InputOTP>
+                      </div>
+                    </div>
+
+                    {error && <ErrorBox message={error} />}
+
+                    <Button
+                      onClick={handleLogin}
+                      disabled={!loginNickname.trim() || loginPin.length !== 4 || isLoading}
+                      className="w-full h-12"
+                    >
+                      {isLoading ? <Sparkles className="w-5 h-5 animate-spin" /> : <>Entrar <ArrowRight className="w-4 h-4 ml-2" /></>}
+                    </Button>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="register-form"
+                    initial={{ opacity: 0, x: 15 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -15 }}
+                    transition={{ duration: 0.25 }}
+                    className="space-y-4"
+                  >
+                    {/* ⚠️ NO RECOVERY WARNING */}
+                    <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-3 flex items-start gap-2.5">
+                      <ShieldAlert className="w-5 h-5 text-yellow-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-semibold text-yellow-300">
+                          Sem recuperação de conta
+                        </p>
+                        <p className="text-[11px] text-yellow-200/70 mt-0.5 leading-relaxed">
+                          Não existe "esqueci minha senha". Guarde seu <strong>Nickname</strong> e <strong>PIN</strong> em local seguro. Se perder, não há como recuperar.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-sm text-muted-foreground mb-1 block">Código de Convite</label>
+                      <Input
+                        placeholder="Ex: SKINV1A2B3C"
+                        value={inviteCode}
+                        onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                        className={`${inputClass} text-center tracking-wider`}
+                        maxLength={15}
+                        autoFocus
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm text-muted-foreground mb-1 block">Escolha seu Nickname</label>
+                      <Input
+                        placeholder="Seu nickname único"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className={inputClass}
+                        maxLength={15}
+                        autoComplete="off"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm text-muted-foreground mb-2 block">Crie um PIN (4 dígitos)</label>
+                      <div className="flex justify-center">
+                        <InputOTP maxLength={4} pattern={REGEXP_ONLY_DIGITS} value={pin} onChange={setPin}>
+                          <InputOTPGroup>
+                            {[0, 1, 2, 3].map(i => (
+                              <InputOTPSlot key={i} index={i} className="w-12 h-14 text-xl border-border bg-card/80" />
+                            ))}
+                          </InputOTPGroup>
+                        </InputOTP>
+                      </div>
+                    </div>
+
+                    {/* Reminder after PIN */}
+                    <p className="text-[11px] text-center text-muted-foreground/80 leading-relaxed">
+                      ⚠️ Anote agora: <strong>Nickname</strong> + <strong>PIN</strong> = seu único acesso. Nunca esqueça!
+                    </p>
+
+                    {error && <ErrorBox message={error} />}
+
+                    <Button
+                      onClick={handleRegister}
+                      disabled={inviteCode.length < 4 || name.trim().length < 2 || pin.length !== 4 || isLoading}
+                      className="w-full h-12"
+                    >
+                      {isLoading ? <Sparkles className="w-5 h-5 animate-spin" /> : <>Entrar no SKEMA <ArrowRight className="w-4 h-4 ml-2" /></>}
+                    </Button>
+
+                    <p className="text-xs text-muted-foreground text-center">
+                      Não tem código? Peça a um amigo que já está no SKEMA!
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
