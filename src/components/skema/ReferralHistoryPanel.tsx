@@ -389,6 +389,7 @@ function InviteCodeItem({
           {isUsed ? (
             <span className="text-emerald-300/80">
               ✅ convite aceito e em uso por <span className="text-white/70 font-semibold">{code.usedByName || '?'}</span>
+              {code.usedAt && <span className="text-white/30 ml-1">• {new Date(code.usedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>}
             </span>
           ) : isPending ? (
             <span className="text-amber-400/80 flex items-center gap-1">
