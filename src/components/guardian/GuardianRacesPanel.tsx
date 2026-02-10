@@ -49,19 +49,15 @@ interface GuardianRacesPanelProps {
 }
 
 // Pre-defined training configurations
-const TRAINING_CONFIGS = [
-  { label: '3 Bots (Rápido)', bots: 3, description: 'Treino rápido contra 3 bots' },
-  { label: '9 Bots (Arena)', bots: 9, description: 'Simula uma Arena x Bots padrão' },
-  { label: '19 Bots (Médio)', bots: 19, description: 'Corrida média com 19 bots' },
-  { label: '49 Bots (Grande)', bots: 49, description: 'Corrida grande com 49 bots' },
-  { label: '99 Bots (Massiva)', bots: 99, description: 'Corrida massiva com 99 bots' },
-];
+// Training configs removed — now uses custom bot count dialog
 
 export function GuardianRacesPanel({ isMasterAdmin }: GuardianRacesPanelProps) {
   const { data: races, isLoading, error } = useOfficialRaces();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [isCreating, setIsCreating] = useState(false);
+  const [isCreatingTraining, setIsCreatingTraining] = useState(false);
+  const [trainingBotCount, setTrainingBotCount] = useState('9');
   const [raceType, setRaceType] = useState<'official' | 'training'>('official');
   const [newRace, setNewRace] = useState({
     name: '',
@@ -155,42 +151,67 @@ export function GuardianRacesPanel({ isMasterAdmin }: GuardianRacesPanelProps) {
 
   return (
     <div className="space-y-6">
-      {/* Training Section - sempre visível para admin */}
+      {/* Training Section - link para criar treino */}
       {isMasterAdmin && (
         <Card className="bg-card/90 backdrop-blur-sm border-amber-500/30">
           <CardHeader>
-            <CardTitle className="text-lg font-semibold flex items-center gap-2">
-              <Bot className="h-5 w-5 text-amber-400" />
-              Corridas Treino (vs Bots)
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                <Bot className="h-5 w-5 text-amber-400" />
+                Corridas Treino (vs Bots)
+              </CardTitle>
+              <Dialog open={isCreatingTraining} onOpenChange={setIsCreatingTraining}>
+                <DialogTrigger asChild>
+                  <Button size="sm" variant="outline" className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Criar Treino
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[320px]">
+                  <DialogHeader>
+                    <DialogTitle>Criar Corrida Treino</DialogTitle>
+                    <DialogDescription>
+                      Sem custo de energia. Resultados não contam no ranking.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="training-bots">Número de Bots</Label>
+                      <Input
+                        id="training-bots"
+                        type="number"
+                        min="3"
+                        max="99"
+                        value={trainingBotCount}
+                        onChange={(e) => setTrainingBotCount(e.target.value)}
+                        placeholder="3 a 99"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsCreatingTraining(false)}>Cancelar</Button>
+                    <Button 
+                      onClick={() => {
+                        const bots = parseInt(trainingBotCount);
+                        if (bots >= 3 && bots <= 99) {
+                          handleStartTraining(bots);
+                          setIsCreatingTraining(false);
+                          setTrainingBotCount('9');
+                        }
+                      }}
+                      disabled={!trainingBotCount || parseInt(trainingBotCount) < 3 || parseInt(trainingBotCount) > 99}
+                    >
+                      <Play className="h-4 w-4 mr-1" />
+                      Iniciar
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
             <p className="text-sm text-muted-foreground">
               Corridas de teste sem custo de energia. Resultados não contam no ranking oficial.
             </p>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-              {TRAINING_CONFIGS.map((config) => (
-                <Button
-                  key={config.bots}
-                  variant="outline"
-                  className="h-auto flex-col gap-2 py-4 border-amber-500/20 hover:border-amber-500/50 hover:bg-amber-500/10"
-                  onClick={() => handleStartTraining(config.bots)}
-                >
-                  <div className="flex items-center gap-1">
-                    <Bot className="h-4 w-4 text-amber-400" />
-                    <span className="font-bold text-lg">{config.bots}</span>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground text-center">
-                    {config.description}
-                  </span>
-                  <div className="flex items-center gap-1 text-[10px] text-amber-400">
-                    <Play className="h-3 w-3" />
-                    Iniciar
-                  </div>
-                </Button>
-              ))}
-            </div>
-          </CardContent>
         </Card>
       )}
 

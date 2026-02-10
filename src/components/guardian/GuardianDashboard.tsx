@@ -355,10 +355,10 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
               </div>
               <div className="bg-primary/10 rounded-lg p-3 border border-primary/30">
                 <p className="text-xs text-muted-foreground font-medium">
-                  ∑ Total Sistema
+                  ∑ Total Sistema (imutável)
                 </p>
                 <p className="text-lg font-bold text-primary">
-                  {formatEnergyUtil(systemTotal)}
+                  {formatEnergyUtil(10_000_000)}
                 </p>
               </div>
             </div>

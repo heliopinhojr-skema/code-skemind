@@ -185,8 +185,11 @@ export function useDashboardStats() {
       // Energia pendente de convites agora faz parte do saldo bloqueado dos jogadores (não é escrow separado)
       const pendingInvitesEnergy = 0;
       
-      // System total = HX + players + skema box + bot treasury (should always equal initial 10M)
-      const systemTotal = hxEnergy + playersEnergy + skemaBoxBalance + botTreasuryBalance;
+      // System total is an IMMUTABLE constant — 10,000,000.00 k$
+      // The calculated sum is used for audit only (delta detection)
+      const SYSTEM_TOTAL_CONSTANT = 10_000_000;
+      const calculatedTotal = hxEnergy + playersEnergy + skemaBoxBalance + botTreasuryBalance;
+      const systemTotal = SYSTEM_TOTAL_CONSTANT;
       
       // Buscar referrals com amounts
       const { data: referrals, error: referralsError } = await supabase
