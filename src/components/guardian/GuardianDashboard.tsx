@@ -353,17 +353,6 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
                   {formatEnergyUtil(stats?.skemaBoxBalance || 0)}
                 </p>
               </div>
-              <div className="bg-background/60 rounded-lg p-3 border border-border/40">
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  🧬 Em Transformação
-                </p>
-                <p className="text-lg font-bold text-foreground">
-                  {formatEnergyUtil(stats?.pendingInvitesEnergy || 0)}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  convites enviados
-                </p>
-              </div>
               <div className="bg-primary/10 rounded-lg p-3 border border-primary/30">
                 <p className="text-xs text-muted-foreground font-medium">
                   ∑ Total Sistema
