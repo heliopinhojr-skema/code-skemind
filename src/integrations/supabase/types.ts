@@ -217,6 +217,7 @@ export type Database = {
           created_at: string
           creator_id: string
           id: string
+          shared_at: string | null
           used_at: string | null
           used_by_id: string | null
         }
@@ -225,6 +226,7 @@ export type Database = {
           created_at?: string
           creator_id: string
           id?: string
+          shared_at?: string | null
           used_at?: string | null
           used_by_id?: string | null
         }
@@ -233,6 +235,7 @@ export type Database = {
           created_at?: string
           creator_id?: string
           id?: string
+          shared_at?: string | null
           used_at?: string | null
           used_by_id?: string | null
         }
@@ -564,6 +567,10 @@ export type Database = {
         Args: { p_player_id: string; p_status: string }
         Returns: undefined
       }
+      cancel_invite_code: {
+        Args: { p_code_id: string; p_player_id: string }
+        Returns: undefined
+      }
       choose_generation_color: {
         Args: { p_color: string; p_player_id: string }
         Returns: undefined
@@ -589,6 +596,10 @@ export type Database = {
           p_new_tier: string
           p_target_user_id: string
         }
+        Returns: undefined
+      }
+      share_invite_code: {
+        Args: { p_code_id: string; p_player_id: string }
         Returns: undefined
       }
       update_bot_treasury: {
