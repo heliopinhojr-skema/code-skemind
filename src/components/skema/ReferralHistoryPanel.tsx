@@ -35,6 +35,7 @@ export function ReferralHistoryPanel({
   const { codes, isLoading: codesLoading, isAutoGenerating, error: codesError, unusedCount, usedCount, refetch: refetchCodes } = useInviteCodes(playerId, playerTier);
   
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [sharedCodes, setSharedCodes] = useState<Set<string>>(new Set());
   const [isCardExpanded, setIsCardExpanded] = useState(false);
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -49,6 +50,7 @@ export function ReferralHistoryPanel({
     try {
       await navigator.clipboard.writeText(code);
       setCopiedCode(code);
+      setSharedCodes(prev => new Set(prev).add(code));
       toast({
         title: '✅ Código copiado!',
         description: `${code} — envie para seu convidado.`,
@@ -64,6 +66,7 @@ export function ReferralHistoryPanel({
     try {
       await navigator.clipboard.writeText(link);
       setCopiedCode(`link-${code}`);
+      setSharedCodes(prev => new Set(prev).add(code));
       toast({
         title: '✅ Link copiado!',
         description: 'Envie para seu convidado.',
@@ -209,6 +212,7 @@ export function ReferralHistoryPanel({
                       code={code}
                       index={index + 1}
                       copiedCode={copiedCode}
+                      isShared={sharedCodes.has(code.code)}
                       onCopyCode={handleCopyCode}
                       onCopyLink={handleCopyLink}
                       formatDate={formatDate}
@@ -302,6 +306,7 @@ function InviteCodeItem({
   code, 
   index,
   copiedCode, 
+  isShared,
   onCopyCode, 
   onCopyLink,
   formatDate 
@@ -309,6 +314,7 @@ function InviteCodeItem({
   code: InviteCode; 
   index: number;
   copiedCode: string | null;
+  isShared: boolean;
   onCopyCode: (code: string) => void;
   onCopyLink: (code: string) => void;
   formatDate: (d: string) => string;
@@ -316,6 +322,7 @@ function InviteCodeItem({
   const isUsed = !!code.usedById;
   const isCopied = copiedCode === code.code;
   const isLinkCopied = copiedCode === `link-${code.code}`;
+  const isPending = !isUsed && isShared;
 
   return (
     <motion.div 
@@ -325,21 +332,25 @@ function InviteCodeItem({
       className={`flex items-center gap-2 rounded-lg p-2 border transition-colors ${
         isUsed 
           ? 'bg-white/3 border-white/5 opacity-50' 
-          : 'bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/20 hover:border-purple-500/40'
+          : isPending
+            ? 'bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border-amber-500/20'
+            : 'bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/20 hover:border-purple-500/40'
       }`}
     >
       {/* Número do slot */}
       <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
         isUsed 
           ? 'bg-white/10 text-white/30' 
-          : 'bg-purple-500/20 text-purple-300'
+          : isPending
+            ? 'bg-amber-500/20 text-amber-300'
+            : 'bg-purple-500/20 text-purple-300'
       }`}>
         {index}
       </div>
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <span className={`font-mono text-xs tracking-wider ${isUsed ? 'text-white/30 line-through' : 'text-purple-200'}`}>
+          <span className={`font-mono text-xs tracking-wider ${isUsed ? 'text-white/30 line-through' : isPending ? 'text-amber-200' : 'text-purple-200'}`}>
             {code.code}
           </span>
         </div>
@@ -347,6 +358,10 @@ function InviteCodeItem({
           {isUsed ? (
             <span>
               ✅ <span className="text-white/50">{code.usedByName || '?'}</span> • {formatDate(code.usedAt!)}
+            </span>
+          ) : isPending ? (
+            <span className="text-amber-400/80 flex items-center gap-1">
+              <Clock className="w-2.5 h-2.5" /> em aceitação
             </span>
           ) : (
             <span className="text-emerald-400/60">● disponível</span>
@@ -389,6 +404,8 @@ function InviteCodeItem({
     </motion.div>
   );
 }
+
+// ==================== Componente de item referral ====================
 
 // ==================== Componente de item referral ====================
 
