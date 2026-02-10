@@ -104,8 +104,11 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
   const [recentJoins, setRecentJoins] = useState<{ name: string; emoji: string; tier: string; time: string }[]>([]);
 
   useEffect(() => {
-    // Count today's players on mount
-    const today = new Date().toISOString().slice(0, 10);
+    // Get local day boundaries in UTC for correct timezone filtering
+    const localStart = new Date();
+    localStart.setHours(0, 0, 0, 0);
+    const todayStartUTC = localStart.toISOString();
+
     supabase
       .from('profiles')
       .select('id, name, emoji, player_tier, created_at')
@@ -114,7 +117,7 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
       .limit(20)
       .then(({ data }) => {
         if (data) {
-          const todayPlayers = data.filter(p => p.created_at >= today + 'T00:00:00');
+          const todayPlayers = data.filter(p => p.created_at >= todayStartUTC);
           setNewPlayersToday(todayPlayers.length);
           setRecentJoins(data.slice(0, 5).map(p => ({
             name: p.name, emoji: p.emoji,
