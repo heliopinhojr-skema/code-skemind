@@ -16,6 +16,7 @@ export interface InviteCode {
   createdAt: string;
   usedById: string | null;
   usedAt: string | null;
+  sharedAt: string | null;
   /** Nome do convidado que usou o código (join) */
   usedByName?: string;
 }
@@ -27,7 +28,10 @@ interface UseInviteCodesResult {
   error: string | null;
   unusedCount: number;
   usedCount: number;
+  sharedCount: number;
   refetch: () => Promise<void>;
+  shareCode: (codeId: string) => Promise<boolean>;
+  cancelCode: (codeId: string) => Promise<boolean>;
 }
 
 export function useInviteCodes(profileId: string | null, playerTier: string | null): UseInviteCodesResult {
@@ -55,6 +59,7 @@ export function useInviteCodes(profileId: string | null, playerTier: string | nu
           created_at,
           used_by_id,
           used_at,
+          shared_at,
           used_by:profiles!invite_codes_used_by_id_fkey(name)
         `)
         .eq('creator_id', profileId)
@@ -66,12 +71,13 @@ export function useInviteCodes(profileId: string | null, playerTier: string | nu
         return;
       }
 
-      const entries: InviteCode[] = (data || []).map((row) => ({
+      const entries: InviteCode[] = (data || []).map((row: any) => ({
         id: row.id,
         code: row.code,
         createdAt: row.created_at,
         usedById: row.used_by_id,
         usedAt: row.used_at,
+        sharedAt: row.shared_at,
         usedByName: row.used_by?.name || undefined,
       }));
 
@@ -171,6 +177,7 @@ export function useInviteCodes(profileId: string | null, playerTier: string | nu
             created_at,
             used_by_id,
             used_at,
+            shared_at,
             used_by:profiles!invite_codes_used_by_id_fkey(name)
           `)
           .eq('creator_id', profileId)
@@ -182,12 +189,13 @@ export function useInviteCodes(profileId: string | null, playerTier: string | nu
           return;
         }
 
-        const entries: InviteCode[] = (data || []).map((row) => ({
+        const entries: InviteCode[] = (data || []).map((row: any) => ({
           id: row.id,
           code: row.code,
           createdAt: row.created_at,
           usedById: row.used_by_id,
           usedAt: row.used_at,
+          sharedAt: row.shared_at,
           usedByName: row.used_by?.name || undefined,
         }));
 
@@ -209,20 +217,62 @@ export function useInviteCodes(profileId: string | null, playerTier: string | nu
     init();
   }, [profileId, playerTier]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const unusedCount = codes.filter((c) => !c.usedById).length;
+  const unusedCount = codes.filter((c) => !c.usedById && !c.sharedAt).length;
   const usedCount = codes.filter((c) => !!c.usedById).length;
+  const sharedCount = codes.filter((c) => !!c.sharedAt && !c.usedById).length;
 
   const refetch = useCallback(async () => {
     await fetchCodes();
   }, [fetchCodes]);
 
+  const shareCode = useCallback(async (codeId: string): Promise<boolean> => {
+    if (!profileId) return false;
+    try {
+      const { error } = await supabase.rpc('share_invite_code', {
+        p_code_id: codeId,
+        p_player_id: profileId,
+      });
+      if (error) {
+        console.error('[INVITE_CODES] Share error:', error);
+        return false;
+      }
+      await fetchCodes();
+      return true;
+    } catch (e) {
+      console.error('[INVITE_CODES] Share unexpected error:', e);
+      return false;
+    }
+  }, [profileId, fetchCodes]);
+
+  const cancelCode = useCallback(async (codeId: string): Promise<boolean> => {
+    if (!profileId) return false;
+    try {
+      const { error } = await supabase.rpc('cancel_invite_code', {
+        p_code_id: codeId,
+        p_player_id: profileId,
+      });
+      if (error) {
+        console.error('[INVITE_CODES] Cancel error:', error);
+        return false;
+      }
+      await fetchCodes();
+      return true;
+    } catch (e) {
+      console.error('[INVITE_CODES] Cancel unexpected error:', e);
+      return false;
+    }
+  }, [profileId, fetchCodes]);
+
   return {
     codes,
     isLoading,
-    isAutoGenerating: isAutoGenerating,
+    isAutoGenerating,
     error,
     unusedCount,
     usedCount,
+    sharedCount,
     refetch,
+    shareCode,
+    cancelCode,
   };
 }

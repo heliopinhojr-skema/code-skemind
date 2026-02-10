@@ -7,7 +7,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Gift, Copy, Check, Clock, Coins, ChevronDown, ChevronUp, Users, Loader2, Share2, Ticket, Dna, Lock, Sparkles } from 'lucide-react';
+import { Gift, Copy, Check, Clock, Coins, ChevronDown, ChevronUp, Users, Loader2, Share2, Ticket, Dna, Lock, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -32,10 +32,9 @@ export function ReferralHistoryPanel({
   onRefreshProfile,
 }: ReferralHistoryPanelProps) {
   const { referrals, isLoading: referralsLoading, error: referralsError, pendingRewardsCount, pendingRewardsTotal, refetch: refetchReferrals } = useReferralHistory(playerId);
-  const { codes, isLoading: codesLoading, isAutoGenerating, error: codesError, unusedCount, usedCount, refetch: refetchCodes } = useInviteCodes(playerId, playerTier);
+  const { codes, isLoading: codesLoading, isAutoGenerating, error: codesError, unusedCount, usedCount, sharedCount, refetch: refetchCodes, shareCode, cancelCode } = useInviteCodes(playerId, playerTier);
   
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
-  const [sharedCodes, setSharedCodes] = useState<Set<string>>(new Set());
   const [isCardExpanded, setIsCardExpanded] = useState(false);
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -46,14 +45,36 @@ export function ReferralHistoryPanel({
   const invitedTierLabel = tierConfig.invitedTierLabel;
   const canInvite = maxInvites > 0;
 
-  const handleCopyCode = async (code: string) => {
+  const handleShareAndCopy = async (codeId: string, code: string, type: 'code' | 'link') => {
+    // Find the code object
+    const codeObj = codes.find(c => c.id === codeId);
+    const isAlreadyShared = codeObj?.sharedAt;
+
+    // Share (debit) if not already shared
+    if (!isAlreadyShared) {
+      const ok = await shareCode(codeId);
+      if (!ok) {
+        toast({
+          title: '❌ Erro ao compartilhar',
+          description: 'Saldo insuficiente ou erro no servidor.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      onRefreshProfile(); // Refresh balance
+    }
+
+    // Copy to clipboard
+    const textToCopy = type === 'link' 
+      ? `${window.location.origin}/?convite=${encodeURIComponent(code)}`
+      : code;
+
     try {
-      await navigator.clipboard.writeText(code);
-      setCopiedCode(code);
-      setSharedCodes(prev => new Set(prev).add(code));
+      await navigator.clipboard.writeText(textToCopy);
+      setCopiedCode(type === 'link' ? `link-${code}` : code);
       toast({
-        title: '✅ Código copiado!',
-        description: `${code} — envie para seu convidado.`,
+        title: '✅ ' + (type === 'link' ? 'Link copiado!' : 'Código copiado!'),
+        description: type === 'link' ? 'Envie para seu convidado.' : `${code} — envie para seu convidado.`,
       });
       setTimeout(() => setCopiedCode(null), 2000);
     } catch (e) {
@@ -61,19 +82,20 @@ export function ReferralHistoryPanel({
     }
   };
 
-  const handleCopyLink = async (code: string) => {
-    const link = `${window.location.origin}/?convite=${encodeURIComponent(code)}`;
-    try {
-      await navigator.clipboard.writeText(link);
-      setCopiedCode(`link-${code}`);
-      setSharedCodes(prev => new Set(prev).add(code));
+  const handleCancelCode = async (codeId: string) => {
+    const ok = await cancelCode(codeId);
+    if (ok) {
       toast({
-        title: '✅ Link copiado!',
-        description: 'Envie para seu convidado.',
+        title: '↩️ Convite cancelado',
+        description: `Energia reembolsada (${formatEnergy(costPerInvite)}).`,
       });
-      setTimeout(() => setCopiedCode(null), 2000);
-    } catch (e) {
-      console.error('Erro ao copiar:', e);
+      onRefreshProfile();
+    } else {
+      toast({
+        title: '❌ Erro ao cancelar',
+        description: 'Convite já aceito ou erro no servidor.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -159,6 +181,11 @@ export function ReferralHistoryPanel({
                 {unusedCount} ✦
               </span>
             )}
+            {sharedCount > 0 && (
+              <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-xs rounded-full font-medium">
+                {sharedCount} ⏳
+              </span>
+            )}
             <span className="text-xs text-white/40 font-mono">
               {usedCount}/{maxInvites}
             </span>
@@ -212,9 +239,8 @@ export function ReferralHistoryPanel({
                       code={code}
                       index={index + 1}
                       copiedCode={copiedCode}
-                      isShared={sharedCodes.has(code.code)}
-                      onCopyCode={handleCopyCode}
-                      onCopyLink={handleCopyLink}
+                      onShareAndCopy={handleShareAndCopy}
+                      onCancel={handleCancelCode}
                       formatDate={formatDate}
                     />
                   ))}
@@ -306,23 +332,28 @@ function InviteCodeItem({
   code, 
   index,
   copiedCode, 
-  isShared,
-  onCopyCode, 
-  onCopyLink,
+  onShareAndCopy,
+  onCancel,
   formatDate 
 }: { 
   code: InviteCode; 
   index: number;
   copiedCode: string | null;
-  isShared: boolean;
-  onCopyCode: (code: string) => void;
-  onCopyLink: (code: string) => void;
+  onShareAndCopy: (codeId: string, code: string, type: 'code' | 'link') => Promise<void>;
+  onCancel: (codeId: string) => Promise<void>;
   formatDate: (d: string) => string;
 }) {
+  const [isCancelling, setIsCancelling] = useState(false);
   const isUsed = !!code.usedById;
   const isCopied = copiedCode === code.code;
   const isLinkCopied = copiedCode === `link-${code.code}`;
-  const isPending = !isUsed && isShared;
+  const isPending = !isUsed && !!code.sharedAt;
+
+  const handleCancel = async () => {
+    setIsCancelling(true);
+    await onCancel(code.id);
+    setIsCancelling(false);
+  };
 
   return (
     <motion.div 
@@ -361,7 +392,7 @@ function InviteCodeItem({
             </span>
           ) : isPending ? (
             <span className="text-amber-400/80 flex items-center gap-1">
-              <Clock className="w-2.5 h-2.5" /> em aceitação
+              <Clock className="w-2.5 h-2.5 animate-pulse" /> em transformação
             </span>
           ) : (
             <span className="text-emerald-400/60">● disponível</span>
@@ -371,34 +402,50 @@ function InviteCodeItem({
 
       {!isUsed && (
         <div className="flex items-center gap-0.5 shrink-0">
-          <motion.div
-            animate={isCopied ? { scale: [1, 1.3, 1] } : {}}
-            transition={{ duration: 0.3 }}
-          >
+          {isPending ? (
+            /* Cancelar convite pendente */
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => onCopyCode(code.code)}
-              className="h-7 w-7 text-white/40 hover:text-white"
-              title="Copiar código"
+              onClick={handleCancel}
+              disabled={isCancelling}
+              className="h-7 w-7 text-red-400/60 hover:text-red-400 hover:bg-red-500/10"
+              title="Cancelar convite"
             >
-              {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              {isCancelling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
             </Button>
-          </motion.div>
-          <motion.div
-            animate={isLinkCopied ? { scale: [1, 1.3, 1] } : {}}
-            transition={{ duration: 0.3 }}
-          >
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onCopyLink(code.code)}
-              className="h-7 w-7 text-white/40 hover:text-white"
-              title="Copiar link de convite"
-            >
-              {isLinkCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
-            </Button>
-          </motion.div>
+          ) : (
+            <>
+              <motion.div
+                animate={isCopied ? { scale: [1, 1.3, 1] } : {}}
+                transition={{ duration: 0.3 }}
+              >
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onShareAndCopy(code.id, code.code, 'code')}
+                  className="h-7 w-7 text-white/40 hover:text-white"
+                  title="Copiar código (debita energia)"
+                >
+                  {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                </Button>
+              </motion.div>
+              <motion.div
+                animate={isLinkCopied ? { scale: [1, 1.3, 1] } : {}}
+                transition={{ duration: 0.3 }}
+              >
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onShareAndCopy(code.id, code.code, 'link')}
+                  className="h-7 w-7 text-white/40 hover:text-white"
+                  title="Copiar link (debita energia)"
+                >
+                  {isLinkCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
+                </Button>
+              </motion.div>
+            </>
+          )}
         </div>
       )}
     </motion.div>
