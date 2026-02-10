@@ -214,7 +214,7 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
   };
 
   const handleCopyLink = async (code: string) => {
-    const link = `${window.location.origin}/?convite=${code}`;
+    const link = `${window.location.origin}/auth?convite=${code}`;
     try {
       await navigator.clipboard.writeText(link);
       setCopied(`link-${code}`);
