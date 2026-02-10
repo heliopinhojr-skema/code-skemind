@@ -109,16 +109,17 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
     supabase
       .from('profiles')
       .select('id, name, emoji, player_tier, created_at')
-      .gte('created_at', today + 'T00:00:00')
       .neq('player_tier', 'master_admin')
       .order('created_at', { ascending: false })
+      .limit(20)
       .then(({ data }) => {
         if (data) {
-          setNewPlayersToday(data.length);
+          const todayPlayers = data.filter(p => p.created_at >= today + 'T00:00:00');
+          setNewPlayersToday(todayPlayers.length);
           setRecentJoins(data.slice(0, 5).map(p => ({
             name: p.name, emoji: p.emoji,
             tier: p.player_tier === 'jogador' ? 'Ploft' : (p.player_tier || 'Ploft'),
-            time: format(new Date(p.created_at), "HH:mm", { locale: ptBR }),
+            time: format(new Date(p.created_at), "dd/MM HH:mm", { locale: ptBR }),
           })));
         }
       });
@@ -453,7 +454,7 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
               <span className="text-[10px] text-muted-foreground">Últimos registros</span>
             </div>
             {recentJoins.length === 0 ? (
-              <p className="text-[10px] text-muted-foreground">Nenhum hoje</p>
+              <p className="text-[10px] text-muted-foreground">Nenhum registro</p>
             ) : (
               <div className="space-y-0.5">
                 {recentJoins.map((j, i) => (
