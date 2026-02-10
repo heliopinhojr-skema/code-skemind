@@ -475,83 +475,84 @@ export function SkemaLobby({
                   <span className="w-16"></span>
                 </div>
 
-                {/* Arena padrão k$0.55 */}
-                <motion.div
-                  whileHover={{ scale: 1.005 }}
-                  className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 items-center px-3 py-2.5 rounded-lg bg-white/5 border border-white/10 hover:border-primary/30 transition-colors"
-                >
-                  <div>
-                    <span className="text-sm font-medium text-white">🎯 Arena Padrão</span>
-                    <div className="text-[10px] text-white/40 mt-0.5">1º {formatEnergy(getScaledArenaPrize(1, 50))}</div>
-                  </div>
-                  <div className="text-right w-16">
-                    <span className="text-xs font-bold text-yellow-400">k$ 0,55</span>
-                  </div>
-                  <div className="text-right w-14">
-                    <span className="text-xs text-white/60">99</span>
-                  </div>
-                  <div className="text-right w-20">
-                    <span className="text-xs text-green-400 font-medium">{formatEnergy(50)}</span>
-                  </div>
-                  <div className="w-16">
-                    <Button
-                      size="sm"
-                      onClick={() => handleJoinArena(0.55, 0.05, 99)}
-                      disabled={!canAffordDefaultArena || isStarting}
-                      className="h-7 w-full text-xs"
-                    >
-                      Jogar
-                    </Button>
-                  </div>
-                </motion.div>
-
-                {/* Arenas customizadas do banco (ordenadas por buy-in desc) */}
+                {/* Todas as arenas ordenadas por buy-in desc (maior primeiro) */}
                 {arenasLoading ? (
                   <div className="flex items-center justify-center py-4">
                     <Loader2 className="w-5 h-5 animate-spin text-white/30" />
                   </div>
                 ) : (
-                  [...(openArenas || [])].sort((a, b) => Number(b.buy_in) - Number(a.buy_in)).map((arena) => {
-                    const pool = calculateArenaPool(Number(arena.buy_in), Number(arena.rake_fee), arena.bot_count);
-                    const first = getScaledArenaPrize(1, pool);
-                    const canAfford = Math.round(player.energy * 100) >= Math.round(Number(arena.buy_in) * 100);
-                    return (
-                      <motion.div
-                        key={arena.id}
-                        whileHover={{ scale: 1.005 }}
-                        className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 items-center px-3 py-2.5 rounded-lg bg-gradient-to-r from-orange-500/5 to-red-500/5 border border-orange-500/20 hover:border-orange-500/40 transition-colors"
-                      >
-                        <div>
-                          <span className="text-sm font-medium text-white">{arena.creator_emoji} {arena.name}</span>
-                          <div className="text-[10px] text-white/40 mt-0.5">1º {formatEnergy(first)} • por {arena.creator_name}</div>
-                        </div>
-                        <div className="text-right w-16">
-                          <span className="text-xs font-bold text-yellow-400">{formatEnergy(Number(arena.buy_in))}</span>
-                        </div>
-                        <div className="text-right w-14">
-                          <span className="text-xs text-white/60">{arena.bot_count}</span>
-                        </div>
-                        <div className="text-right w-20">
-                          <span className="text-xs text-green-400 font-medium">{formatEnergy(pool)}</span>
-                        </div>
-                        <div className="w-16">
-                          <Button
-                            size="sm"
-                            onClick={() => handleJoinArena(Number(arena.buy_in), Number(arena.rake_fee), arena.bot_count)}
-                            disabled={!canAfford || isStarting}
-                            className="h-7 w-full text-xs"
-                          >
-                            Jogar
-                          </Button>
-                        </div>
-                      </motion.div>
-                    );
-                  })
+                  (() => {
+                    // Merge default arena with custom arenas, sort all by buy-in desc
+                    const defaultArena = {
+                      id: 'default',
+                      name: '🎯 Arena Padrão',
+                      buy_in: 0.55,
+                      rake_fee: 0.05,
+                      bot_count: 99,
+                      creator_name: 'SKEMA',
+                      creator_emoji: '',
+                      isDefault: true,
+                    };
+                    const customArenas = (openArenas || []).map(a => ({
+                      id: a.id,
+                      name: `${a.creator_emoji} ${a.name}`,
+                      buy_in: Number(a.buy_in),
+                      rake_fee: Number(a.rake_fee),
+                      bot_count: a.bot_count,
+                      creator_name: a.creator_name,
+                      creator_emoji: a.creator_emoji,
+                      isDefault: false,
+                    }));
+                    const allArenas = [defaultArena, ...customArenas].sort((a, b) => b.buy_in - a.buy_in);
+
+                    return allArenas.map((arena) => {
+                      const pool = calculateArenaPool(arena.buy_in, arena.rake_fee, arena.bot_count);
+                      const first = getScaledArenaPrize(1, pool);
+                      const canAfford = Math.round(player.energy * 100) >= Math.round(arena.buy_in * 100);
+                      return (
+                        <motion.div
+                          key={arena.id}
+                          whileHover={{ scale: 1.005 }}
+                          className={`grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 items-center px-3 py-2.5 rounded-lg ${
+                            arena.isDefault 
+                              ? 'bg-white/5 border border-white/10 hover:border-primary/30' 
+                              : 'bg-gradient-to-r from-orange-500/5 to-red-500/5 border border-orange-500/20 hover:border-orange-500/40'
+                          } transition-colors`}
+                        >
+                          <div>
+                            <span className="text-sm font-medium text-white">{arena.name}</span>
+                            <div className="text-[10px] text-white/40 mt-0.5">
+                              1º {formatEnergy(first)}{!arena.isDefault && ` • por ${arena.creator_name}`}
+                            </div>
+                          </div>
+                          <div className="text-right w-16">
+                            <span className="text-xs font-bold text-yellow-400">{formatEnergy(arena.buy_in)}</span>
+                          </div>
+                          <div className="text-right w-14">
+                            <span className="text-xs text-white/60">{arena.bot_count}</span>
+                          </div>
+                          <div className="text-right w-20">
+                            <span className="text-xs text-green-400 font-medium">{formatEnergy(pool)}</span>
+                          </div>
+                          <div className="w-16">
+                            <Button
+                              size="sm"
+                              onClick={() => handleJoinArena(arena.buy_in, arena.rake_fee, arena.bot_count)}
+                              disabled={!canAfford || isStarting}
+                              className="h-7 w-full text-xs"
+                            >
+                              Jogar
+                            </Button>
+                          </div>
+                        </motion.div>
+                      );
+                    });
+                  })()
                 )}
 
                 {!arenasLoading && (!openArenas || openArenas.length === 0) && (
                   <div className="text-center py-3 text-xs text-white/30">
-                    Nenhuma arena customizada aberta
+                    Apenas a Arena Padrão disponível
                   </div>
                 )}
               </TabsContent>
