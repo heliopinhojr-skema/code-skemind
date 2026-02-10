@@ -355,13 +355,13 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
               </div>
               <div className="bg-background/60 rounded-lg p-3 border border-border/40">
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Share2 className="h-3 w-3" /> Escrow
+                  🔒 Bloqueado Convite
                 </p>
                 <p className="text-lg font-bold text-foreground">
                   {formatEnergyUtil(stats?.pendingInvitesEnergy || 0)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  convites pendentes
+                  pré-pago pendente
                 </p>
               </div>
               <div className="bg-primary/10 rounded-lg p-3 border border-primary/30">
