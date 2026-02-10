@@ -66,7 +66,7 @@ export function ReferralHistoryPanel({
 
     // Copy to clipboard
     const textToCopy = type === 'link' 
-      ? `${window.location.origin}/?convite=${encodeURIComponent(code)}`
+      ? `${window.location.origin}/auth?convite=${encodeURIComponent(code)}`
       : code;
 
     try {
