@@ -15,6 +15,7 @@ export interface DashboardStats {
   skemaBoxBalance: number;
   botTreasuryBalance: number;
   botTreasuryBotCount: number;
+  pendingInvitesEnergy: number;
   totalReferrals: number;
   creditedReferrals: number;
   totalDistributed: number;
@@ -181,8 +182,38 @@ export function useDashboardStats() {
       const botTreasuryBalance = Number(botTreasury?.balance) || 0;
       const botTreasuryBotCount = Number(botTreasury?.bot_count) || 99;
       
-      // System total = HX + players + skema box + bot treasury (should always equal initial 10M)
-      const systemTotal = hxEnergy + playersEnergy + skemaBoxBalance + botTreasuryBalance;
+      // Fetch pending invites (shared but not used - energy in escrow)
+      const { data: pendingCodes } = await supabase
+        .from('invite_codes')
+        .select('creator_id')
+        .not('shared_at', 'is', null)
+        .is('used_by_id', null);
+      
+      let pendingInvitesEnergy = 0;
+      if (pendingCodes && pendingCodes.length > 0) {
+        // Map creator_id to their tier to calculate escrow amount
+        const tierCostMap: Record<string, number> = {
+          master_admin: 200000,
+          Criador: 15000,
+          'Grão Mestre': 1300,
+          Mestre: 130,
+          Boom: 10,
+        };
+        const creatorIds = [...new Set(pendingCodes.map(c => c.creator_id))];
+        const { data: creatorProfiles } = await supabase
+          .from('profiles')
+          .select('id, player_tier')
+          .in('id', creatorIds);
+        
+        const creatorTierMap = new Map(creatorProfiles?.map(p => [p.id, p.player_tier]) || []);
+        pendingCodes.forEach(code => {
+          const tier = creatorTierMap.get(code.creator_id) || 'jogador';
+          pendingInvitesEnergy += tierCostMap[tier] || 0;
+        });
+      }
+      
+      // System total = HX + players + skema box + bot treasury + pending invites (should always equal initial 10M)
+      const systemTotal = hxEnergy + playersEnergy + skemaBoxBalance + botTreasuryBalance + pendingInvitesEnergy;
       
       // Buscar referrals com amounts
       const { data: referrals, error: referralsError } = await supabase
@@ -210,6 +241,7 @@ export function useDashboardStats() {
         skemaBoxBalance,
         botTreasuryBalance,
         botTreasuryBotCount,
+        pendingInvitesEnergy,
         totalReferrals,
         creditedReferrals,
         totalDistributed,

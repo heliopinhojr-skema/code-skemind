@@ -308,7 +308,7 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
             <Skeleton className="h-20 w-full" />
           ) : (
             <>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
               <div className="bg-background/60 rounded-lg p-3 border border-border/40">
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <Zap className="h-3 w-3" /> HX (Tesouro)
@@ -351,6 +351,17 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
                 </p>
                 <p className="text-lg font-bold text-foreground">
                   {formatEnergyUtil(stats?.skemaBoxBalance || 0)}
+                </p>
+              </div>
+              <div className="bg-background/60 rounded-lg p-3 border border-border/40">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Share2 className="h-3 w-3" /> Escrow
+                </p>
+                <p className="text-lg font-bold text-foreground">
+                  {formatEnergyUtil(stats?.pendingInvitesEnergy || 0)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  convites pendentes
                 </p>
               </div>
               <div className="bg-primary/10 rounded-lg p-3 border border-primary/30">
