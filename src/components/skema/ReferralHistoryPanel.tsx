@@ -387,8 +387,8 @@ function InviteCodeItem({
         </div>
         <div className="text-[10px] text-white/30 mt-0.5">
           {isUsed ? (
-            <span>
-              ✅ <span className="text-white/50">{code.usedByName || '?'}</span> • {formatDate(code.usedAt!)}
+            <span className="text-emerald-300/80">
+              ✅ convite aceito e em uso por <span className="text-white/70 font-semibold">{code.usedByName || '?'}</span>
             </span>
           ) : isPending ? (
             <span className="text-amber-400/80 flex items-center gap-1">
