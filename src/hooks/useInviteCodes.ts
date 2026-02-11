@@ -17,6 +17,7 @@ export interface InviteCode {
   usedById: string | null;
   usedAt: string | null;
   sharedAt: string | null;
+  sharedToName: string | null;
   /** Nome do convidado que usou o código (join) */
   usedByName?: string;
 }
@@ -30,7 +31,7 @@ interface UseInviteCodesResult {
   usedCount: number;
   sharedCount: number;
   refetch: () => Promise<void>;
-  shareCode: (codeId: string) => Promise<boolean>;
+  shareCode: (codeId: string, sharedToName?: string) => Promise<boolean>;
   cancelCode: (codeId: string) => Promise<boolean>;
 }
 
@@ -60,6 +61,7 @@ export function useInviteCodes(profileId: string | null, playerTier: string | nu
           used_by_id,
           used_at,
           shared_at,
+          shared_to_name,
           used_by:profiles!invite_codes_used_by_id_fkey(name)
         `)
         .eq('creator_id', profileId)
@@ -78,6 +80,7 @@ export function useInviteCodes(profileId: string | null, playerTier: string | nu
         usedById: row.used_by_id,
         usedAt: row.used_at,
         sharedAt: row.shared_at,
+        sharedToName: row.shared_to_name || null,
         usedByName: row.used_by?.name || undefined,
       }));
 
@@ -172,16 +175,17 @@ export function useInviteCodes(profileId: string | null, playerTier: string | nu
         const { data, error: fetchError } = await supabase
           .from('invite_codes')
           .select(`
-            id,
-            code,
-            created_at,
-            used_by_id,
-            used_at,
-            shared_at,
-            used_by:profiles!invite_codes_used_by_id_fkey(name)
-          `)
-          .eq('creator_id', profileId)
-          .order('created_at', { ascending: true });
+          id,
+          code,
+          created_at,
+          used_by_id,
+          used_at,
+          shared_at,
+          shared_to_name,
+          used_by:profiles!invite_codes_used_by_id_fkey(name)
+        `)
+        .eq('creator_id', profileId)
+        .order('created_at', { ascending: true });
 
         if (fetchError) {
           console.error('[INVITE_CODES] Fetch error:', fetchError);
@@ -196,6 +200,7 @@ export function useInviteCodes(profileId: string | null, playerTier: string | nu
           usedById: row.used_by_id,
           usedAt: row.used_at,
           sharedAt: row.shared_at,
+          sharedToName: row.shared_to_name || null,
           usedByName: row.used_by?.name || undefined,
         }));
 
@@ -225,13 +230,14 @@ export function useInviteCodes(profileId: string | null, playerTier: string | nu
     await fetchCodes();
   }, [fetchCodes]);
 
-  const shareCode = useCallback(async (codeId: string): Promise<boolean> => {
+  const shareCode = useCallback(async (codeId: string, sharedToName?: string): Promise<boolean> => {
     if (!profileId) return false;
     try {
       const { error } = await supabase.rpc('share_invite_code', {
         p_code_id: codeId,
         p_player_id: profileId,
-      });
+        p_shared_to_name: sharedToName || null,
+      } as any);
       if (error) {
         console.error('[INVITE_CODES] Share error:', error);
         return false;
