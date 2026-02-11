@@ -25,7 +25,7 @@ const App = () => (
           
           {/* Guardian panel - requires master_admin or guardiao role (access controlled inside) */}
           <Route path="/guardian" element={
-            <ProtectedRoute>
+            <ProtectedRoute requireRole="master_admin">
               <Guardian />
             </ProtectedRoute>
           } />
