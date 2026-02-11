@@ -22,6 +22,8 @@ import { supabase } from '@/integrations/supabase/client';
 import skemaOrbit from '@/assets/skema-orbit.jpeg';
 import skemaGenesis from '@/assets/skema-genesis.jpeg';
 import { SplashScreen } from '@/components/SplashScreen';
+import { useI18n } from '@/i18n/I18nContext';
+import { LanguageSelector } from '@/components/LanguageSelector';
 
 const SPLASH_SHOWN_KEY = 'skema_splash_shown';
 
@@ -43,6 +45,7 @@ const NICKNAME_STORAGE_KEY = 'skema_last_nickname';
 export default function Auth() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { t } = useI18n();
   const initialInvite = searchParams.get('convite') || searchParams.get('invite') || '';
   const savedNickname = useMemo(() => localStorage.getItem(NICKNAME_STORAGE_KEY) || '', []);
 
@@ -101,8 +104,8 @@ export default function Auth() {
 
   const handleLogin = useCallback(async () => {
     setError(null);
-    if (!loginNickname.trim()) return setError('Digite seu nickname');
-    if (loginPin.length !== 4) return setError('PIN deve ter 4 dígitos');
+    if (!loginNickname.trim()) return setError(t.auth.errors.enterNickname);
+    if (loginPin.length !== 4) return setError(t.auth.errors.pinMustBe4);
 
     setIsLoading(true);
     try {
@@ -112,7 +115,7 @@ export default function Auth() {
       });
 
       if (err) {
-        setError('Nickname ou PIN incorretos');
+        setError(t.auth.errors.wrongCredentials);
         setIsLoading(false);
         return;
       }
@@ -128,30 +131,30 @@ export default function Auth() {
           localStorage.setItem(NICKNAME_STORAGE_KEY, loginNickname.trim());
           navigate('/', { replace: true });
         } else {
-          setError('Perfil não encontrado. Registre-se novamente.');
+          setError(t.auth.errors.profileNotFound);
           await supabase.auth.signOut();
         }
       }
     } catch {
-      setError('Erro inesperado');
+      setError(t.auth.errors.unexpectedError);
     }
     setIsLoading(false);
-  }, [loginNickname, loginPin, navigate]);
+  }, [loginNickname, loginPin, navigate, t]);
 
   // ==================== REGISTER ====================
 
   const handleRegister = useCallback(async () => {
     setError(null);
     const code = inviteCode.trim().toUpperCase();
-    if (code.length < 4) return setError('Código de convite inválido');
-    if (name.trim().length < 2) return setError('Nickname deve ter pelo menos 2 caracteres');
-    if (pin.length !== 4) return setError('PIN deve ter 4 dígitos');
+    if (code.length < 4) return setError(t.auth.errors.invalidInviteCode);
+    if (name.trim().length < 2) return setError(t.auth.errors.nicknameTooShort);
+    if (pin.length !== 4) return setError(t.auth.errors.pinMustBe4);
 
     setIsLoading(true);
     try {
       const { data: validation, error: valErr } = await supabase.rpc('validate_invite_code', { p_code: code });
       if (valErr || !validation) {
-        setError('Código de convite inválido');
+        setError(t.auth.errors.invalidInviteCode);
         setIsLoading(false);
         return;
       }
@@ -159,9 +162,9 @@ export default function Auth() {
       const result = validation as unknown as { valid: boolean; inviter_name: string | null; reason?: string };
       if (!result.valid) {
         if (result.reason === 'code_already_used') {
-          setError('Este código de convite já foi utilizado. Peça um novo código.');
+          setError(t.auth.errors.codeAlreadyUsed);
         } else {
-          setError('Código de convite inválido');
+          setError(t.auth.errors.invalidInviteCode);
         }
         setIsLoading(false);
         return;
@@ -175,14 +178,14 @@ export default function Auth() {
 
       if (signUpErr) {
         setError(signUpErr.message.includes('already registered')
-          ? 'Este nickname já está em uso.'
+          ? t.auth.errors.nicknameInUse
           : signUpErr.message);
         setIsLoading(false);
         return;
       }
 
       if (!authData.user) {
-        setError('Erro ao criar conta.');
+        setError(t.auth.errors.accountCreateError);
         setIsLoading(false);
         return;
       }
@@ -195,8 +198,8 @@ export default function Auth() {
 
       if (profileErr) {
         setError(profileErr.message.includes('duplicate') || profileErr.message.includes('unique')
-          ? 'Este nickname já está em uso.'
-          : 'Erro ao criar perfil: ' + profileErr.message);
+          ? t.auth.errors.nicknameInUse
+          : t.auth.errors.profileCreateError + profileErr.message);
         await supabase.auth.signOut();
         setIsLoading(false);
         return;
@@ -207,10 +210,10 @@ export default function Auth() {
       localStorage.setItem(NICKNAME_STORAGE_KEY, name.trim());
       navigate('/', { replace: true });
     } catch {
-      setError('Erro inesperado ao registrar');
+      setError(t.auth.errors.unexpectedRegister);
     }
     setIsLoading(false);
-  }, [inviteCode, name, pin, navigate]);
+  }, [inviteCode, name, pin, navigate, t]);
 
   // ==================== RENDER ====================
 
@@ -221,6 +224,10 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen relative flex items-center justify-center">
+      {/* Language selector */}
+      <div className="fixed top-4 right-4 z-50">
+        <LanguageSelector />
+      </div>
       {/* Splash screen */}
       {showSplash && <SplashScreen onComplete={handleSplashComplete} />}
 
@@ -280,9 +287,7 @@ export default function Auth() {
               transition={{ delay: 1.4, duration: 1 }}
               className="text-sm md:text-base tracking-[0.12em] uppercase text-purple-200/70 font-light max-w-sm"
             >
-              Cada escolha uma renúncia,
-              <br />
-              uma consequência...
+              {t.auth.tagline}
             </motion.p>
 
             {/* Tap to continue */}
@@ -292,7 +297,7 @@ export default function Auth() {
               transition={{ delay: 2.5, duration: 2, repeat: Infinity }}
               className="mt-16 text-xs text-white/40 tracking-[0.2em] uppercase"
             >
-              Toque para entrar
+              {t.auth.tapToEnter}
             </motion.p>
           </motion.div>
         )}
@@ -322,7 +327,7 @@ export default function Auth() {
                 transition={{ delay: 0.5, duration: 1 }}
                 className="text-purple-300/60 text-xs mt-2 tracking-[0.15em] uppercase font-light"
               >
-                Cada escolha uma renúncia, uma consequência...
+                {t.auth.tagline}
               </motion.p>
             </div>
 
@@ -334,7 +339,7 @@ export default function Auth() {
                 className="flex-1"
               >
                 <LogIn className="w-4 h-4 mr-2" />
-                Entrar
+                {t.auth.login}
               </Button>
               <Button
                 variant={mode === 'register' ? 'default' : 'outline'}
@@ -342,7 +347,7 @@ export default function Auth() {
                 className="flex-1"
               >
                 <UserPlus className="w-4 h-4 mr-2" />
-                Novo
+                {t.auth.register}
               </Button>
             </div>
 
@@ -359,9 +364,9 @@ export default function Auth() {
                     className="space-y-4"
                   >
                     <div>
-                      <label className="text-sm text-muted-foreground mb-1 block">Nickname</label>
+                      <label className="text-sm text-muted-foreground mb-1 block">{t.auth.nickname}</label>
                       <Input
-                        placeholder="Seu nickname"
+                        placeholder={t.auth.nicknamePlaceholder}
                         value={loginNickname}
                         onChange={(e) => setLoginNickname(e.target.value)}
                         className={inputClass}
@@ -371,7 +376,7 @@ export default function Auth() {
                     </div>
 
                     <div>
-                      <label className="text-sm text-muted-foreground mb-2 block">PIN (4 dígitos)</label>
+                      <label className="text-sm text-muted-foreground mb-2 block">{t.auth.pin}</label>
                       <div className="flex justify-center">
                         <InputOTP maxLength={4} pattern={REGEXP_ONLY_DIGITS} value={loginPin} onChange={setLoginPin}>
                           <InputOTPGroup>
@@ -390,7 +395,7 @@ export default function Auth() {
                       disabled={!loginNickname.trim() || loginPin.length !== 4 || isLoading}
                       className="w-full h-12"
                     >
-                      {isLoading ? <Sparkles className="w-5 h-5 animate-spin" /> : <>Entrar <ArrowRight className="w-4 h-4 ml-2" /></>}
+                      {isLoading ? <Sparkles className="w-5 h-5 animate-spin" /> : <>{t.auth.login} <ArrowRight className="w-4 h-4 ml-2" /></>}
                     </Button>
                   </motion.div>
                 ) : (
@@ -407,18 +412,18 @@ export default function Auth() {
                       <ShieldAlert className="w-5 h-5 text-yellow-400 shrink-0 mt-0.5" />
                       <div>
                         <p className="text-xs font-semibold text-yellow-300">
-                          Sem recuperação de conta
+                          {t.auth.noRecoveryTitle}
                         </p>
-                        <p className="text-[11px] text-yellow-200/70 mt-0.5 leading-relaxed">
-                          Não existe "esqueci minha senha". Guarde seu <strong>Nickname</strong> e <strong>PIN</strong> em local seguro. Se perder, não há como recuperar.
-                        </p>
+                        <p className="text-[11px] text-yellow-200/70 mt-0.5 leading-relaxed"
+                          dangerouslySetInnerHTML={{ __html: t.auth.noRecoveryDesc }}
+                        />
                       </div>
                     </div>
 
                     <div>
-                      <label className="text-sm text-muted-foreground mb-1 block">Código de Convite</label>
+                      <label className="text-sm text-muted-foreground mb-1 block">{t.auth.inviteCode}</label>
                       <Input
-                        placeholder="Ex: SKINV1A2B3C"
+                        placeholder={t.auth.inviteCodePlaceholder}
                         value={inviteCode}
                         onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
                         className={`${inputClass} text-center tracking-wider`}
@@ -428,9 +433,9 @@ export default function Auth() {
                     </div>
 
                     <div>
-                      <label className="text-sm text-muted-foreground mb-1 block">Escolha seu Nickname</label>
+                      <label className="text-sm text-muted-foreground mb-1 block">{t.auth.chooseNickname}</label>
                       <Input
-                        placeholder="Seu nickname único"
+                        placeholder={t.auth.chooseNicknamePlaceholder}
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         className={inputClass}
@@ -440,7 +445,7 @@ export default function Auth() {
                     </div>
 
                     <div>
-                      <label className="text-sm text-muted-foreground mb-2 block">Crie um PIN (4 dígitos)</label>
+                      <label className="text-sm text-muted-foreground mb-2 block">{t.auth.createPin}</label>
                       <div className="flex justify-center">
                         <InputOTP maxLength={4} pattern={REGEXP_ONLY_DIGITS} value={pin} onChange={setPin}>
                           <InputOTPGroup>
