@@ -218,6 +218,7 @@ export type Database = {
           creator_id: string
           id: string
           shared_at: string | null
+          shared_to_name: string | null
           used_at: string | null
           used_by_id: string | null
         }
@@ -227,6 +228,7 @@ export type Database = {
           creator_id: string
           id?: string
           shared_at?: string | null
+          shared_to_name?: string | null
           used_at?: string | null
           used_by_id?: string | null
         }
@@ -236,6 +238,7 @@ export type Database = {
           creator_id?: string
           id?: string
           shared_at?: string | null
+          shared_to_name?: string | null
           used_at?: string | null
           used_by_id?: string | null
         }
@@ -598,10 +601,19 @@ export type Database = {
         }
         Returns: undefined
       }
-      share_invite_code: {
-        Args: { p_code_id: string; p_player_id: string }
-        Returns: undefined
-      }
+      share_invite_code:
+        | {
+            Args: { p_code_id: string; p_player_id: string }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_code_id: string
+              p_player_id: string
+              p_shared_to_name?: string
+            }
+            Returns: undefined
+          }
       update_bot_treasury: {
         Args: { p_amount: number; p_description?: string }
         Returns: number

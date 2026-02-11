@@ -5,9 +5,9 @@
  * Cada código é único e só pode ser usado uma vez.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Gift, Copy, Check, Clock, Coins, ChevronDown, ChevronUp, Users, Loader2, Share2, Ticket, Dna, Lock, Sparkles, X } from 'lucide-react';
+import { Gift, Copy, Check, Clock, Coins, ChevronDown, ChevronUp, Users, Loader2, Share2, Ticket, Dna, Lock, Sparkles, X, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -45,14 +45,14 @@ export function ReferralHistoryPanel({
   const invitedTierLabel = tierConfig.invitedTierLabel;
   const canInvite = maxInvites > 0;
 
-  const handleShareAndCopy = async (codeId: string, code: string, type: 'code' | 'link') => {
+  const handleShareAndCopy = async (codeId: string, code: string, type: 'code' | 'link', sharedToName?: string) => {
     // Find the code object
     const codeObj = codes.find(c => c.id === codeId);
     const isAlreadyShared = codeObj?.sharedAt;
 
     // Share (debit) if not already shared
     if (!isAlreadyShared) {
-      const ok = await shareCode(codeId);
+      const ok = await shareCode(codeId, sharedToName);
       if (!ok) {
         toast({
           title: '❌ Erro ao compartilhar',
@@ -74,7 +74,9 @@ export function ReferralHistoryPanel({
       setCopiedCode(type === 'link' ? `link-${code}` : code);
       toast({
         title: '✅ ' + (type === 'link' ? 'Link copiado!' : 'Código copiado!'),
-        description: type === 'link' ? 'Envie para seu convidado.' : `${code} — envie para seu convidado.`,
+        description: sharedToName 
+          ? `Convite para "${sharedToName}" — envie agora!`
+          : (type === 'link' ? 'Envie para seu convidado.' : `${code} — envie para seu convidado.`),
       });
       setTimeout(() => setCopiedCode(null), 2000);
     } catch (e) {
@@ -339,11 +341,15 @@ function InviteCodeItem({
   code: InviteCode; 
   index: number;
   copiedCode: string | null;
-  onShareAndCopy: (codeId: string, code: string, type: 'code' | 'link') => Promise<void>;
+  onShareAndCopy: (codeId: string, code: string, type: 'code' | 'link', sharedToName?: string) => Promise<void>;
   onCancel: (codeId: string) => Promise<void>;
   formatDate: (d: string) => string;
 }) {
   const [isCancelling, setIsCancelling] = useState(false);
+  const [showNameInput, setShowNameInput] = useState(false);
+  const [inviteeName, setInviteeName] = useState('');
+  const [pendingAction, setPendingAction] = useState<'code' | 'link' | null>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const isUsed = !!code.usedById;
   const isCopied = copiedCode === code.code;
   const isLinkCopied = copiedCode === `link-${code.code}`;
@@ -355,12 +361,37 @@ function InviteCodeItem({
     setIsCancelling(false);
   };
 
+  const handleStartShare = (type: 'code' | 'link') => {
+    setPendingAction(type);
+    setShowNameInput(true);
+    setTimeout(() => nameInputRef.current?.focus(), 100);
+  };
+
+  const handleConfirmShare = async () => {
+    if (!pendingAction) return;
+    const name = inviteeName.trim();
+    if (!name) {
+      nameInputRef.current?.focus();
+      return;
+    }
+    await onShareAndCopy(code.id, code.code, pendingAction, name);
+    setShowNameInput(false);
+    setInviteeName('');
+    setPendingAction(null);
+  };
+
+  const handleCancelInput = () => {
+    setShowNameInput(false);
+    setInviteeName('');
+    setPendingAction(null);
+  };
+
   return (
     <motion.div 
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.03 }}
-      className={`flex items-center gap-2 rounded-lg p-2 border transition-colors ${
+      className={`rounded-lg p-2 border transition-colors ${
         isUsed 
           ? 'bg-white/3 border-white/5 opacity-50' 
           : isPending
@@ -368,87 +399,139 @@ function InviteCodeItem({
             : 'bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/20 hover:border-purple-500/40'
       }`}
     >
-      {/* Número do slot */}
-      <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
-        isUsed 
-          ? 'bg-white/10 text-white/30' 
-          : isPending
-            ? 'bg-amber-500/20 text-amber-300'
-            : 'bg-purple-500/20 text-purple-300'
-      }`}>
-        {index}
+      <div className="flex items-center gap-2">
+        {/* Número do slot */}
+        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+          isUsed 
+            ? 'bg-white/10 text-white/30' 
+            : isPending
+              ? 'bg-amber-500/20 text-amber-300'
+              : 'bg-purple-500/20 text-purple-300'
+        }`}>
+          {index}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className={`font-mono text-xs tracking-wider ${isUsed ? 'text-white/30 line-through' : isPending ? 'text-amber-200' : 'text-purple-200'}`}>
+              {code.code}
+            </span>
+          </div>
+          <div className="text-[10px] text-white/30 mt-0.5">
+            {isUsed ? (
+              <span className="text-emerald-300/80">
+                ✅ convite aceito e em uso por <span className="text-white/70 font-semibold">{code.usedByName || '?'}</span>
+                {code.usedAt && <span className="text-white/30 ml-1">• {new Date(code.usedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>}
+              </span>
+            ) : isPending ? (
+              <span className="text-amber-400/80 flex items-center gap-1">
+                <Clock className="w-2.5 h-2.5 animate-pulse" /> em transformação
+                {code.sharedToName && (
+                  <span className="text-white/50 ml-0.5">• para <span className="font-semibold text-amber-200">{code.sharedToName}</span></span>
+                )}
+              </span>
+            ) : (
+              <span className="text-emerald-400/60">● disponível</span>
+            )}
+          </div>
+        </div>
+
+        {!isUsed && (
+          <div className="flex items-center gap-0.5 shrink-0">
+            {isPending ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleCancel}
+                disabled={isCancelling}
+                className="h-7 w-7 text-red-400/60 hover:text-red-400 hover:bg-red-500/10"
+                title="Cancelar convite"
+              >
+                {isCancelling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+              </Button>
+            ) : (
+              <>
+                <motion.div
+                  animate={isCopied ? { scale: [1, 1.3, 1] } : {}}
+                  transition={{ duration: 0.3 }}
+                >
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleStartShare('code')}
+                    className="h-7 w-7 text-white/40 hover:text-white"
+                    title="Copiar código"
+                  >
+                    {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  </Button>
+                </motion.div>
+                <motion.div
+                  animate={isLinkCopied ? { scale: [1, 1.3, 1] } : {}}
+                  transition={{ duration: 0.3 }}
+                >
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleStartShare('link')}
+                    className="h-7 w-7 text-white/40 hover:text-white"
+                    title="Copiar link"
+                  >
+                    {isLinkCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
+                  </Button>
+                </motion.div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
-          <span className={`font-mono text-xs tracking-wider ${isUsed ? 'text-white/30 line-through' : isPending ? 'text-amber-200' : 'text-purple-200'}`}>
-            {code.code}
-          </span>
-        </div>
-        <div className="text-[10px] text-white/30 mt-0.5">
-          {isUsed ? (
-            <span className="text-emerald-300/80">
-              ✅ convite aceito e em uso por <span className="text-white/70 font-semibold">{code.usedByName || '?'}</span>
-              {code.usedAt && <span className="text-white/30 ml-1">• {new Date(code.usedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>}
-            </span>
-          ) : isPending ? (
-            <span className="text-amber-400/80 flex items-center gap-1">
-              <Clock className="w-2.5 h-2.5 animate-pulse" /> em transformação
-            </span>
-          ) : (
-            <span className="text-emerald-400/60">● disponível</span>
-          )}
-        </div>
-      </div>
-
-      {!isUsed && (
-        <div className="flex items-center gap-0.5 shrink-0">
-          {isPending ? (
-            /* Cancelar convite pendente */
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleCancel}
-              disabled={isCancelling}
-              className="h-7 w-7 text-red-400/60 hover:text-red-400 hover:bg-red-500/10"
-              title="Cancelar convite"
-            >
-              {isCancelling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
-            </Button>
-          ) : (
-            <>
-              <motion.div
-                animate={isCopied ? { scale: [1, 1.3, 1] } : {}}
-                transition={{ duration: 0.3 }}
+      {/* Input de nome do convidado */}
+      <AnimatePresence>
+        {showNameInput && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="overflow-hidden"
+          >
+            <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-white/10">
+              <UserPlus className="w-3.5 h-3.5 text-purple-300 shrink-0" />
+              <input
+                ref={nameInputRef}
+                type="text"
+                placeholder="Nome do convidado..."
+                value={inviteeName}
+                onChange={(e) => setInviteeName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleConfirmShare();
+                  if (e.key === 'Escape') handleCancelInput();
+                }}
+                className="flex-1 bg-white/10 border border-white/20 rounded-md px-2 py-1 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 min-w-0"
+                maxLength={30}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleConfirmShare}
+                className="h-6 w-6 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 shrink-0"
+                title="Confirmar"
               >
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => onShareAndCopy(code.id, code.code, 'code')}
-                  className="h-7 w-7 text-white/40 hover:text-white"
-                  title="Copiar código (debita energia)"
-                >
-                  {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                </Button>
-              </motion.div>
-              <motion.div
-                animate={isLinkCopied ? { scale: [1, 1.3, 1] } : {}}
-                transition={{ duration: 0.3 }}
+                <Check className="w-3.5 h-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleCancelInput}
+                className="h-6 w-6 text-white/40 hover:text-white hover:bg-white/10 shrink-0"
+                title="Cancelar"
               >
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => onShareAndCopy(code.id, code.code, 'link')}
-                  className="h-7 w-7 text-white/40 hover:text-white"
-                  title="Copiar link (debita energia)"
-                >
-                  {isLinkCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
-                </Button>
-              </motion.div>
-            </>
-          )}
-        </div>
-      )}
+                <X className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
