@@ -27,6 +27,7 @@ import { useOpenArenas, ArenaListing } from '@/hooks/useArenaListings';
 import { calculateArenaPool, getScaledArenaPrize } from '@/lib/arenaPayouts';
 import { OnlinePlayer } from '@/hooks/useOnlinePlayers';
 import { ReferralHistoryPanel } from './ReferralHistoryPanel';
+import { LanguageSelector } from '@/components/LanguageSelector';
 
 import { CreatorDescendancyPanel } from './CreatorDescendancyPanel';
 import { TransferPanel } from './TransferPanel';
@@ -376,9 +377,12 @@ export function SkemaLobby({
                   </div>
                 ) : null;
               })()}
-              <Button variant="ghost" size="icon" onClick={onLogout} className="text-white/50 hover:text-white">
-                <LogOut className="w-5 h-5" />
-              </Button>
+              <div className="flex items-center gap-1">
+                <LanguageSelector />
+                <Button variant="ghost" size="icon" onClick={onLogout} className="text-white/50 hover:text-white">
+                  <LogOut className="w-5 h-5" />
+                </Button>
+              </div>
             </div>
           </div>
           
