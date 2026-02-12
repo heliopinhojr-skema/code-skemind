@@ -354,6 +354,9 @@ export function SkemaLobby({
                     <span>{onlineCount} online</span>
                   </span>
                 </div>
+                <div className="mt-1">
+                  <InvestorBanner playerId={player.id} playerName={player.name} />
+                </div>
                 {player.invitedByName && (
                   <div className="text-xs text-purple-300 mt-0.5">
                     🔗 Convidado por <span className="font-medium">{player.invitedByName}</span>
@@ -440,8 +443,8 @@ export function SkemaLobby({
             </div>
           </motion.div>
 
-          {/* Banner Investidor */}
-          <InvestorBanner playerId={player.id} playerName={player.name} />
+
+
 
           {/* ═══════════════════════════════════════════
               LOBBY POKERSTARS-STYLE — Tabs (logo abaixo do banner)
