@@ -73,34 +73,32 @@ export function InvestorBanner({ playerId, playerName }: InvestorBannerProps) {
           whileTap={{ scale: 0.98 }}
           className="mx-4 mt-3 cursor-pointer relative rounded-xl overflow-hidden border border-yellow-500/50 backdrop-blur-sm"
         >
-          <img src={investorImg} alt="" className="absolute inset-0 w-full h-full object-cover opacity-40" />
-          <div className="absolute inset-0 bg-black/50" />
-          <div className="relative z-10 flex items-center gap-3 px-4 py-3">
+          <img src={investorImg} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-black/70" />
+          <div className="relative z-10 flex flex-col items-center gap-2 px-4 py-4">
             <motion.div
               animate={{ scale: [1, 1.05, 1] }}
               transition={{ duration: 3, repeat: Infinity }}
-              className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0"
+              className="w-14 h-14 rounded-full overflow-hidden border-2 border-yellow-500/50 shadow-lg shadow-yellow-500/20"
             >
               <img src={skemaEmojis} alt="" className="w-full h-full object-cover" />
             </motion.div>
-            <div className="flex-1">
-              <p className="text-sm font-bold text-yellow-200/70">
-                Conheça as oportunidades s<span className="text-orange-400 font-bold">k</span>ema
-              </p>
-              <p className="text-[10px] text-yellow-300/60">
-                Interesse em participar como investidor? • Toque para saber mais
-              </p>
-            </div>
-            <div className="flex flex-col items-center gap-0.5">
-              <motion.div
+            <p className="text-base font-extrabold text-yellow-200 tracking-wide text-center">
+              Conheça as oportunidades s<span className="text-orange-400 font-bold">k</span>ema
+            </p>
+            <p className="text-[11px] text-yellow-300/70 text-center">
+              Interesse em participar como investidor? • Toque para saber mais
+            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <motion.span
                 key={count}
                 initial={{ scale: 1.3, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="text-lg font-black text-yellow-300"
+                className="text-xl font-black text-yellow-300"
               >
                 {count}
-              </motion.div>
-              <span className="text-[9px] text-yellow-400/60">interessados</span>
+              </motion.span>
+              <span className="text-[10px] text-yellow-400/60">interessados</span>
             </div>
           </div>
         </motion.div>
