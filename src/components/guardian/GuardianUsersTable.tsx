@@ -238,7 +238,9 @@ export function GuardianUsersTable() {
                   }}
                 >
                   {/* Avatar */}
-                  <span className="text-xl flex-shrink-0">{player.emoji}</span>
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 border border-border/60 flex items-center justify-center flex-shrink-0 shadow-sm">
+                    <span className="text-lg leading-none">{player.emoji || '🎮'}</span>
+                  </div>
                   
                   {/* Info principal - nome + tier na mesma linha */}
                   <div className="flex-1 min-w-0">
