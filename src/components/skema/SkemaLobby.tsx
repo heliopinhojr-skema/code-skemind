@@ -37,6 +37,7 @@ import { GenerationColorPicker } from './GenerationColorPicker';
 import universeBg from '@/assets/universe-bg.jpg';
 import skemaNebula from '@/assets/skema-nebula.jpeg';
 import { InvestorBanner } from './InvestorBanner';
+import { CreatorsMissionBoard } from './CreatorsMissionBoard';
 
 // Type for online presence passed from parent
 interface OnlinePresenceData {
@@ -443,8 +444,8 @@ export function SkemaLobby({
             </div>
           </motion.div>
 
-
-
+          {/* Missão dos Criadores */}
+          <CreatorsMissionBoard />
 
           {/* ═══════════════════════════════════════════
               LOBBY POKERSTARS-STYLE — Tabs (logo abaixo do banner)
