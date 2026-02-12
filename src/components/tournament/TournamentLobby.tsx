@@ -403,26 +403,53 @@ export function TournamentLobby({
               openArenas.map((arena) => {
                 const pool = calculateArenaPool(arena.buy_in, arena.rake_fee, arena.bot_count);
                 const canAffordArena = credits >= arena.buy_in;
+                const isMedioArena = arena.iq_min === 90 && arena.iq_max === 110;
                 
                 return (
                   <motion.div
                     key={arena.id}
-                    whileHover={{ scale: 1.01 }}
-                    className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-3"
+                    whileHover={{ scale: 1.02 }}
+                    className={`relative overflow-hidden rounded-xl p-3 border ${
+                      isMedioArena
+                        ? 'border-purple-400/40 shadow-lg shadow-purple-500/20'
+                        : 'border-yellow-500/20'
+                    }`}
+                    style={isMedioArena ? {
+                      background: 'linear-gradient(135deg, rgba(88,28,135,0.4) 0%, rgba(15,23,42,0.6) 25%, rgba(30,64,175,0.35) 50%, rgba(88,28,135,0.3) 75%, rgba(6,182,212,0.3) 100%)',
+                    } : {
+                      background: 'linear-gradient(to right, rgba(234,179,8,0.1), rgba(249,115,22,0.1))',
+                    }}
                   >
-                    <div className="flex items-center justify-between">
+                    {/* Furta-cor shimmer overlay for Qi MEDIO */}
+                    {isMedioArena && (
+                      <motion.div
+                        className="absolute inset-0 opacity-30 pointer-events-none"
+                        style={{
+                          background: 'linear-gradient(90deg, transparent 0%, rgba(168,85,247,0.4) 25%, rgba(56,189,248,0.4) 50%, rgba(232,121,249,0.4) 75%, transparent 100%)',
+                          backgroundSize: '200% 100%',
+                        }}
+                        animate={{ backgroundPosition: ['200% 0%', '-200% 0%'] }}
+                        transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+                      />
+                    )}
+                    
+                    <div className="relative z-10 flex items-center justify-between">
                       <div>
-                        <div className="font-medium text-white flex items-center gap-2">
-                          {arena.creator_emoji} {arena.name}
+                        <div className={`font-bold flex items-center gap-2 ${isMedioArena ? 'text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-cyan-300 to-pink-300' : 'text-white'}`}>
+                          {isMedioArena ? '🧠' : arena.creator_emoji} {arena.name}
                         </div>
                         <div className="flex items-center gap-3 mt-1 text-xs text-white/50">
                           <span><Users className="w-3 h-3 inline mr-1" />{arena.bot_count + 1} jogadores</span>
-                          <span>por {arena.creator_name}</span>
+                          {isMedioArena ? (
+                            <span className="text-purple-300/80 font-medium">IQ 90-110 • Lógicos</span>
+                          ) : (
+                            <span>por {arena.creator_name}</span>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-right">
-                          <div className="flex items-center justify-end gap-1 text-yellow-400">
+                          <div className={`flex items-center justify-end gap-1 ${isMedioArena ? 'text-cyan-300' : 'text-yellow-400'}`}>
                             <Coins className="w-4 h-4" />
                             <span className="font-bold">{formatEnergy(arena.buy_in)}</span>
                           </div>
@@ -433,7 +460,7 @@ export function TournamentLobby({
                           size="sm"
                           onClick={() => handleEnrollArena(arena)}
                           disabled={!canAffordArena || isStarting}
-                          className="h-9"
+                          className={`h-9 ${isMedioArena ? 'bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 border-0 shadow-md shadow-purple-500/30' : ''}`}
                         >
                           Jogar
                         </Button>
