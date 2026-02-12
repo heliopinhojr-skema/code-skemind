@@ -283,6 +283,26 @@ export function GuardianUsersTable() {
                         {format(new Date(player.created_at), "dd/MM/yy", { locale: ptBR })}
                       </span>
                     </div>
+                    {/* Barra de meta de convites */}
+                    {balance.maxInvites > 0 && (
+                      <div className="mt-1.5 w-full">
+                        <div className="w-full h-1.5 rounded-full bg-muted/40 overflow-hidden">
+                          {(() => {
+                            const pct = Math.min(100, (balance.invitesSent / balance.maxInvites) * 100);
+                            const barColor = pct >= 80 ? 'bg-emerald-500' 
+                              : pct >= 40 ? 'bg-amber-400' 
+                              : pct > 0 ? 'bg-orange-500' 
+                              : 'bg-destructive/40';
+                            return (
+                              <div 
+                                className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                                style={{ width: `${Math.max(pct, 3)}%` }}
+                              />
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Delete button */}
