@@ -10,7 +10,7 @@ import { Trophy, Clock, Target, Loader2, Crown, Eye, DollarSign } from 'lucide-r
 import { TournamentPlayer, TournamentResult } from '@/hooks/useTournament';
 import { Symbol } from '@/components/game/Symbol';
 import type { GameSymbol } from '@/hooks/useGame';
-import { isITM, getScaledArenaPrize, ITM_POSITIONS } from '@/lib/arenaPayouts';
+import { isITM, getScaledArenaPrize, getITMCount } from '@/lib/arenaPayouts';
 
 interface TournamentLeaderboardProps {
   players: TournamentPlayer[];
@@ -65,7 +65,7 @@ export function TournamentLeaderboard({
       <div className="bg-muted/50 px-4 py-3 border-b flex items-center gap-2">
         <Trophy className="w-5 h-5 text-yellow-500" />
         <span className="font-bold">Ranking</span>
-        <span className="text-xs text-muted-foreground ml-1">ITM: top {ITM_POSITIONS}</span>
+        <span className="text-xs text-muted-foreground ml-1">ITM: top {getITMCount(players.length)}</span>
         {!isFinished && (
           <Loader2 className="w-4 h-4 ml-auto animate-spin text-muted-foreground" />
         )}
@@ -79,8 +79,8 @@ export function TournamentLeaderboard({
             const isWaiting = !result || result.status === 'waiting';
             const isPlaying = result?.status === 'playing';
             const rank = isFinished && result?.rank ? result.rank : (isWaiting || isPlaying ? '-' : index + 1);
-            const itmPosition = typeof rank === 'number' && isITM(rank);
-            const prize = typeof rank === 'number' ? getScaledArenaPrize(rank, arenaPool) : 0;
+            const itmPosition = typeof rank === 'number' && isITM(rank, players.length);
+            const prize = typeof rank === 'number' ? getScaledArenaPrize(rank, arenaPool, players.length) : 0;
             return (
               <motion.div
                 key={player.id}
@@ -92,7 +92,7 @@ export function TournamentLeaderboard({
                   px-4 py-3
                   ${isHuman ? 'bg-primary/10' : ''}
                   ${result?.status === 'won' && isFinished && itmPosition ? 'bg-green-500/10' : ''}
-                  ${isFinished && typeof rank === 'number' && rank === ITM_POSITIONS ? 'border-b-2 border-dashed border-yellow-500/30' : ''}
+                  ${isFinished && typeof rank === 'number' && rank === getITMCount(players.length) ? 'border-b-2 border-dashed border-yellow-500/30' : ''}
                 `}
               >
                 <div className="flex items-center gap-3">

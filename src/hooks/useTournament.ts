@@ -12,7 +12,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { generateSecret, CODE_LENGTH, MAX_ATTEMPTS } from '@/lib/mastermindEngine';
 import { createBot, simulateBotGame } from '@/lib/botAI';
 import { UI_SYMBOLS, GAME_DURATION } from './useGame';
-import { getScaledArenaPrize, isITM, ITM_POSITIONS, calculateArenaPool } from '@/lib/arenaPayouts';
+import { getScaledArenaPrize, isITM, getITMCount, calculateArenaPool } from '@/lib/arenaPayouts';
 import { supabase } from '@/integrations/supabase/client';
 
 // ==================== TIPOS ====================
@@ -105,14 +105,14 @@ export function useTournament() {
   }, []);
   
   // Calcula o total de prêmios dos bots a partir dos resultados
-  const calculateBotPrizesTotal = useCallback((allResults: TournamentResult[], pool: number) => {
+  const calculateBotPrizesTotal = useCallback((allResults: TournamentResult[], pool: number, totalPlayers: number) => {
     let total = 0;
     for (const result of allResults) {
-      if (result.playerId !== humanPlayerId && isITM(result.rank)) {
-        total += getScaledArenaPrize(result.rank, pool);
+      if (result.playerId !== humanPlayerId && isITM(result.rank, totalPlayers)) {
+        total += getScaledArenaPrize(result.rank, pool, totalPlayers);
       }
     }
-    return Math.round(total * 100) / 100; // round to 2 decimals
+    return Math.round(total * 100) / 100;
   }, [humanPlayerId]);
 
   // Configura arena customizada (chamado pelo lobby antes de iniciar)
@@ -356,12 +356,13 @@ export function useTournament() {
     // ── Processa economia via Edge Function ──
     // Usa ref para pool ativo - imune a race conditions do React state
     const pool = activePoolRef.current || arenaPool;
+    const totalPlayersCount = rankedResults.length;
     const humanResult = rankedResults.find(r => r.playerId === humanPlayerId)!;
-    const humanPrize = isITM(humanResult.rank)
-      ? getScaledArenaPrize(humanResult.rank, pool)
+    const humanPrize = isITM(humanResult.rank, totalPlayersCount)
+      ? getScaledArenaPrize(humanResult.rank, pool, totalPlayersCount)
       : 0;
 
-    const botPrizesTotal = calculateBotPrizesTotal(rankedResults, pool);
+    const botPrizesTotal = calculateBotPrizesTotal(rankedResults, pool, totalPlayersCount);
 
     console.log(`[TOURNAMENT] Finishing - Player rank: #${humanResult.rank}, prize: k$${humanPrize.toFixed(2)}, bot prizes total: k$${botPrizesTotal.toFixed(2)}, pool: k$${pool.toFixed(2)}`);
 

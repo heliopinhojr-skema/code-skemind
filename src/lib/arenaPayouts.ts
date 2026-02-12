@@ -1,25 +1,35 @@
 /**
  * arenaPayouts - Tabela de pagamento estilo poker para Arena x Bots
  * 
- * Base: 100 jogadores, 25 ITM (25% do field)
- * Pool base: k$50.00 (100 × k$0.50 buy-in)
+ * ITM = 25% do field (dinâmico)
+ * Pool base: total_players × net_buy_in
  * 
  * Estrutura escalável:
  * - Percentuais fixos aplicados ao pool total
- * - Pool escala com buy_in: pool = 100 × net_buy_in
+ * - Pool escala com buy_in
  * - net_buy_in = buy_in - rake (rake ≈ 9.09% do buy_in)
  * 
  * Todos os valores em CENTAVOS para evitar floating-point.
  */
 
-/** Número de posições pagas (25% de 100) */
+/** Percentual do field que recebe prêmio */
+export const ITM_PERCENT = 0.25;
+
+/** Número legado de posições pagas (100 players) - backward compat */
 export const ITM_POSITIONS = 25;
 
 /**
- * Tabela de pagamento em MILÉSIMOS (‰) do pool total.
- * Soma = 1000‰ = 100%
+ * Calcula quantas posições são pagas (25% do field, mínimo 1).
  */
-const PAYOUT_PERMIL: Record<number, number> = {
+export function getITMCount(totalPlayers: number): number {
+  return Math.max(1, Math.floor(totalPlayers * ITM_PERCENT));
+}
+
+/**
+ * Tabela de pagamento em MILÉSIMOS (‰) do pool total para até 25 posições.
+ * Para fields menores, redistribui os ‰ das posições cortadas.
+ */
+const PAYOUT_PERMIL_25: Record<number, number> = {
   1:  270,  // 27.0%
   2:  160,  // 16.0%
   3:  100,  // 10.0%
@@ -39,16 +49,44 @@ const PAYOUT_PERMIL: Record<number, number> = {
 };
 
 // Validação estática: soma = 1000‰
-const _TOTAL_PERMIL = Object.values(PAYOUT_PERMIL).reduce((a, b) => a + b, 0);
+const _TOTAL_PERMIL = Object.values(PAYOUT_PERMIL_25).reduce((a, b) => a + b, 0);
 if (_TOTAL_PERMIL !== 1000) {
   console.error(`[ARENA PAYOUTS] ❌ Soma dos permil errada: ${_TOTAL_PERMIL} (esperado 1000)`);
 }
 
 /**
+ * Gera tabela de pagamento dinâmica para N posições ITM.
+ * Pega os top N da tabela de 25 e redistribui os ‰ restantes proporcionalmente.
+ */
+function buildPayoutTable(itmCount: number): Record<number, number> {
+  if (itmCount >= 25) return { ...PAYOUT_PERMIL_25 };
+  
+  // Soma dos ‰ das posições que existem
+  let usedPermil = 0;
+  const table: Record<number, number> = {};
+  
+  for (let i = 1; i <= itmCount; i++) {
+    table[i] = PAYOUT_PERMIL_25[i] || 11;
+    usedPermil += table[i];
+  }
+  
+  // Redistribui o restante (1000 - usedPermil) proporcionalmente
+  const remaining = 1000 - usedPermil;
+  if (remaining > 0 && itmCount > 0) {
+    for (let i = 1; i <= itmCount; i++) {
+      const share = Math.floor(remaining * (table[i] / usedPermil));
+      table[i] += share;
+    }
+    // Ajusta arredondamento no 1º lugar
+    const newTotal = Object.values(table).reduce((a, b) => a + b, 0);
+    table[1] += (1000 - newTotal);
+  }
+  
+  return table;
+}
+
+/**
  * Calcula o pool total para uma arena com buy-in e bot_count customizados.
- * total_players = bot_count + 1 (humano)
- * net_buy_in = buy_in - rake_fee
- * pool = total_players × net_buy_in
  */
 export function calculateArenaPool(buyIn: number, rakeFee: number, botCount: number = 99): number {
   const totalPlayers = botCount + 1;
@@ -64,22 +102,31 @@ export function calculateTotalRake(rakeFee: number, botCount: number = 99): numb
 }
 
 /**
- * Retorna o prêmio em k$ para uma posição no ranking, dado um pool total.
- * Retorna 0 se a posição não é ITM (> 25).
+ * Retorna o prêmio em k$ para uma posição no ranking.
+ * totalPlayers é usado para calcular ITM dinâmico (25% do field).
  */
-export function getScaledArenaPrize(rank: number, pool: number): number {
-  const permil = PAYOUT_PERMIL[rank];
+export function getScaledArenaPrize(rank: number, pool: number, totalPlayers: number = 100): number {
+  const itmCount = getITMCount(totalPlayers);
+  if (rank < 1 || rank > itmCount) return 0;
+  
+  const table = buildPayoutTable(itmCount);
+  const permil = table[rank];
   if (!permil) return 0;
-  // prize = pool × (permil / 1000), arredondado para 2 casas
+  
   return Math.round(pool * permil / 1000 * 100) / 100;
 }
 
 /**
- * Retorna o prêmio em centavos para uma posição, dado um pool total.
+ * Retorna o prêmio em centavos para uma posição.
  */
-export function getScaledArenaPrizeCents(rank: number, pool: number): number {
-  const permil = PAYOUT_PERMIL[rank];
+export function getScaledArenaPrizeCents(rank: number, pool: number, totalPlayers: number = 100): number {
+  const itmCount = getITMCount(totalPlayers);
+  if (rank < 1 || rank > itmCount) return 0;
+  
+  const table = buildPayoutTable(itmCount);
+  const permil = table[rank];
   if (!permil) return 0;
+  
   return Math.round(pool * permil / 1000 * 100);
 }
 
@@ -89,61 +136,69 @@ export function getScaledArenaPrizeCents(rank: number, pool: number): number {
 const DEFAULT_POOL = 50;
 
 /**
- * Retorna o prêmio em k$ para a arena padrão (buy-in k$0.55).
- * Mantém backward-compatibility.
+ * Retorna o prêmio em k$ para a arena padrão (100 players).
  */
 export function getArenaPrize(rank: number): number {
-  return getScaledArenaPrize(rank, DEFAULT_POOL);
+  return getScaledArenaPrize(rank, DEFAULT_POOL, 100);
 }
 
 /**
  * Retorna o prêmio em centavos para a arena padrão.
  */
 export function getArenaPrizeCents(rank: number): number {
-  return getScaledArenaPrizeCents(rank, DEFAULT_POOL);
+  return getScaledArenaPrizeCents(rank, DEFAULT_POOL, 100);
 }
 
 /**
  * Verifica se uma posição está ITM (In The Money).
  */
-export function isITM(rank: number): boolean {
-  return rank >= 1 && rank <= ITM_POSITIONS;
+export function isITM(rank: number, totalPlayers: number = 100): boolean {
+  return rank >= 1 && rank <= getITMCount(totalPlayers);
 }
 
 /**
  * Retorna a tabela completa de pagamento formatada para um pool dado.
  */
-export function getPayoutSummary(pool: number = DEFAULT_POOL): Array<{
+export function getPayoutSummary(pool: number = DEFAULT_POOL, totalPlayers: number = 100): Array<{
   positions: string;
   prizeEach: number;
   label: string;
 }> {
-  return [
-    { positions: '1º',      prizeEach: getScaledArenaPrize(1, pool),  label: 'Campeão' },
-    { positions: '2º',      prizeEach: getScaledArenaPrize(2, pool),  label: 'Vice' },
-    { positions: '3º',      prizeEach: getScaledArenaPrize(3, pool),  label: 'Bronze' },
-    { positions: '4º',      prizeEach: getScaledArenaPrize(4, pool),  label: '' },
-    { positions: '5º',      prizeEach: getScaledArenaPrize(5, pool),  label: '' },
-    { positions: '6º',      prizeEach: getScaledArenaPrize(6, pool),  label: '' },
-    { positions: '7º',      prizeEach: getScaledArenaPrize(7, pool),  label: '' },
-    { positions: '8º',      prizeEach: getScaledArenaPrize(8, pool),  label: '' },
-    { positions: '9º',      prizeEach: getScaledArenaPrize(9, pool),  label: '' },
-    { positions: '10º',     prizeEach: getScaledArenaPrize(10, pool), label: '' },
-    { positions: '11º-15º', prizeEach: getScaledArenaPrize(11, pool), label: '' },
-    { positions: '16º-20º', prizeEach: getScaledArenaPrize(16, pool), label: '' },
-    { positions: '21º-25º', prizeEach: getScaledArenaPrize(21, pool), label: 'Min-cash' },
-  ];
+  const itmCount = getITMCount(totalPlayers);
+  const table = buildPayoutTable(itmCount);
+  const result: Array<{ positions: string; prizeEach: number; label: string }> = [];
+  
+  const labels: Record<number, string> = { 1: 'Campeão', 2: 'Vice', 3: 'Bronze' };
+  
+  let i = 1;
+  while (i <= itmCount) {
+    // Check if next positions have same permil value for grouping
+    let j = i + 1;
+    while (j <= itmCount && table[j] === table[i]) j++;
+    
+    const count = j - i;
+    const positions = count === 1 ? `${i}º` : `${i}º-${j - 1}º`;
+    const label = i <= 3 ? (labels[i] || '') : (j - 1 === itmCount ? 'Min-cash' : '');
+    
+    result.push({
+      positions,
+      prizeEach: Math.round(pool * table[i] / 1000 * 100) / 100,
+      label,
+    });
+    
+    i = j;
+  }
+  
+  return result;
 }
 
 /**
  * Taxa fixa de rake: 9.09% (1/11 do buy-in total).
- * Isso garante: rake = buy_in × (1/11) ≈ 9.09%
  */
 export const RAKE_RATE = 1 / 11;
 
 /**
- * Calcula buy-in e rake a partir de um valor total de entrada digitado pelo Guardian.
- * rake = arredondado(buyIn × RAKE_RATE, 2 casas)
+ * Calcula buy-in e rake a partir de um valor total de entrada.
  */
 export function computeBuyInAndRake(totalEntry: number): { buyIn: number; rakeFee: number } {
   const rakeFee = Math.round(totalEntry * RAKE_RATE * 100) / 100;
@@ -151,7 +206,7 @@ export function computeBuyInAndRake(totalEntry: number): { buyIn: number; rakeFe
 }
 
 /**
- * Pre-defined arena buy-in options (backward compat / quick-select).
+ * Pre-defined arena buy-in options.
  */
 export const ARENA_BUY_IN_OPTIONS = [
   { buyIn: 0.55,  rakeFee: 0.05,  label: 'k$ 0,55' },
