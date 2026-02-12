@@ -21,7 +21,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useArenaListings, useCreateArena, useCloseArena, useDeleteArena, useBotTreasuryBalance } from '@/hooks/useArenaListings';
+import { useArenaListings, useCreateArena, useCloseArena, useDeleteArena, useUpdateArena, useBotTreasuryBalance } from '@/hooks/useArenaListings';
 import { useSupabasePlayer } from '@/hooks/useSupabasePlayer';
 import {
   ARENA_BOT_OPTIONS,
@@ -33,7 +33,7 @@ import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
-  Swords, Plus, Bot, Users, Zap, Trophy, Ban, Loader2, Trash2
+  Swords, Plus, Bot, Users, Zap, Trophy, Ban, Loader2, Trash2, Pencil
 } from 'lucide-react';
 
 const statusColors: Record<string, string> = {
@@ -51,6 +51,7 @@ export function GuardianArenasPanel() {
   const createArena = useCreateArena();
   const closeArena = useCloseArena();
   const deleteArena = useDeleteArena();
+  const updateArena = useUpdateArena();
   const { player } = useSupabasePlayer();
   const { data: botTreasuryBalance } = useBotTreasuryBalance();
   const [isCreating, setIsCreating] = useState(false);
@@ -58,16 +59,30 @@ export function GuardianArenasPanel() {
   const [selectedBots, setSelectedBots] = useState(99);
   const [arenaName, setArenaName] = useState('');
 
+  // Edit state
+  const [editingArena, setEditingArena] = useState<any>(null);
+  const [editName, setEditName] = useState('');
+  const [editBuyInInput, setEditBuyInInput] = useState('');
+  const [editBots, setEditBots] = useState(99);
+
   const parsedBuyIn = parseFloat(customBuyInInput) || 0;
   const { buyIn, rakeFee } = computeBuyInAndRake(parsedBuyIn);
   const pool = calculateArenaPool(buyIn, rakeFee, selectedBots);
   const totalRake = calculateTotalRake(rakeFee, selectedBots);
   const first = getScaledArenaPrize(1, pool);
   const minCash = getScaledArenaPrize(25, pool);
-  const isValidBuyIn = parsedBuyIn >= 0.11; // mínimo k$ 0,11
+  const isValidBuyIn = parsedBuyIn >= 0.11;
   const botTotalNeeded = selectedBots * parsedBuyIn;
   const treasurySufficient = (botTreasuryBalance ?? 0) >= botTotalNeeded;
   const maxBuyInSupported = selectedBots > 0 ? Math.floor(((botTreasuryBalance ?? 0) / selectedBots) * 100) / 100 : 0;
+
+  // Edit computations
+  const editParsedBuyIn = parseFloat(editBuyInInput) || 0;
+  const editComputed = computeBuyInAndRake(editParsedBuyIn);
+  const editPool = calculateArenaPool(editComputed.buyIn, editComputed.rakeFee, editBots);
+  const editIsValid = editParsedBuyIn >= 0.11;
+  const editBotTotal = editBots * editParsedBuyIn;
+  const editTreasurySufficient = (botTreasuryBalance ?? 0) >= editBotTotal;
 
   const handleCreate = async () => {
     if (!player?.id || !arenaName.trim() || !isValidBuyIn) return;
@@ -110,6 +125,30 @@ export function GuardianArenasPanel() {
     try {
       await deleteArena.mutateAsync(arenaId);
       toast({ title: 'Arena excluída', description: `"${name}" foi removida.` });
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  const openEdit = (arena: any) => {
+    setEditingArena(arena);
+    setEditName(arena.name);
+    setEditBuyInInput(String(Number(arena.buy_in) + Number(arena.rake_fee)));
+    setEditBots(arena.bot_count);
+  };
+
+  const handleUpdate = async () => {
+    if (!editingArena || !editName.trim() || !editIsValid) return;
+    try {
+      await updateArena.mutateAsync({
+        id: editingArena.id,
+        name: editName.trim(),
+        buy_in: editComputed.buyIn,
+        rake_fee: editComputed.rakeFee,
+        bot_count: editBots,
+      });
+      toast({ title: '✏️ Arena atualizada', description: `"${editName}" foi editada.` });
+      setEditingArena(null);
     } catch (err: any) {
       toast({ title: 'Erro', description: err.message, variant: 'destructive' });
     }
@@ -318,15 +357,24 @@ export function GuardianArenasPanel() {
                         <TableCell>
                           <div className="flex items-center gap-1">
                             {arena.status === 'open' && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleClose(arena.id, arena.name)}
-                                disabled={closeArena.isPending}
-                              >
-                                <Ban className="h-3 w-3 mr-1" />
-                                Fechar
-                              </Button>
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openEdit(arena)}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleClose(arena.id, arena.name)}
+                                  disabled={closeArena.isPending}
+                                >
+                                  <Ban className="h-3 w-3 mr-1" />
+                                  Fechar
+                                </Button>
+                              </>
                             )}
                             <Button
                               variant="ghost"
@@ -348,6 +396,92 @@ export function GuardianArenasPanel() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Arena Dialog */}
+      <Dialog open={!!editingArena} onOpenChange={(open) => !open && setEditingArena(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Arena</DialogTitle>
+            <DialogDescription>
+              Altere nome, buy-in ou número de bots.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label>Nome da Arena</Label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Buy-in Total (k$)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0.11"
+                  value={editBuyInInput}
+                  onChange={(e) => setEditBuyInInput(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Rake: {(RAKE_RATE * 100).toFixed(2)}% → k$ {formatEnergy(editComputed.rakeFee)}/entrada
+                </p>
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Bots</Label>
+                <Select
+                  value={String(editBots)}
+                  onValueChange={(v) => setEditBots(Number(v))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ARENA_BOT_OPTIONS.map((n) => (
+                      <SelectItem key={n} value={String(n)}>
+                        {n} bots
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="bg-muted/30 rounded-lg p-3 space-y-1 text-sm border border-border/50">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Pool total</span>
+                <span className="font-mono font-bold">{formatEnergy(editPool)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Bot Treasury</span>
+                <span className={`font-mono ${editTreasurySufficient ? 'text-green-400' : 'text-destructive font-bold'}`}>
+                  {formatEnergy(botTreasuryBalance ?? 0)}
+                </span>
+              </div>
+              {!editTreasurySufficient && editIsValid && (
+                <div className="mt-1 p-2 rounded bg-destructive/10 border border-destructive/30 text-destructive text-xs">
+                  ⚠️ Bot Treasury insuficiente para este buy-in!
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingArena(null)}>Cancelar</Button>
+            <Button
+              onClick={handleUpdate}
+              disabled={!editName.trim() || !editIsValid || !editTreasurySufficient || updateArena.isPending}
+            >
+              {updateArena.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
