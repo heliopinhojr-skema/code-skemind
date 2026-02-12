@@ -211,6 +211,35 @@ export type Database = {
           },
         ]
       }
+      investor_interest: {
+        Row: {
+          created_at: string
+          id: string
+          player_id: string
+          player_name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          player_id: string
+          player_name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          player_id?: string
+          player_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investor_interest_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invite_codes: {
         Row: {
           code: string
