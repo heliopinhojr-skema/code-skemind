@@ -78,13 +78,13 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
     staleTime: 30_000,
   });
 
-  // Fetch which generation colors are taken and by whom
+  // Fetch which generation colors are taken and by whom (include emoji)
   const { data: takenColors } = useQuery({
     queryKey: ['guardian-taken-colors'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('name, generation_color, player_tier')
+        .select('name, generation_color, player_tier, emoji')
         .not('generation_color', 'is', null)
         .in('player_tier', ['Criador', 'guardiao']);
       if (error) throw error;
@@ -701,7 +701,7 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
                   <span className="text-[11px] font-medium text-foreground">{color.name}</span>
                   {isTaken ? (
                     <Badge variant="secondary" className="text-[9px] px-1.5 py-0.5 gap-1">
-                      🔒 {owner.name}
+                      🔒 {owner.emoji} {owner.name}
                     </Badge>
                   ) : (
                     <Badge variant="outline" className="text-[9px] px-1.5 py-0.5 text-muted-foreground">
