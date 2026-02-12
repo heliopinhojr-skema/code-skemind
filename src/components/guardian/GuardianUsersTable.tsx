@@ -20,6 +20,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { PlayerDetailDrawer } from './PlayerDetailDrawer';
 import { Search, Users, Shield, Crown, Swords, Gamepad2, Zap, Rocket, Star, Lock, Unlock, Trash2 } from 'lucide-react';
+import { getColorConfig, PlanetFace } from '@/components/skema/GenerationColorPicker';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { calculateBalanceBreakdown, formatEnergy } from '@/lib/tierEconomy';
@@ -244,11 +245,23 @@ export function GuardianUsersTable() {
                     setDrawerOpen(true);
                   }}
                 >
-                  {/* Avatar — glowing orb */}
-                  <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${tierConfig.glow} flex items-center justify-center flex-shrink-0 shadow-lg relative`}>
-                    <div className={`absolute inset-0 rounded-full bg-gradient-to-br ${tierConfig.glow} blur-md opacity-40`} />
-                    <span className="text-lg leading-none relative z-10 drop-shadow-md">{player.emoji || '😌'}</span>
-                  </div>
+                  {/* Avatar — PlanetFace if generation_color, else glowing orb with emoji */}
+                  {(() => {
+                    const genColor = getColorConfig((player as any).generation_color);
+                    if (genColor) {
+                      return (
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${genColor.bg} ${genColor.glow}`}>
+                          <PlanetFace className={genColor.face} />
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${tierConfig.glow} flex items-center justify-center flex-shrink-0 shadow-lg relative`}>
+                        <div className={`absolute inset-0 rounded-full bg-gradient-to-br ${tierConfig.glow} blur-md opacity-40`} />
+                        <span className="text-lg leading-none relative z-10 drop-shadow-md">{player.emoji || '😌'}</span>
+                      </div>
+                    );
+                  })()}
                   
                   {/* Info principal - nome + tier na mesma linha */}
                   <div className="flex-1 min-w-0">

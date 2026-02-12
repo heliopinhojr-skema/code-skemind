@@ -237,7 +237,7 @@ export function usePlayersList() {
       // Select only non-sensitive fields (exclude pin)
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, user_id, name, emoji, energy, invite_code, invited_by, invited_by_name, player_tier, stats_wins, stats_races, stats_best_time, created_at, updated_at')
+        .select('id, user_id, name, emoji, energy, invite_code, invited_by, invited_by_name, player_tier, generation_color, stats_wins, stats_races, stats_best_time, created_at, updated_at')
         .neq('player_tier', 'master_admin')
         .order('created_at', { ascending: false });
       
