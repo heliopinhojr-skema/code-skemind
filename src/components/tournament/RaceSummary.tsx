@@ -13,7 +13,7 @@ import { Trophy, Target, Clock, Star, Users, TrendingUp, Medal, Zap, DollarSign,
 import { Symbol } from '@/components/game/Symbol';
 import type { TournamentPlayer, TournamentResult } from '@/hooks/useTournament';
 import type { GameSymbol } from '@/hooks/useGame';
-import { isITM, ITM_POSITIONS, getScaledArenaPrize, getPayoutSummary } from '@/lib/arenaPayouts';
+import { isITM, getITMCount, getScaledArenaPrize, getPayoutSummary } from '@/lib/arenaPayouts';
 import { useState } from 'react';
 
 interface RaceSummaryProps {
@@ -42,14 +42,14 @@ export function RaceSummary({
   const rank = humanResult.rank;
   
   // Compute prize from arenaPool directly to avoid stale-state inconsistencies
-  const computedPrize = isITM(rank) ? getScaledArenaPrize(rank, arenaPool) : 0;
+  const computedPrize = isITM(rank, totalPlayers) ? getScaledArenaPrize(rank, arenaPool, totalPlayers) : 0;
   
   // Posição visual
   const getRankDisplay = () => {
     if (rank === 1) return { icon: '🏆', text: 'CAMPEÃO!', color: 'text-yellow-400' };
     if (rank === 2) return { icon: '🥈', text: 'Vice-Campeão', color: 'text-gray-300' };
     if (rank === 3) return { icon: '🥉', text: '3º Lugar', color: 'text-orange-400' };
-    if (isITM(rank)) return { icon: '💰', text: `${rank}º Lugar • ITM`, color: 'text-green-400' };
+    if (isITM(rank, totalPlayers)) return { icon: '💰', text: `${rank}º Lugar • ITM`, color: 'text-green-400' };
     return { icon: '📊', text: `${rank}º de ${totalPlayers}`, color: 'text-muted-foreground' };
   };
   
@@ -68,7 +68,7 @@ export function RaceSummary({
     .sort((a, b) => a.rank - b.rank);
 
   // Tabela de premiação completa
-  const payoutTable = getPayoutSummary(arenaPool);
+  const payoutTable = getPayoutSummary(arenaPool, totalPlayers);
 
   return (
     <motion.div
@@ -89,8 +89,8 @@ export function RaceSummary({
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
           Posição {rank} de {totalPlayers} jogadores
-          {isITM(rank) && rank > 3 && <span className="text-green-400 ml-1">• ITM</span>}
-          {!isITM(rank) && <span className="text-red-400/60 ml-1">• Fora do ITM ({ITM_POSITIONS}º pago)</span>}
+          {isITM(rank, totalPlayers) && rank > 3 && <span className="text-green-400 ml-1">• ITM</span>}
+          {!isITM(rank, totalPlayers) && <span className="text-red-400/60 ml-1">• Fora do ITM ({getITMCount(totalPlayers)}º pago)</span>}
         </p>
       </motion.div>
 
@@ -197,14 +197,14 @@ export function RaceSummary({
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Medal className="w-3 h-3" />
           <span>Pódio & Prêmios</span>
-          <span className="ml-auto text-white/40">25 ITM de {totalPlayers}</span>
+          <span className="ml-auto text-white/40">{getITMCount(totalPlayers)} ITM de {totalPlayers}</span>
         </div>
         <div className="space-y-1">
           {top5.map((result, i) => {
             const player = players.find(p => p.id === result.playerId);
             const isHuman = result.playerId === humanResult.playerId;
             const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
-            const prize = getScaledArenaPrize(result.rank, arenaPool);
+            const prize = getScaledArenaPrize(result.rank, arenaPool, totalPlayers);
             
             return (
               <motion.div

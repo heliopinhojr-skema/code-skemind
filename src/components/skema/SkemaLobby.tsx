@@ -519,7 +519,7 @@ export function SkemaLobby({
 
                     return allArenas.map((arena) => {
                       const pool = calculateArenaPool(arena.buy_in, arena.rake_fee, arena.bot_count);
-                      const first = getScaledArenaPrize(1, pool);
+                      const first = getScaledArenaPrize(1, pool, arena.bot_count + 1);
                       const canAfford = Math.round(player.energy * 100) >= Math.round(arena.buy_in * 100);
                       return (
                         <motion.div
