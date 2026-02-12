@@ -1,8 +1,9 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { I18nProvider } from "@/i18n/I18nContext";
 import Skema from "./pages/Skema";
@@ -16,6 +17,23 @@ import DemoFaces from "./pages/DemoFaces";
 
 const queryClient = new QueryClient();
 
+// Intercept Supabase auth error redirects (e.g., "Código de verificação inválido")
+function AuthErrorInterceptor() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && (hash.includes('error_description') || hash.includes('error='))) {
+      console.warn('Auth redirect error intercepted, redirecting to /auth');
+      window.history.replaceState(null, '', location.pathname);
+      navigate('/auth', { replace: true });
+    }
+  }, [location, navigate]);
+
+  return null;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <I18nProvider>
@@ -23,6 +41,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <AuthErrorInterceptor />
           <Routes>
             {/* Public route */}
             <Route path="/auth" element={<Auth />} />
