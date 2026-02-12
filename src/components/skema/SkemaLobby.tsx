@@ -326,7 +326,7 @@ export function SkemaLobby({
                 if (genColor) {
                   return (
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center ${genColor.bg} ${genColor.glow}`}>
-                      <PlanetFace className={genColor.face} />
+                      <PlanetFace className={genColor.face} variant={player.name.length % 2 === 0 ? 'open' : 'closed'} />
                     </div>
                   );
                 }

@@ -35,16 +35,43 @@ export function getColorConfig(colorId: string | null) {
   return GENERATION_COLORS.find(c => c.id === colorId) || null;
 }
 
-// Planet face SVG (smiling closed-eyes face like the reference)
-export function PlanetFace({ className }: { className?: string }) {
+// Planet face SVG — two variants matching the cosmic orb reference
+// variant="closed" = serene closed eyes (left orb in reference)
+// variant="open" = cute big eyes (right orb in reference)
+export function PlanetFace({ className, variant = 'closed', size }: { className?: string; variant?: 'closed' | 'open'; size?: string }) {
+  const sizeClass = size || 'w-8 h-8';
+
+  if (variant === 'open') {
+    return (
+      <svg viewBox="0 0 60 60" className={`${sizeClass} ${className || ''}`}>
+        {/* Left eye - big round with iris & pupil & shine */}
+        <circle cx="20" cy="24" r="6.5" fill="white" opacity="0.95" />
+        <circle cx="21" cy="24.5" r="4" fill="#1a3a5c" />
+        <circle cx="21" cy="24.5" r="2.2" fill="#0a1a2e" />
+        <circle cx="22.5" cy="23" r="1.2" fill="white" opacity="0.9" />
+        {/* Right eye */}
+        <circle cx="40" cy="24" r="6.5" fill="white" opacity="0.95" />
+        <circle cx="41" cy="24.5" r="4" fill="#1a3a5c" />
+        <circle cx="41" cy="24.5" r="2.2" fill="#0a1a2e" />
+        <circle cx="42.5" cy="23" r="1.2" fill="white" opacity="0.9" />
+        {/* Eyebrows */}
+        <path d="M13 17 Q17 14 23 16" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" opacity="0.5" />
+        <path d="M37 16 Q43 14 47 17" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" opacity="0.5" />
+        {/* Smile - open happy */}
+        <path d="M22 37 Q30 44 38 37" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  // Closed eyes (default) - serene meditation face
   return (
-    <svg viewBox="0 0 40 40" className={`w-8 h-8 ${className}`} fill="currentColor">
-      {/* Left eye - closed arc */}
-      <path d="M11 17 Q14 14 17 17" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+    <svg viewBox="0 0 60 60" className={`${sizeClass} ${className || ''}`} fill="currentColor">
+      {/* Left eye - closed arc, thicker */}
+      <path d="M14 25 Q20 19 26 25" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
       {/* Right eye - closed arc */}
-      <path d="M23 17 Q26 14 29 17" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-      {/* Smile */}
-      <path d="M14 24 Q20 29 26 24" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+      <path d="M34 25 Q40 19 46 25" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
+      {/* Serene smile */}
+      <path d="M21 36 Q30 43 39 36" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" />
     </svg>
   );
 }
