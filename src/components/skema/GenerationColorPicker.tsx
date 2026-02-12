@@ -4,7 +4,7 @@
  * Cores já escolhidas ficam travadas.
  */
 
-import { useState } from 'react';
+import { useState, forwardRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, Lock, Sparkles } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -38,7 +38,7 @@ export function getColorConfig(colorId: string | null) {
 // Planet face SVG — two rich variants matching cosmic orb aesthetic
 // variant="closed" = serene dreaming face with rosy cheeks
 // variant="open" = cute big sparkly eyes with lashes and blush
-export function PlanetFace({ className, variant = 'closed', size }: { className?: string; variant?: 'closed' | 'open'; size?: string }) {
+export const PlanetFace = forwardRef<SVGSVGElement, { className?: string; variant?: 'closed' | 'open'; size?: string }>(function PlanetFace({ className, variant = 'closed', size }, _ref) {
   const sizeClass = size || 'w-8 h-8';
 
   if (variant === 'open') {
@@ -127,7 +127,7 @@ export function PlanetFace({ className, variant = 'closed', size }: { className?
       </g>
     </svg>
   );
-}
+});
 
 export function GenerationColorPicker({ playerId, onColorChosen }: GenerationColorPickerProps) {
   const [selected, setSelected] = useState<string | null>(null);
