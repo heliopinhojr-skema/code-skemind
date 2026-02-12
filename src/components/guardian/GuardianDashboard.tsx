@@ -14,7 +14,7 @@ import { useSupabasePlayer } from '@/hooks/useSupabasePlayer';
 import { useInviteCodes } from '@/hooks/useInviteCodes';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, Zap, Box, Gift, Trophy, TrendingUp, Copy, Check, Share2, Link, ArrowDownRight, Dna, TreePine, Heart, Loader2, Calendar, Receipt, Radio, UserPlus, Activity, AlertTriangle } from 'lucide-react';
+import { Users, Zap, Box, Gift, Trophy, TrendingUp, Copy, Check, Share2, Link, ArrowDownRight, Dna, TreePine, Heart, Loader2, Calendar, Receipt, Radio, UserPlus, Activity, AlertTriangle, Briefcase } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { calculateBalanceBreakdown, formatEnergy as formatEnergyUtil, getTierEconomy } from '@/lib/tierEconomy';
@@ -59,6 +59,20 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
         invitedTier: profileMap.get(r.invited_id)?.player_tier || '?',
         day: r.created_at.slice(0, 10),
       })) || [];
+    },
+    staleTime: 30_000,
+  });
+
+  // Fetch investor interest list
+  const { data: investorInterest } = useQuery({
+    queryKey: ['guardian-investor-interest'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('investor_interest')
+        .select('id, player_id, player_name, created_at')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
     },
     staleTime: 30_000,
   });
@@ -557,6 +571,34 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Interesse em Investir */}
+      {investorInterest && investorInterest.length > 0 && (
+        <Card className="border border-primary/30 bg-primary/5 backdrop-blur-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <Briefcase className="h-4 w-4 text-primary" />
+              Interesse em Investir ({investorInterest.length})
+            </CardTitle>
+            <p className="text-[10px] text-muted-foreground">
+              Jogadores que sinalizaram interesse em investir no Universo Skema
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-1 max-h-[200px] overflow-y-auto pr-1">
+              {investorInterest.map(inv => (
+                <div key={inv.id} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded bg-muted/30">
+                  <Briefcase className="h-3 w-3 text-primary shrink-0" />
+                  <span className="font-medium text-foreground truncate flex-1">{inv.player_name}</span>
+                  <span className="text-muted-foreground text-[10px] shrink-0">
+                    {format(new Date(inv.created_at), "dd/MM HH:mm", { locale: ptBR })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Alerta: Jogadores que atingiram o limite de convites */}
       {referralNodes && (() => {
