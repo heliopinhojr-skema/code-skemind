@@ -83,11 +83,11 @@ export function InvestorBanner({ playerId, playerName }: InvestorBannerProps) {
               💎
             </motion.div>
             <div className="flex-1">
-              <p className="text-sm font-bold text-yellow-300">
-                Interesse em participar como investidor?
+              <p className="text-sm font-bold text-yellow-200/70">
+                Conheça as oportunidades s<span className="text-orange-400 font-bold">k</span>ema
               </p>
-              <p className="text-[10px] text-yellow-200/70">
-                Conheça as oportunidades do universo s<span className="text-orange-400 font-bold">k</span>ema • Toque para saber mais
+              <p className="text-[10px] text-yellow-300/60">
+                Interesse em participar como investidor? • Toque para saber mais
               </p>
             </div>
             <div className="flex flex-col items-center gap-0.5">
