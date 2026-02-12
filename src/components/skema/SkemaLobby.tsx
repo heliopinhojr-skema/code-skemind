@@ -13,7 +13,7 @@ import { formatEnergy, calculateBalanceBreakdown } from '@/lib/tierEconomy';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { getColorConfig, PlanetFace } from './GenerationColorPicker';
+import { getColorConfig, PlanetFace, PLANET_MOODS, PlanetMood } from './GenerationColorPicker';
 import { 
   Zap, Trophy, Users, Clock, Brain, Swords, Target,
   Rocket, Sparkles, Calendar, Crown, AlertCircle, LogOut, UserCheck, Bot,
@@ -26,7 +26,7 @@ import { SkemaPlayer, getSkemaHour, PlayerTier } from '@/hooks/useSupabasePlayer
 import { useOfficialRaces } from '@/hooks/useOfficialRace';
 import { useOpenArenas, ArenaListing } from '@/hooks/useArenaListings';
 import { calculateArenaPool, getScaledArenaPrize } from '@/lib/arenaPayouts';
-import { OnlinePlayer } from '@/hooks/useOnlinePlayers';
+import { OnlinePlayer, PlayerMood } from '@/hooks/useOnlinePlayers';
 import { ReferralHistoryPanel } from './ReferralHistoryPanel';
 import { LanguageSelector } from '@/components/LanguageSelector';
 
@@ -44,6 +44,8 @@ interface OnlinePresenceData {
   onlinePlayers: OnlinePlayer[];
   isConnected: boolean;
   updateStatus: (status: 'online' | 'playing' | 'away') => void;
+  updateMood: (mood: PlayerMood) => void;
+  currentMood: PlayerMood;
   onlineCount: number;
 }
 
@@ -179,7 +181,7 @@ export function SkemaLobby({
 }: SkemaLobbyProps) {
   const { races: officialRaces, isLoading: racesLoading, refresh: refreshRaces } = useOfficialRaces();
   const { data: openArenas, isLoading: arenasLoading } = useOpenArenas();
-  const { onlinePlayers, isConnected, updateStatus, onlineCount } = onlinePresence;
+  const { onlinePlayers, isConnected, updateStatus, updateMood, currentMood, onlineCount } = onlinePresence;
   const skemaHour = getSkemaHour();
   
   const [activeTab, setActiveTab] = useState<string>('sitgo');
@@ -187,6 +189,7 @@ export function SkemaLobby({
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+  const [moodPickerOpen, setMoodPickerOpen] = useState(false);
 
   // Estrelas animadas
   const stars = useMemo(() => 
@@ -321,24 +324,59 @@ export function SkemaLobby({
         >
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
-              {(() => {
-                const currentStatus = onlinePresence.onlinePlayers.find(p => p.id === player.id)?.status || 'online';
-                const isAway = currentStatus === 'away';
-                const toggleStatus = () => updateStatus(isAway ? 'online' : 'away');
-                const genColor = getColorConfig(player.generationColor);
-                if (genColor) {
+              {/* Avatar with mood picker */}
+              <div className="relative">
+                {(() => {
+                  const genColor = getColorConfig(player.generationColor);
+                  const avatarClick = () => setMoodPickerOpen(prev => !prev);
+                  if (genColor) {
+                    return (
+                      <button onClick={avatarClick} className={`w-12 h-12 rounded-full flex items-center justify-center ${genColor.bg} ${genColor.glow} transition-transform hover:scale-110 cursor-pointer`} title="Mudar humor">
+                        <PlanetFace className={genColor.face} variant={currentMood} />
+                      </button>
+                    );
+                  }
                   return (
-                    <button onClick={toggleStatus} className={`w-12 h-12 rounded-full flex items-center justify-center ${genColor.bg} ${genColor.glow} transition-transform hover:scale-110 cursor-pointer`} title={isAway ? 'Clique para acordar' : 'Clique para dormir'}>
-                      <PlanetFace className={genColor.face} variant={isAway ? 'closed' : 'open'} />
+                    <button onClick={avatarClick} className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-2xl transition-transform hover:scale-110 cursor-pointer" title="Mudar humor">
+                      {player.emoji}
                     </button>
                   );
-                }
-                return (
-                  <button onClick={toggleStatus} className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-2xl transition-transform hover:scale-110 cursor-pointer" title={isAway ? 'Clique para acordar' : 'Clique para dormir'}>
-                    {player.emoji}
-                  </button>
-                );
-              })()}
+                })()}
+
+                {/* Mood picker dropdown */}
+                <AnimatePresence>
+                  {moodPickerOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8, y: -5 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.8, y: -5 }}
+                      className="absolute top-14 left-0 z-50 bg-black/90 backdrop-blur-md border border-white/20 rounded-xl p-2 flex gap-1 shadow-xl"
+                    >
+                      {PLANET_MOODS.map(m => {
+                        const isActive = currentMood === m.id;
+                        const genColor = getColorConfig(player.generationColor);
+                        return (
+                          <button
+                            key={m.id}
+                            onClick={() => { updateMood(m.id); setMoodPickerOpen(false); }}
+                            className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-all ${isActive ? 'bg-white/20 ring-1 ring-primary' : 'hover:bg-white/10'}`}
+                            title={m.label}
+                          >
+                            <div className={`w-9 h-9 rounded-full flex items-center justify-center ${genColor ? genColor.bg : 'bg-gradient-to-br from-primary to-purple-500'}`}>
+                              {genColor ? (
+                                <PlanetFace className={genColor.face} variant={m.id} size="w-7 h-7" />
+                              ) : (
+                                <span className="text-lg">{m.emoji}</span>
+                              )}
+                            </div>
+                            <span className="text-[9px] text-white/60">{m.label}</span>
+                          </button>
+                        );
+                      })}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
 
               <div>
                 <div className="flex items-center gap-2">

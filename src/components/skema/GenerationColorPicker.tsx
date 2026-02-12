@@ -35,59 +35,77 @@ export function getColorConfig(colorId: string | null) {
   return GENERATION_COLORS.find(c => c.id === colorId) || null;
 }
 
-// Planet face SVG — two rich variants matching cosmic orb aesthetic
-// variant="closed" = serene dreaming face with rosy cheeks
-// variant="open" = cute big sparkly eyes with lashes and blush
-export const PlanetFace = forwardRef<SVGSVGElement, { className?: string; variant?: 'closed' | 'open'; size?: string }>(function PlanetFace({ className, variant = 'closed', size }, _ref) {
-  const sizeClass = size || 'w-8 h-8';
+// Mood types available for PlanetFace
+export type PlanetMood = 'happy' | 'sleeping' | 'sad' | 'angry';
 
-  if (variant === 'open') {
+export const PLANET_MOODS: { id: PlanetMood; label: string; emoji: string }[] = [
+  { id: 'happy',    label: 'Feliz',    emoji: '😊' },
+  { id: 'sleeping', label: 'Dormindo', emoji: '😴' },
+  { id: 'sad',      label: 'Triste',   emoji: '😢' },
+  { id: 'angry',    label: 'Bravo',    emoji: '😡' },
+];
+
+// Planet face SVG — four mood variants matching cosmic orb aesthetic
+export const PlanetFace = forwardRef<SVGSVGElement, { className?: string; variant?: PlanetMood | 'open' | 'closed'; size?: string }>(function PlanetFace({ className, variant = 'happy', size }, _ref) {
+  const sizeClass = size || 'w-8 h-8';
+  // Map legacy variants
+  const mood: PlanetMood = variant === 'open' ? 'happy' : variant === 'closed' ? 'sleeping' : variant;
+
+  const cheekDefs = (
+    <defs>
+      <radialGradient id="pf-cheek-l" cx="0.5" cy="0.5" r="0.5">
+        <stop offset="0%" stopColor="currentColor" stopOpacity="0.35" />
+        <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+      </radialGradient>
+      <radialGradient id="pf-cheek-r" cx="0.5" cy="0.5" r="0.5">
+        <stop offset="0%" stopColor="currentColor" stopOpacity="0.35" />
+        <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+      </radialGradient>
+      <radialGradient id="pf-eye-shine" cx="0.3" cy="0.3" r="0.5">
+        <stop offset="0%" stopColor="white" stopOpacity="0.95" />
+        <stop offset="100%" stopColor="white" stopOpacity="0" />
+      </radialGradient>
+    </defs>
+  );
+
+  const cheeks = (
+    <>
+      <ellipse cx="18" cy="42" rx="6" ry="4" fill="url(#pf-cheek-l)" />
+      <ellipse cx="62" cy="42" rx="6" ry="4" fill="url(#pf-cheek-r)" />
+    </>
+  );
+
+  // Glossy open eyes (shared by happy/angry)
+  const openEyes = (
+    <>
+      <ellipse cx="28" cy="32" rx="9" ry="9.5" fill="white" opacity="0.97" />
+      <ellipse cx="28" cy="32" rx="8" ry="8.5" fill="white" />
+      <circle cx="29.5" cy="33" r="5.5" fill="#1a2d4a" />
+      <circle cx="29.5" cy="33" r="3.2" fill="#0d1520" />
+      <circle cx="31" cy="30.5" r="2" fill="url(#pf-eye-shine)" />
+      <circle cx="27" cy="35" r="1" fill="white" opacity="0.5" />
+      <path d="M19 26 Q22 22 25 24" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" opacity="0.6" />
+      <ellipse cx="52" cy="32" rx="9" ry="9.5" fill="white" opacity="0.97" />
+      <ellipse cx="52" cy="32" rx="8" ry="8.5" fill="white" />
+      <circle cx="53.5" cy="33" r="5.5" fill="#1a2d4a" />
+      <circle cx="53.5" cy="33" r="3.2" fill="#0d1520" />
+      <circle cx="55" cy="30.5" r="2" fill="url(#pf-eye-shine)" />
+      <circle cx="51" cy="35" r="1" fill="white" opacity="0.5" />
+      <path d="M58 26 Q55 22 52 24" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" opacity="0.6" />
+    </>
+  );
+
+  if (mood === 'happy') {
     return (
       <svg viewBox="0 0 80 80" className={`${sizeClass} ${className || ''}`}>
-        <defs>
-          <radialGradient id="pf-cheek-l" cx="0.5" cy="0.5" r="0.5">
-            <stop offset="0%" stopColor="currentColor" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
-          </radialGradient>
-          <radialGradient id="pf-cheek-r" cx="0.5" cy="0.5" r="0.5">
-            <stop offset="0%" stopColor="currentColor" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
-          </radialGradient>
-          <radialGradient id="pf-eye-shine" cx="0.3" cy="0.3" r="0.5">
-            <stop offset="0%" stopColor="white" stopOpacity="0.95" />
-            <stop offset="100%" stopColor="white" stopOpacity="0" />
-          </radialGradient>
-        </defs>
-        {/* Left eye — large glossy */}
-        <ellipse cx="28" cy="32" rx="9" ry="9.5" fill="white" opacity="0.97" />
-        <ellipse cx="28" cy="32" rx="8" ry="8.5" fill="white" />
-        <circle cx="29.5" cy="33" r="5.5" fill="#1a2d4a" />
-        <circle cx="29.5" cy="33" r="3.2" fill="#0d1520" />
-        <circle cx="31" cy="30.5" r="2" fill="url(#pf-eye-shine)" />
-        <circle cx="27" cy="35" r="1" fill="white" opacity="0.5" />
-        {/* Left lashes */}
-        <path d="M19 26 Q22 22 25 24" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" opacity="0.6" />
-        <path d="M22 24 Q25 20 28 23" stroke="currentColor" strokeWidth="1" fill="none" strokeLinecap="round" opacity="0.4" />
-        {/* Right eye — large glossy */}
-        <ellipse cx="52" cy="32" rx="9" ry="9.5" fill="white" opacity="0.97" />
-        <ellipse cx="52" cy="32" rx="8" ry="8.5" fill="white" />
-        <circle cx="53.5" cy="33" r="5.5" fill="#1a2d4a" />
-        <circle cx="53.5" cy="33" r="3.2" fill="#0d1520" />
-        <circle cx="55" cy="30.5" r="2" fill="url(#pf-eye-shine)" />
-        <circle cx="51" cy="35" r="1" fill="white" opacity="0.5" />
-        {/* Right lashes */}
-        <path d="M55 24 Q58 20 61 24" stroke="currentColor" strokeWidth="1" fill="none" strokeLinecap="round" opacity="0.4" />
-        <path d="M58 26 Q55 22 52 24" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" opacity="0.6" />
-        {/* Blush / rosy cheeks */}
-        <ellipse cx="18" cy="42" rx="6" ry="4" fill="url(#pf-cheek-l)" />
-        <ellipse cx="62" cy="42" rx="6" ry="4" fill="url(#pf-cheek-r)" />
-        {/* Mouth — wide expressive smile with lips and tongue */}
+        {cheekDefs}
+        {openEyes}
+        {cheeks}
+        {/* Big happy smile */}
         <path d="M30 48 Q40 62 50 48" stroke="currentColor" strokeWidth="2.8" fill="none" strokeLinecap="round" />
         <path d="M32 50 Q40 58 48 50" fill="currentColor" opacity="0.12" />
         <path d="M36 53 Q40 57 44 53" fill="#e85d75" opacity="0.45" />
-        {/* Upper lip accent */}
         <path d="M34 48.5 Q40 46 46 48.5" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" opacity="0.3" />
-        {/* Sparkle accents */}
         <g opacity="0.6" fill="currentColor">
           <polygon points="14,18 15,15 16,18 15,19" />
           <polygon points="65,16 66,13 67,16 66,17" />
@@ -96,40 +114,66 @@ export const PlanetFace = forwardRef<SVGSVGElement, { className?: string; varian
     );
   }
 
-  // Closed eyes (default) - serene dreaming orb with rosy cheeks
+  if (mood === 'sleeping') {
+    return (
+      <svg viewBox="0 0 80 80" className={`${sizeClass} ${className || ''}`} fill="currentColor">
+        {cheekDefs}
+        {/* Closed eyes — arcs */}
+        <path d="M18 33 Q24 23 32 33" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+        <path d="M18 33 Q16 30 18 28" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" opacity="0.5" />
+        <path d="M32 33 Q34 30 32 28" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" opacity="0.5" />
+        <path d="M48 33 Q54 23 62 33" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+        <path d="M48 33 Q46 30 48 28" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" opacity="0.5" />
+        <path d="M62 33 Q64 30 62 28" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" opacity="0.5" />
+        {cheeks}
+        {/* Serene smile */}
+        <path d="M28 49 Q40 62 52 49" stroke="currentColor" strokeWidth="2.8" fill="none" strokeLinecap="round" />
+        <path d="M32 51 Q40 57 48 51" fill="currentColor" opacity="0.1" />
+        <path d="M33 49 Q40 46.5 47 49" stroke="currentColor" strokeWidth="1" fill="none" strokeLinecap="round" opacity="0.25" />
+        {/* Zzz */}
+        <g opacity="0.5" fill="currentColor" fontSize="10" fontWeight="bold">
+          <text x="60" y="18" fontSize="11">z</text>
+          <text x="66" y="12" fontSize="8">z</text>
+          <text x="70" y="7" fontSize="6">z</text>
+        </g>
+      </svg>
+    );
+  }
+
+  if (mood === 'sad') {
+    return (
+      <svg viewBox="0 0 80 80" className={`${sizeClass} ${className || ''}`}>
+        {cheekDefs}
+        {openEyes}
+        {cheeks}
+        {/* Tear drop on left eye */}
+        <ellipse cx="22" cy="42" rx="2" ry="3" fill="#60a5fa" opacity="0.6" />
+        {/* Sad frown — inverted curve */}
+        <path d="M30 56 Q40 46 50 56" stroke="currentColor" strokeWidth="2.8" fill="none" strokeLinecap="round" />
+        <path d="M34 55 Q40 50 46 55" stroke="currentColor" strokeWidth="1" fill="none" strokeLinecap="round" opacity="0.25" />
+        <g opacity="0.4" fill="currentColor">
+          <circle cx="12" cy="20" r="1.2" />
+          <circle cx="68" cy="22" r="1" />
+        </g>
+      </svg>
+    );
+  }
+
+  // angry
   return (
-    <svg viewBox="0 0 80 80" className={`${sizeClass} ${className || ''}`} fill="currentColor">
-      <defs>
-        <radialGradient id="pf-blush-l" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0%" stopColor="currentColor" stopOpacity="0.3" />
-          <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id="pf-blush-r" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0%" stopColor="currentColor" stopOpacity="0.3" />
-          <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-      {/* Left eye — elegant thick arc with lash tips */}
-      <path d="M18 33 Q24 23 32 33" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-      <path d="M18 33 Q16 30 18 28" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" opacity="0.5" />
-      <path d="M32 33 Q34 30 32 28" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" opacity="0.5" />
-      {/* Right eye — elegant thick arc with lash tips */}
-      <path d="M48 33 Q54 23 62 33" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-      <path d="M48 33 Q46 30 48 28" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" opacity="0.5" />
-      <path d="M62 33 Q64 30 62 28" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" opacity="0.5" />
-      {/* Blush / rosy cheeks */}
-      <ellipse cx="18" cy="42" rx="6" ry="3.5" fill="url(#pf-blush-l)" />
-      <ellipse cx="62" cy="42" rx="6" ry="3.5" fill="url(#pf-blush-r)" />
-      {/* Serene smile — fuller lips with subtle shading */}
-      <path d="M28 49 Q40 62 52 49" stroke="currentColor" strokeWidth="2.8" fill="none" strokeLinecap="round" />
-      <path d="M32 51 Q40 57 48 51" fill="currentColor" opacity="0.1" />
-      {/* Upper lip line */}
-      <path d="M33 49 Q40 46.5 47 49" stroke="currentColor" strokeWidth="1" fill="none" strokeLinecap="round" opacity="0.25" />
-      {/* Tiny stars / sparkles near face */}
-      <g opacity="0.5" fill="currentColor">
-        <circle cx="12" cy="20" r="1.2" />
-        <circle cx="68" cy="22" r="1" />
-        <circle cx="40" cy="14" r="0.8" />
+    <svg viewBox="0 0 80 80" className={`${sizeClass} ${className || ''}`}>
+      {cheekDefs}
+      {openEyes}
+      {/* Angry eyebrows — V shape */}
+      <path d="M18 24 L30 28" stroke="currentColor" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M62 24 L50 28" stroke="currentColor" strokeWidth="3" fill="none" strokeLinecap="round" />
+      {cheeks}
+      {/* Tight angry mouth — flat line with slight frown */}
+      <path d="M30 52 Q35 55 40 52 Q45 55 50 52" stroke="currentColor" strokeWidth="2.8" fill="none" strokeLinecap="round" />
+      {/* Steam / anger marks */}
+      <g opacity="0.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round">
+        <path d="M10 14 L14 10 L18 14" />
+        <path d="M62 14 L66 10 L70 14" />
       </g>
     </svg>
   );

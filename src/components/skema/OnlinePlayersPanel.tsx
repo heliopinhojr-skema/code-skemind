@@ -3,8 +3,9 @@
  */
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Circle, Gamepad2, Moon } from 'lucide-react';
+import { Users, Circle, Gamepad2 } from 'lucide-react';
 import { OnlinePlayer } from '@/hooks/useOnlinePlayers';
+import { getColorConfig, PlanetFace, PlanetMood } from './GenerationColorPicker';
 
 interface OnlinePlayersPanelProps {
   players: OnlinePlayer[];
@@ -23,7 +24,7 @@ export function OnlinePlayersPanel({ players, currentPlayerId, isConnected }: On
       case 'playing':
         return <Gamepad2 className="w-3 h-3 text-yellow-400" />;
       case 'away':
-        return <Moon className="w-3 h-3 text-gray-400" />;
+        return <Circle className="w-2 h-2 fill-gray-400 text-gray-400" />;
       default:
         return <Circle className="w-2 h-2 fill-green-400 text-green-400" />;
     }
@@ -90,9 +91,9 @@ export function OnlinePlayersPanel({ players, currentPlayerId, isConnected }: On
                 layout
                 className={`flex items-center gap-3 p-2 rounded-lg border ${getStatusColor(player.status)}`}
               >
-                {/* Avatar */}
+                {/* Avatar with mood */}
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/50 to-purple-500/50 flex items-center justify-center text-lg">
-                  {player.emoji}
+                  <PlanetFace variant={(player.mood as PlanetMood) || 'happy'} size="w-6 h-6" />
                 </div>
 
                 {/* Info */}
