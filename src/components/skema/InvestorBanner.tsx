@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Sparkles, Calendar, Clock, Users, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import investorImg from '@/assets/skema-investor.jpeg';
+import investorImg from '@/assets/skema-negociacoes.jpeg';
 import skemaEmojis from '@/assets/skema-emojis.jpeg';
 
 interface InvestorBannerProps {
