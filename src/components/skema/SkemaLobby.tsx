@@ -322,18 +322,21 @@ export function SkemaLobby({
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
               {(() => {
+                const currentStatus = onlinePresence.onlinePlayers.find(p => p.id === player.id)?.status || 'online';
+                const isAway = currentStatus === 'away';
+                const toggleStatus = () => updateStatus(isAway ? 'online' : 'away');
                 const genColor = getColorConfig(player.generationColor);
                 if (genColor) {
                   return (
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${genColor.bg} ${genColor.glow}`}>
-                      <PlanetFace className={genColor.face} variant={player.name.length % 2 === 0 ? 'open' : 'closed'} />
-                    </div>
+                    <button onClick={toggleStatus} className={`w-12 h-12 rounded-full flex items-center justify-center ${genColor.bg} ${genColor.glow} transition-transform hover:scale-110 cursor-pointer`} title={isAway ? 'Clique para acordar' : 'Clique para dormir'}>
+                      <PlanetFace className={genColor.face} variant={isAway ? 'closed' : 'open'} />
+                    </button>
                   );
                 }
                 return (
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-2xl">
+                  <button onClick={toggleStatus} className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-2xl transition-transform hover:scale-110 cursor-pointer" title={isAway ? 'Clique para acordar' : 'Clique para dormir'}>
                     {player.emoji}
-                  </div>
+                  </button>
                 );
               })()}
 
