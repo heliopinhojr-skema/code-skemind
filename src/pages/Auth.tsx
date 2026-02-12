@@ -49,6 +49,20 @@ export default function Auth() {
   const initialInvite = searchParams.get('convite') || searchParams.get('invite') || '';
   const savedNickname = useMemo(() => localStorage.getItem(NICKNAME_STORAGE_KEY) || '', []);
 
+  // Handle Supabase auth error redirects (e.g., expired verification tokens)
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.includes('error_description') || hash.includes('error=')) {
+      const params = new URLSearchParams(hash.replace('#', ''));
+      const errorDesc = params.get('error_description');
+      if (errorDesc) {
+        console.warn('Auth redirect error:', errorDesc);
+        // Clear the hash to prevent re-triggering
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    }
+  }, []);
+
   // Phase: 'welcome' → 'auth'
   const [phase, setPhase] = useState<'welcome' | 'auth'>(initialInvite ? 'auth' : 'welcome');
   const [mode, setMode] = useState<'login' | 'register'>(initialInvite ? 'register' : 'login');
