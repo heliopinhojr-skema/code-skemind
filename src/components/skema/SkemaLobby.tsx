@@ -8,6 +8,7 @@
  */
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { formatEnergy, calculateBalanceBreakdown } from '@/lib/tierEconomy';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
@@ -437,6 +438,76 @@ export function SkemaLobby({
               </p>
             </div>
           </motion.div>
+
+          {/* Banner Investidor */}
+          <Dialog>
+            <DialogTrigger asChild>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.06 }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="mx-4 mt-3 cursor-pointer relative rounded-xl overflow-hidden border border-yellow-500/50 bg-gradient-to-r from-yellow-500/20 via-orange-500/20 to-amber-500/20 backdrop-blur-sm"
+              >
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(251,191,36,0.15),transparent_70%)]" />
+                <div className="relative z-10 flex items-center gap-3 px-4 py-3">
+                  <motion.div
+                    animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
+                    transition={{ duration: 3, repeat: Infinity }}
+                    className="text-2xl"
+                  >
+                    💎
+                  </motion.div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-yellow-300">
+                      Interesse em participar como investidor?
+                    </p>
+                    <p className="text-[10px] text-yellow-200/70">
+                      Conheça as oportunidades do universo s<span className="text-orange-400 font-bold">k</span>ema • Toque para saber mais
+                    </p>
+                  </div>
+                  <Sparkles className="w-5 h-5 text-yellow-400 animate-pulse" />
+                </div>
+              </motion.div>
+            </DialogTrigger>
+            <DialogContent className="bg-transparent border-none shadow-none p-0 max-w-md">
+              <div className="relative rounded-2xl overflow-hidden border border-yellow-500/40">
+                <div 
+                  className="absolute inset-0 bg-cover bg-center" 
+                  style={{ backgroundImage: `url(${universeBg})` }} 
+                />
+                <div className="absolute inset-0 bg-black/80" />
+                <div className="relative z-10 p-6 text-center space-y-4">
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: 'spring', delay: 0.1 }}
+                    className="text-5xl"
+                  >
+                    🚀
+                  </motion.div>
+                  <h2 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-orange-400 to-yellow-300">
+                    1ª Rodada de Negociações
+                  </h2>
+                  <p className="text-xs text-white/60">Universo s<span className="text-orange-400 font-bold">k</span>ema — Oportunidades para investidores</p>
+                  <div className="bg-white/5 border border-yellow-500/30 rounded-xl p-4 space-y-1">
+                    <div className="flex items-center justify-center gap-2">
+                      <Calendar className="w-4 h-4 text-yellow-400" />
+                      <span className="text-xl font-black text-yellow-300">03 / 03 / 2026</span>
+                    </div>
+                    <div className="flex items-center justify-center gap-2">
+                      <Clock className="w-4 h-4 text-yellow-400" />
+                      <span className="text-lg font-bold text-yellow-300">13:00h</span>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-white/40 leading-relaxed">
+                    Mais detalhes serão divulgados em breve.<br/>Fique atento ao universo.
+                  </p>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           {/* ═══════════════════════════════════════════
               LOBBY POKERSTARS-STYLE — Tabs (logo abaixo do banner)
