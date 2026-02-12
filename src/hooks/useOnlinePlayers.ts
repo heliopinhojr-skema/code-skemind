@@ -27,10 +27,10 @@ interface PresenceState {
 export function useOnlinePlayers(currentPlayer: { id: string; name: string; emoji: string; mood?: string } | null) {
   const [onlinePlayers, setOnlinePlayers] = useState<OnlinePlayer[]>([]);
   const [isConnected, setIsConnected] = useState(false);
-  const initialMood = (currentPlayer?.mood as PlayerMood) || 'happy';
-  const [currentMood, setCurrentMood] = useState<PlayerMood>(initialMood);
+  const [currentMood, setCurrentMood] = useState<PlayerMood>('happy');
   const channelRef = useRef<RealtimeChannel | null>(null);
-  const moodRef = useRef<PlayerMood>(initialMood);
+  const moodRef = useRef<PlayerMood>('happy');
+  const moodInitializedRef = useRef(false);
 
   // Track current player's presence
   const trackPresence = useCallback(async (status: 'online' | 'playing' | 'away' = 'online', mood?: PlayerMood) => {
@@ -70,9 +70,10 @@ export function useOnlinePlayers(currentPlayer: { id: string; name: string; emoj
     }
   }, [trackPresence, currentPlayer?.id]);
 
-  // Sync mood from profile when player data loads/changes
+  // Sync mood from profile when player data loads/changes (only once on first load)
   useEffect(() => {
-    if (currentPlayer?.mood) {
+    if (currentPlayer?.mood && !moodInitializedRef.current) {
+      moodInitializedRef.current = true;
       const m = currentPlayer.mood as PlayerMood;
       moodRef.current = m;
       setCurrentMood(m);
