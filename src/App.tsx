@@ -40,8 +40,8 @@ const App = () => (
             <Route path="/classic" element={<ProtectedRoute playerOnly><Index /></ProtectedRoute>} />
             <Route path="/tournament" element={<ProtectedRoute playerOnly><Tournament /></ProtectedRoute>} />
             
-            {/* Public pages */}
-            <Route path="/termos" element={<Terms />} />
+            {/* Termos - requires login */}
+            <Route path="/termos" element={<ProtectedRoute playerOnly><Terms /></ProtectedRoute>} />
             
             {/* Fallback */}
             <Route path="*" element={<ProtectedRoute playerOnly><Skema /></ProtectedRoute>} />
