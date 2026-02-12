@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Sparkles, Calendar, Clock, Users, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import universeBg from '@/assets/universe-bg.jpg';
+import investorImg from '@/assets/skema-investor.jpeg';
 
 interface InvestorBannerProps {
   playerId: string;
@@ -70,9 +70,10 @@ export function InvestorBanner({ playerId, playerName }: InvestorBannerProps) {
           transition={{ delay: 0.06 }}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          className="mx-4 mt-3 cursor-pointer relative rounded-xl overflow-hidden border border-yellow-500/50 bg-gradient-to-r from-yellow-500/20 via-orange-500/20 to-amber-500/20 backdrop-blur-sm"
+          className="mx-4 mt-3 cursor-pointer relative rounded-xl overflow-hidden border border-yellow-500/50 backdrop-blur-sm"
         >
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(251,191,36,0.15),transparent_70%)]" />
+          <img src={investorImg} alt="" className="absolute inset-0 w-full h-full object-cover opacity-40" />
+          <div className="absolute inset-0 bg-black/50" />
           <div className="relative z-10 flex items-center gap-3 px-4 py-3">
             <motion.div
               animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
@@ -105,8 +106,8 @@ export function InvestorBanner({ playerId, playerName }: InvestorBannerProps) {
       </DialogTrigger>
       <DialogContent className="bg-transparent border-none shadow-none p-0 max-w-md">
         <div className="relative rounded-2xl overflow-hidden border border-yellow-500/40">
-          <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${universeBg})` }} />
-          <div className="absolute inset-0 bg-black/80" />
+          <img src={investorImg} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-black/75" />
           <div className="relative z-10 p-6 text-center space-y-4">
             <motion.div
               initial={{ scale: 0 }}
