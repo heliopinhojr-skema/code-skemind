@@ -12,6 +12,7 @@ import Auth from "./pages/Auth";
 import Guardian from "./pages/Guardian";
 import NotFound from "./pages/NotFound";
 import Terms from "./pages/Terms";
+import DemoFaces from "./pages/DemoFaces";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,7 @@ const App = () => (
             
             {/* Termos - requires login */}
             <Route path="/termos" element={<ProtectedRoute playerOnly><Terms /></ProtectedRoute>} />
+            <Route path="/demo-faces" element={<DemoFaces />} />
             
             {/* Fallback */}
             <Route path="*" element={<ProtectedRoute playerOnly><Skema /></ProtectedRoute>} />
