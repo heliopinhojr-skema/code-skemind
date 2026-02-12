@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { calculateBalanceBreakdown, formatEnergy as formatEnergyUtil, getTierEconomy } from '@/lib/tierEconomy';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { GENERATION_COLORS, PlanetFace } from '@/components/skema/GenerationColorPicker';
 
 interface GuardianDashboardProps {
   onNavigateTab?: (tab: string) => void;
@@ -71,6 +72,21 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
         .from('investor_interest')
         .select('id, player_id, player_name, created_at')
         .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 30_000,
+  });
+
+  // Fetch which generation colors are taken and by whom
+  const { data: takenColors } = useQuery({
+    queryKey: ['guardian-taken-colors'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('name, generation_color, player_tier')
+        .not('generation_color', 'is', null)
+        .in('player_tier', ['Criador', 'guardiao']);
       if (error) throw error;
       return data || [];
     },
@@ -649,6 +665,55 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
           </Card>
         );
       })()}
+
+      {/* Galeria PlanetFace — Cores de Geração */}
+      <Card className="border border-border/60 bg-card/90 backdrop-blur-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+            <Dna className="h-5 w-5 text-primary" />
+            Cores de Geração — PlanetFace
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            10 cores disponíveis para Criadores. Cores escolhidas propagam para toda a linhagem.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+            {GENERATION_COLORS.map(color => {
+              const owner = takenColors?.find(p => p.generation_color === color.id);
+              const isTaken = !!owner;
+              return (
+                <div key={color.id} className={cn(
+                  "relative flex flex-col items-center gap-2 p-3 rounded-xl border transition-all",
+                  isTaken 
+                    ? "bg-muted/20 border-border/60" 
+                    : "bg-background/40 border-border/30 opacity-60"
+                )}>
+                  {/* Both variants side by side */}
+                  <div className="flex gap-2">
+                    <div className={cn("w-12 h-12 rounded-full flex items-center justify-center", color.bg, color.glow)}>
+                      <PlanetFace className={color.face} variant="open" size="w-8 h-8" />
+                    </div>
+                    <div className={cn("w-12 h-12 rounded-full flex items-center justify-center", color.bg, color.glow)}>
+                      <PlanetFace className={color.face} variant="closed" size="w-8 h-8" />
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-medium text-foreground">{color.name}</span>
+                  {isTaken ? (
+                    <Badge variant="secondary" className="text-[9px] px-1.5 py-0.5 gap-1">
+                      🔒 {owner.name}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[9px] px-1.5 py-0.5 text-muted-foreground">
+                      disponível
+                    </Badge>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Visão Geral */}
       <h2 className="text-xl font-semibold text-foreground">Visão Geral</h2>
