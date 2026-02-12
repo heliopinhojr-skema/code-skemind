@@ -21,6 +21,7 @@ import { calculateArenaPool } from '@/lib/arenaPayouts';
 import { formatEnergy } from '@/lib/tierEconomy';
 import { toast } from 'sonner';
 import universeBg from '@/assets/universe-bg.jpg';
+import arenaQiMedioBg from '@/assets/arena-qi-medio-bg.jpeg';
 
 export interface ArenaConfig {
   buyIn: number;
@@ -409,31 +410,37 @@ export function TournamentLobby({
                   <motion.div
                     key={arena.id}
                     whileHover={{ scale: 1.02 }}
-                    className={`relative overflow-hidden rounded-xl p-3 border ${
+                    className={`relative overflow-hidden rounded-xl border ${
                       isMedioArena
-                        ? 'border-purple-400/40 shadow-lg shadow-purple-500/20'
-                        : 'border-yellow-500/20'
+                        ? 'border-purple-400/40 shadow-lg shadow-purple-500/20 min-h-[80px]'
+                        : 'border-yellow-500/20 p-3'
                     }`}
-                    style={isMedioArena ? {
-                      background: 'linear-gradient(135deg, rgba(88,28,135,0.4) 0%, rgba(15,23,42,0.6) 25%, rgba(30,64,175,0.35) 50%, rgba(88,28,135,0.3) 75%, rgba(6,182,212,0.3) 100%)',
-                    } : {
+                    style={!isMedioArena ? {
                       background: 'linear-gradient(to right, rgba(234,179,8,0.1), rgba(249,115,22,0.1))',
-                    }}
+                    } : undefined}
                   >
-                    {/* Furta-cor shimmer overlay for Qi MEDIO */}
+                    {/* Background image for Qi MEDIO */}
                     {isMedioArena && (
-                      <motion.div
-                        className="absolute inset-0 opacity-30 pointer-events-none"
-                        style={{
-                          background: 'linear-gradient(90deg, transparent 0%, rgba(168,85,247,0.4) 25%, rgba(56,189,248,0.4) 50%, rgba(232,121,249,0.4) 75%, transparent 100%)',
-                          backgroundSize: '200% 100%',
-                        }}
-                        animate={{ backgroundPosition: ['200% 0%', '-200% 0%'] }}
-                        transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
-                      />
+                      <>
+                        <div
+                          className="absolute inset-0 bg-cover bg-center"
+                          style={{ backgroundImage: `url(${arenaQiMedioBg})` }}
+                        />
+                        <div className="absolute inset-0 bg-black/40" />
+                        {/* Furta-cor shimmer overlay */}
+                        <motion.div
+                          className="absolute inset-0 opacity-20 pointer-events-none"
+                          style={{
+                            background: 'linear-gradient(90deg, transparent 0%, rgba(168,85,247,0.5) 20%, rgba(56,189,248,0.5) 40%, rgba(232,121,249,0.5) 60%, rgba(250,204,21,0.4) 80%, transparent 100%)',
+                            backgroundSize: '200% 100%',
+                          }}
+                          animate={{ backgroundPosition: ['200% 0%', '-200% 0%'] }}
+                          transition={{ duration: 5, repeat: Infinity, ease: 'linear' }}
+                        />
+                      </>
                     )}
                     
-                    <div className="relative z-10 flex items-center justify-between">
+                    <div className={`relative z-10 flex items-center justify-between ${isMedioArena ? 'p-3' : ''}`}>
                       <div>
                         <div className={`font-bold flex items-center gap-2 ${isMedioArena ? 'text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-cyan-300 to-pink-300' : 'text-white'}`}>
                           {isMedioArena ? '🧠' : arena.creator_emoji} {arena.name}
