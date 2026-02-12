@@ -414,6 +414,23 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
         </CardContent>
       </Card>
 
+      {/* Alerta Bot Treasury ≤ 110.000 */}
+      {!isLoading && (stats?.botTreasuryBalance || 0) <= 110_000 && (
+        <Card className="border border-destructive/40 bg-destructive/10 backdrop-blur-sm animate-pulse">
+          <CardContent className="p-4 flex items-center gap-3">
+            <AlertTriangle className="h-6 w-6 text-destructive shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-destructive">
+                ⚠️ Bot Treasury em nível crítico: {formatEnergyUtil(stats?.botTreasuryBalance || 0)}
+              </p>
+              <p className="text-xs text-destructive/80">
+                Saldo abaixo de k$ 110.000,00 — considere doar do HX para manter arenas funcionando
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Live Counters Strip */}
       <div className="grid grid-cols-3 gap-3">
         {/* Online agora */}
