@@ -21,7 +21,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useArenaListings, useCreateArena, useCloseArena, useBotTreasuryBalance } from '@/hooks/useArenaListings';
+import { useArenaListings, useCreateArena, useCloseArena, useDeleteArena, useBotTreasuryBalance } from '@/hooks/useArenaListings';
 import { useSupabasePlayer } from '@/hooks/useSupabasePlayer';
 import {
   ARENA_BOT_OPTIONS,
@@ -33,7 +33,7 @@ import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
-  Swords, Plus, Bot, Users, Zap, Trophy, Ban, Loader2
+  Swords, Plus, Bot, Users, Zap, Trophy, Ban, Loader2, Trash2
 } from 'lucide-react';
 
 const statusColors: Record<string, string> = {
@@ -50,6 +50,7 @@ export function GuardianArenasPanel() {
   const { data: arenas, isLoading } = useArenaListings();
   const createArena = useCreateArena();
   const closeArena = useCloseArena();
+  const deleteArena = useDeleteArena();
   const { player } = useSupabasePlayer();
   const { data: botTreasuryBalance } = useBotTreasuryBalance();
   const [isCreating, setIsCreating] = useState(false);
@@ -100,6 +101,15 @@ export function GuardianArenasPanel() {
     try {
       await closeArena.mutateAsync(arenaId);
       toast({ title: 'Arena encerrada', description: `"${name}" foi fechada.` });
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  const handleDelete = async (arenaId: string, name: string) => {
+    try {
+      await deleteArena.mutateAsync(arenaId);
+      toast({ title: 'Arena excluída', description: `"${name}" foi removida.` });
     } catch (err: any) {
       toast({ title: 'Erro', description: err.message, variant: 'destructive' });
     }
@@ -265,7 +275,9 @@ export function GuardianArenasPanel() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  arenas?.map((arena) => {
+                  [...(arenas || [])]
+                    .sort((a, b) => Number(b.buy_in) - Number(a.buy_in))
+                    .map((arena) => {
                     const arenaPool = calculateArenaPool(Number(arena.buy_in), Number(arena.rake_fee), arena.bot_count);
                     return (
                       <TableRow key={arena.id}>
@@ -304,17 +316,28 @@ export function GuardianArenasPanel() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          {arena.status === 'open' && (
+                          <div className="flex items-center gap-1">
+                            {arena.status === 'open' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleClose(arena.id, arena.name)}
+                                disabled={closeArena.isPending}
+                              >
+                                <Ban className="h-3 w-3 mr-1" />
+                                Fechar
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleClose(arena.id, arena.name)}
-                              disabled={closeArena.isPending}
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => handleDelete(arena.id, arena.name)}
+                              disabled={deleteArena.isPending}
                             >
-                              <Ban className="h-3 w-3 mr-1" />
-                              Fechar
+                              <Trash2 className="h-3 w-3" />
                             </Button>
-                          )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     );

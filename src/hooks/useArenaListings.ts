@@ -182,3 +182,28 @@ export function useCloseArena() {
     },
   });
 }
+
+export function useDeleteArena() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (arenaId: string) => {
+      // Delete associated entries first
+      await supabase
+        .from('arena_entries')
+        .delete()
+        .eq('arena_id', arenaId);
+
+      const { error } = await supabase
+        .from('arena_listings')
+        .delete()
+        .eq('id', arenaId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['arena-listings'] });
+      queryClient.invalidateQueries({ queryKey: ['open-arenas'] });
+    },
+  });
+}
