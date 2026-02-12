@@ -97,12 +97,12 @@ export function InvestorBanner({ playerId, playerName }: InvestorBannerProps) {
           <div className="absolute inset-0 bg-black/75" />
           <div className="relative z-10 p-6 text-center space-y-4">
             <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: 'spring', delay: 0.1 }}
-              className="text-5xl"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="text-xs uppercase tracking-[0.3em] text-yellow-400/60 font-semibold"
             >
-              🚀
+              Universo Skema
             </motion.div>
             <h2 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-orange-400 to-yellow-300">
               1ª Rodada de Negociações
@@ -150,9 +150,9 @@ export function InvestorBanner({ playerId, playerName }: InvestorBannerProps) {
               size="lg"
             >
               {loading ? 'Processando...' : registered ? (
-                <span className="flex items-center gap-2"><CheckCircle className="w-4 h-4" /> Interesse registrado — clique para cancelar</span>
+                <span>✓ Interesse registrado — clique para cancelar</span>
               ) : (
-                <span className="flex items-center gap-2"><Sparkles className="w-4 h-4" /> Tenho interesse em investir!</span>
+                <span>Tenho interesse em investir</span>
               )}
             </Button>
 
