@@ -28,7 +28,7 @@ import {
   Shield, Star, Crown, Swords, Rocket, Gamepad2, Lock, Unlock,
   Target, Calendar, ArrowUpRight, ArrowDownRight, TrendingUp,
   Ban, MinusCircle, Trash2, AlertTriangle, CheckCircle, DollarSign,
-  ArrowUp, ArrowDown
+  ArrowUp, ArrowDown, Dna, X, Loader2
 } from 'lucide-react';
 
 const TIER_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
@@ -71,6 +71,26 @@ function usePlayerGameHistory(playerId: string | null) {
   });
 }
 
+function usePlayerInviteCodes(playerId: string | null) {
+  return useQuery({
+    queryKey: ['player-invite-codes', playerId],
+    queryFn: async () => {
+      if (!playerId) return [];
+      const { data, error } = await supabase
+        .from('invite_codes')
+        .select(`
+          id, code, created_at, used_by_id, used_at, shared_at, shared_to_name,
+          used_by:profiles!invite_codes_used_by_id_fkey(name)
+        `)
+        .eq('creator_id', playerId)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!playerId,
+  });
+}
+
 function usePlayerArenaEntries(playerId: string | null) {
   return useQuery({
     queryKey: ['player-arena-entries', playerId],
@@ -95,12 +115,14 @@ export function PlayerDetailDrawer({ playerId, open, onOpenChange, allNodes, isM
   const player = useMemo(() => allNodes.find(n => n.id === playerId), [allNodes, playerId]);
   const { data: gameHistory, isLoading: historyLoading } = usePlayerGameHistory(playerId);
   const { data: arenaEntries } = usePlayerArenaEntries(playerId);
+  const { data: playerInviteCodes, refetch: refetchInviteCodes } = usePlayerInviteCodes(playerId);
   const queryClient = useQueryClient();
 
   // Admin action state
   const [adminAction, setAdminAction] = useState<AdminAction>(null);
   const [penaltyAmount, setPenaltyAmount] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [cancellingCodeId, setCancellingCodeId] = useState<string | null>(null);
 
   // Arena P&L calculation
   const arenaPnL = useMemo(() => {
@@ -244,6 +266,24 @@ export function PlayerDetailDrawer({ playerId, open, onOpenChange, allNodes, isM
       setIsProcessing(false);
       setAdminAction(null);
       setPenaltyAmount('');
+    }
+  };
+
+  const handleAdminCancelCode = async (codeId: string, code: string, isUsed: boolean) => {
+    setCancellingCodeId(codeId);
+    try {
+      const { error } = await supabase.rpc('admin_cancel_invite_code', {
+        p_code_id: codeId,
+      });
+      if (error) throw error;
+      toast.success(`Código ${code} cancelado${isUsed ? ' (vínculo de referral removido)' : ''}`);
+      refetchInviteCodes();
+      queryClient.invalidateQueries({ queryKey: ['guardian-referral-tree'] });
+      queryClient.invalidateQueries({ queryKey: ['guardian-dashboard-stats'] });
+    } catch (err: any) {
+      toast.error(`Erro ao cancelar: ${err.message}`);
+    } finally {
+      setCancellingCodeId(null);
     }
   };
 
@@ -567,6 +607,62 @@ export function PlayerDetailDrawer({ playerId, open, onOpenChange, allNodes, isM
                 <div>🔗 Convidado por: <strong>{player.inviter_name}</strong></div>
               )}
             </div>
+
+            {/* Códigos DNA do jogador (admin pode cancelar qualquer um) */}
+            {isMasterAdmin && playerInviteCodes && playerInviteCodes.length > 0 && (
+              <>
+                <Separator />
+                <div>
+                  <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                    <Dna className="h-4 w-4 text-purple-400" />
+                    Códigos DNA ({playerInviteCodes.length})
+                  </h3>
+                  <div className="space-y-1 max-h-60 overflow-y-auto">
+                    {playerInviteCodes.map((ic: any) => {
+                      const isUsed = !!ic.used_by_id;
+                      const isShared = !!ic.shared_at && !isUsed;
+                      const usedByName = ic.used_by?.name;
+                      return (
+                        <div key={ic.id} className="flex items-center gap-2 text-xs bg-muted/20 rounded-lg p-2">
+                          <code className="font-mono text-[10px] bg-muted px-1.5 py-0.5 rounded shrink-0">
+                            {ic.code}
+                          </code>
+                          {isUsed ? (
+                            <Badge variant="outline" className="text-[9px] text-emerald-400 border-emerald-400/30">
+                              ✅ {usedByName || 'usado'}
+                            </Badge>
+                          ) : isShared ? (
+                            <Badge variant="outline" className="text-[9px] text-amber-400 border-amber-400/30">
+                              ⏳ {ic.shared_to_name || 'compartilhado'}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[9px] text-muted-foreground">
+                              disponível
+                            </Badge>
+                          )}
+                          <span className="ml-auto text-muted-foreground text-[10px]">
+                            {format(new Date(ic.created_at), "dd/MM HH:mm", { locale: ptBR })}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-5 w-5 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleAdminCancelCode(ic.id, ic.code, isUsed)}
+                            disabled={cancellingCodeId === ic.id}
+                          >
+                            {cancellingCodeId === ic.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <X className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </ScrollArea>
       </SheetContent>
