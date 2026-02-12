@@ -183,12 +183,42 @@ export function useCloseArena() {
   });
 }
 
+export function useUpdateArena() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      id: string;
+      name?: string;
+      buy_in?: number;
+      rake_fee?: number;
+      bot_count?: number;
+    }) => {
+      const updateData: Record<string, any> = {};
+      if (params.name !== undefined) updateData.name = params.name;
+      if (params.buy_in !== undefined) updateData.buy_in = params.buy_in;
+      if (params.rake_fee !== undefined) updateData.rake_fee = params.rake_fee;
+      if (params.bot_count !== undefined) updateData.bot_count = params.bot_count;
+
+      const { error } = await supabase
+        .from('arena_listings')
+        .update(updateData)
+        .eq('id', params.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['arena-listings'] });
+      queryClient.invalidateQueries({ queryKey: ['open-arenas'] });
+    },
+  });
+}
+
 export function useDeleteArena() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (arenaId: string) => {
-      // Delete associated entries first
       await supabase
         .from('arena_entries')
         .delete()
