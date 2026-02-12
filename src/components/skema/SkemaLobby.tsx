@@ -496,6 +496,15 @@ export function SkemaLobby({
                 ) : (
                   (() => {
                     // Merge default arena with custom arenas, sort all by buy-in desc
+                    const getDifficultyStyle = (diff: string) => {
+                      switch (diff) {
+                        case 'FACIL': return { color: 'text-green-400', bg: 'bg-green-500/20', label: '🟢 FÁCIL' };
+                        case 'MEDIO': return { color: 'text-yellow-400', bg: 'bg-yellow-500/20', label: '🟡 MÉDIO' };
+                        case 'MEDIO HARD': return { color: 'text-orange-400', bg: 'bg-orange-500/20', label: '🟠 MÉDIO HARD' };
+                        case 'HARD': return { color: 'text-red-400', bg: 'bg-red-500/20', label: '🔴 HARD' };
+                        default: return { color: 'text-yellow-400', bg: 'bg-yellow-500/20', label: '🟡 MÉDIO' };
+                      }
+                    };
                     const defaultArena = {
                       id: 'default',
                       name: '🎯 Arena Padrão',
@@ -504,6 +513,7 @@ export function SkemaLobby({
                       bot_count: 99,
                       creator_name: 'SKEMA',
                       creator_emoji: '',
+                      difficulty: 'MEDIO',
                       isDefault: true,
                     };
                     const customArenas = (openArenas || []).map(a => ({
@@ -514,6 +524,7 @@ export function SkemaLobby({
                       bot_count: a.bot_count,
                       creator_name: a.creator_name,
                       creator_emoji: a.creator_emoji,
+                      difficulty: a.difficulty || 'MEDIO',
                       isDefault: false,
                     }));
                     const allArenas = [defaultArena, ...customArenas].sort((a, b) => b.buy_in - a.buy_in);
@@ -533,7 +544,17 @@ export function SkemaLobby({
                           } transition-colors`}
                         >
                           <div>
-                            <span className="text-sm font-medium text-white">{arena.name}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-white">{arena.name}</span>
+                              {(() => {
+                                const ds = getDifficultyStyle(arena.difficulty);
+                                return (
+                                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${ds.bg} ${ds.color}`}>
+                                    {ds.label}
+                                  </span>
+                                );
+                              })()}
+                            </div>
                             <div className="text-[10px] text-white/40 mt-0.5">
                               1º {formatEnergy(first)}{!arena.isDefault && ` • por ${arena.creator_name}`}
                             </div>
