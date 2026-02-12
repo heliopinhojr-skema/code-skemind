@@ -289,6 +289,8 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
   ];
 
   const systemTotal = stats?.systemTotal || 0;
+  const calculatedTotal = (stats?.hxEnergy || 0) + (stats?.playersEnergy || 0) + (stats?.skemaBoxBalance || 0) + (stats?.botTreasuryBalance || 0);
+  const systemDelta = calculatedTotal - 10_000_000;
 
   return (
     <div className="space-y-6">
@@ -353,13 +355,24 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
                   {formatEnergyUtil(stats?.skemaBoxBalance || 0)}
                 </p>
               </div>
-              <div className="bg-primary/10 rounded-lg p-3 border border-primary/30">
+              <div className="bg-primary/10 rounded-lg p-3 border border-primary/30 col-span-2">
                 <p className="text-xs text-muted-foreground font-medium">
-                  ∑ Total Sistema (imutável)
+                  ∑ Total Sistema
                 </p>
                 <p className="text-lg font-bold text-primary">
-                  {formatEnergyUtil(10_000_000)}
+                  {formatEnergyUtil(calculatedTotal)}
                 </p>
+                {systemDelta !== 0 && (
+                  <p className={cn(
+                    "text-[10px] font-medium mt-0.5",
+                    systemDelta < 0 ? "text-destructive" : "text-primary"
+                  )}>
+                    {systemDelta > 0 ? '+' : ''}{formatEnergyUtil(systemDelta)} delta vs 10M
+                  </p>
+                )}
+                {systemDelta === 0 && (
+                  <p className="text-[10px] text-primary mt-0.5">✅ Soma zero exata</p>
+                )}
               </div>
             </div>
 
