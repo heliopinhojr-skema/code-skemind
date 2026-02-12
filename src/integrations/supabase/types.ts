@@ -565,6 +565,10 @@ export type Database = {
         Args: { p_new_energy: number; p_player_id: string; p_reason?: string }
         Returns: undefined
       }
+      admin_cancel_invite_code: {
+        Args: { p_code_id: string }
+        Returns: undefined
+      }
       admin_delete_player: { Args: { p_player_id: string }; Returns: undefined }
       admin_set_player_status: {
         Args: { p_player_id: string; p_status: string }
