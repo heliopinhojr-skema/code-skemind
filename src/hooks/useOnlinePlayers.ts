@@ -9,11 +9,14 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+export type PlayerMood = 'happy' | 'sleeping' | 'sad' | 'angry';
+
 export interface OnlinePlayer {
   id: string;
   name: string;
   emoji: string;
   status: 'online' | 'playing' | 'away';
+  mood: PlayerMood;
   joinedAt: string;
 }
 
@@ -24,11 +27,14 @@ interface PresenceState {
 export function useOnlinePlayers(currentPlayer: { id: string; name: string; emoji: string } | null) {
   const [onlinePlayers, setOnlinePlayers] = useState<OnlinePlayer[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [currentMood, setCurrentMood] = useState<PlayerMood>('happy');
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const moodRef = useRef<PlayerMood>(currentMood);
 
   // Track current player's presence
-  const trackPresence = useCallback(async (status: 'online' | 'playing' | 'away' = 'online') => {
+  const trackPresence = useCallback(async (status: 'online' | 'playing' | 'away' = 'online', mood?: PlayerMood) => {
     if (!channelRef.current || !currentPlayer) return;
+    const m = mood ?? moodRef.current;
 
     try {
       await channelRef.current.track({
@@ -36,9 +42,10 @@ export function useOnlinePlayers(currentPlayer: { id: string; name: string; emoj
         name: currentPlayer.name,
         emoji: currentPlayer.emoji,
         status,
+        mood: m,
         joinedAt: new Date().toISOString(),
       });
-      console.log('[PRESENCE] Tracked status:', status);
+      console.log('[PRESENCE] Tracked status:', status, 'mood:', m);
     } catch (e) {
       console.error('[PRESENCE] Failed to track:', e);
     }
@@ -47,6 +54,12 @@ export function useOnlinePlayers(currentPlayer: { id: string; name: string; emoj
   // Update status (e.g., when entering a game)
   const updateStatus = useCallback((status: 'online' | 'playing' | 'away') => {
     trackPresence(status);
+  }, [trackPresence]);
+
+  const updateMood = useCallback((mood: PlayerMood) => {
+    moodRef.current = mood;
+    setCurrentMood(mood);
+    trackPresence(undefined, mood);
   }, [trackPresence]);
 
   useEffect(() => {
@@ -139,6 +152,7 @@ export function useOnlinePlayers(currentPlayer: { id: string; name: string; emoj
           name: currentPlayer.name,
           emoji: currentPlayer.emoji,
           status: 'online',
+          mood: moodRef.current,
           joinedAt: new Date().toISOString(),
         });
       }
@@ -173,7 +187,8 @@ export function useOnlinePlayers(currentPlayer: { id: string; name: string; emoj
     onlinePlayers,
     isConnected,
     updateStatus,
-    // Exclude current player from count
+    updateMood,
+    currentMood,
     onlineCount: onlinePlayers.filter(p => p.id !== currentPlayer?.id).length,
   };
 }
