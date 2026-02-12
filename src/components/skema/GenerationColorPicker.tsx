@@ -28,7 +28,7 @@ export const GENERATION_COLORS: { id: string; name: string; glow: string; bg: st
   { id: 'orange',  name: 'Laranja Supernova',glow: 'shadow-[0_0_30px_rgba(249,115,22,0.7)]', bg: 'bg-gradient-to-br from-orange-400 to-orange-600', border: 'border-orange-400/60',  face: 'text-orange-900' },
   { id: 'cyan',    name: 'Ciano Orbital',   glow: 'shadow-[0_0_30px_rgba(6,182,212,0.7)]',   bg: 'bg-gradient-to-br from-cyan-400 to-cyan-600',     border: 'border-cyan-400/60',    face: 'text-cyan-900' },
   { id: 'white',   name: 'Branco Lunar',    glow: 'shadow-[0_0_30px_rgba(255,255,255,0.5)]', bg: 'bg-gradient-to-br from-gray-200 to-gray-400',     border: 'border-white/60',       face: 'text-gray-700' },
-  { id: 'crimson', name: 'Carmesim Profundo',glow: 'shadow-[0_0_30px_rgba(220,38,38,0.7)]',  bg: 'bg-gradient-to-br from-rose-500 to-red-700',      border: 'border-rose-400/60',    face: 'text-rose-900' },
+  { id: 'crimson', name: 'Carmesim Profundo',glow: 'shadow-[0_0_30px_rgba(159,18,57,0.7)]',  bg: 'bg-gradient-to-br from-rose-800 to-rose-950',     border: 'border-rose-700/60',    face: 'text-rose-200' },
 ];
 
 export function getColorConfig(colorId: string | null) {
