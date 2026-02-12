@@ -26,41 +26,48 @@ import { calculateBalanceBreakdown, formatEnergy } from '@/lib/tierEconomy';
 import { toast } from 'sonner';
 
 // Tier labels match the player_tier values set by register_player
-const TIER_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+const TIER_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string; glow: string }> = {
   'master_admin': { 
     label: 'CD HX', 
     icon: <Shield className="h-3 w-3" />, 
-    color: 'text-red-400 bg-red-400/10 border-red-400/30' 
+    color: 'text-red-400 bg-red-400/10 border-red-400/30',
+    glow: 'from-red-500 to-orange-500 shadow-red-500/50',
   },
   'Criador': { 
     label: 'Criador', 
     icon: <Star className="h-3 w-3" />, 
-    color: 'text-amber-400 bg-amber-400/10 border-amber-400/30' 
+    color: 'text-amber-400 bg-amber-400/10 border-amber-400/30',
+    glow: 'from-amber-400 to-yellow-500 shadow-amber-400/50',
   },
   'Grão Mestre': { 
     label: 'Grão Mestre', 
     icon: <Crown className="h-3 w-3" />, 
-    color: 'text-purple-400 bg-purple-400/10 border-purple-400/30' 
+    color: 'text-purple-400 bg-purple-400/10 border-purple-400/30',
+    glow: 'from-purple-500 to-pink-500 shadow-purple-500/50',
   },
   'Mestre': { 
     label: 'Mestre', 
     icon: <Swords className="h-3 w-3" />, 
-    color: 'text-blue-400 bg-blue-400/10 border-blue-400/30' 
+    color: 'text-blue-400 bg-blue-400/10 border-blue-400/30',
+    glow: 'from-blue-500 to-cyan-400 shadow-blue-500/50',
   },
   'Boom': { 
     label: 'Boom', 
     icon: <Rocket className="h-3 w-3" />, 
-    color: 'text-green-400 bg-green-400/10 border-green-400/30' 
+    color: 'text-green-400 bg-green-400/10 border-green-400/30',
+    glow: 'from-green-500 to-emerald-400 shadow-green-500/50',
   },
   'Ploft': { 
     label: 'Ploft', 
     icon: <Gamepad2 className="h-3 w-3" />, 
-    color: 'text-muted-foreground bg-muted/30 border-border' 
+    color: 'text-muted-foreground bg-muted/30 border-border',
+    glow: 'from-slate-400 to-slate-500 shadow-slate-400/30',
   },
   'jogador': { 
     label: 'Ploft', 
     icon: <Gamepad2 className="h-3 w-3" />, 
-    color: 'text-muted-foreground bg-muted/30 border-border' 
+    color: 'text-muted-foreground bg-muted/30 border-border',
+    glow: 'from-slate-400 to-slate-500 shadow-slate-400/30',
   },
 };
 
@@ -237,9 +244,10 @@ export function GuardianUsersTable() {
                     setDrawerOpen(true);
                   }}
                 >
-                  {/* Avatar */}
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 border border-border/60 flex items-center justify-center flex-shrink-0 shadow-sm">
-                    <span className="text-lg leading-none">{player.emoji || '🎮'}</span>
+                  {/* Avatar — glowing orb */}
+                  <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${tierConfig.glow} flex items-center justify-center flex-shrink-0 shadow-lg relative`}>
+                    <div className={`absolute inset-0 rounded-full bg-gradient-to-br ${tierConfig.glow} blur-md opacity-40`} />
+                    <span className="text-lg leading-none relative z-10 drop-shadow-md">{player.emoji || '😌'}</span>
                   </div>
                   
                   {/* Info principal - nome + tier na mesma linha */}
