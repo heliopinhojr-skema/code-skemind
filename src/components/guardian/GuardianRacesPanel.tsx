@@ -22,7 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useOfficialRaces } from '@/hooks/useGuardianData';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { Trophy, Plus, Users, Calendar, Zap, Bot, Play, Swords } from 'lucide-react';
+import { Trophy, Plus, Users, Calendar, Zap, Bot, Play, Swords, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from '@/hooks/use-toast';
@@ -126,6 +126,36 @@ export function GuardianRacesPanel({ isMasterAdmin }: GuardianRacesPanelProps) {
     } catch (err: any) {
       toast({
         title: 'Erro ao cancelar corrida',
+        description: err.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteRace = async (raceId: string, raceName: string) => {
+    if (!isMasterAdmin) return;
+    if (!confirm(`Excluir permanentemente a corrida "${raceName}"?`)) return;
+    try {
+      // Delete registrations first
+      await supabase.from('race_registrations').delete().eq('race_id', raceId);
+      await supabase.from('race_results').delete().eq('race_id', raceId);
+      
+      const { error } = await supabase
+        .from('official_races')
+        .delete()
+        .eq('id', raceId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Corrida excluída',
+        description: `A corrida "${raceName}" foi removida permanentemente.`,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['guardian-official-races'] });
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao excluir corrida',
         description: err.message,
         variant: 'destructive',
       });
@@ -366,15 +396,28 @@ export function GuardianRacesPanel({ isMasterAdmin }: GuardianRacesPanelProps) {
                       </TableCell>
                       {isMasterAdmin && (
                         <TableCell>
-                          {race.status === 'registration' && (
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => handleCancelRace(race.id, race.name)}
-                            >
-                              Cancelar
-                            </Button>
-                          )}
+                          <div className="flex items-center gap-1">
+                            {race.status === 'registration' && (
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleCancelRace(race.id, race.name)}
+                              >
+                                Cancelar
+                              </Button>
+                            )}
+                            {race.status === 'cancelled' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => handleDeleteRace(race.id, race.name)}
+                              >
+                                <Trash2 className="h-4 w-4 mr-1" />
+                                Excluir
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       )}
                     </TableRow>
