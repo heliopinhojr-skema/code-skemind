@@ -14,6 +14,8 @@ export interface ArenaListing {
   buy_in: number;
   rake_fee: number;
   bot_count: number;
+  iq_min: number;
+  iq_max: number;
   status: string;
   total_entries: number;
   created_at: string;

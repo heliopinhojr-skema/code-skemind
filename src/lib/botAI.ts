@@ -37,10 +37,22 @@ const BOT_NAMES = [
 const BOT_AVATARS = ['🤖', '🧠', '💻', '🎯', '⚡', '🔮', '🎲', '🌟', '🚀', '💡'];
 
 /**
- * Distribui IQ entre bots: 30% IQ80, 20% IQ90, 30% IQ100, 20% IQ110
+ * Distribui IQ entre bots baseado no range configurado.
+ * Se iqMin/iqMax fornecidos, distribui uniformemente nesse range (steps de 10).
+ * Default: 30% IQ80, 20% IQ90, 30% IQ100, 20% IQ110
  */
-function assignBotIQ(index: number, totalBots: number): number {
-  // Distribui de forma determinística baseado na posição percentual
+function assignBotIQ(index: number, totalBots: number, iqMin?: number, iqMax?: number): number {
+  // Se range customizado, distribui uniformemente entre os steps disponíveis
+  if (iqMin !== undefined && iqMax !== undefined && (iqMin !== 80 || iqMax !== 110)) {
+    const steps: number[] = [];
+    for (let iq = iqMin; iq <= iqMax; iq += 10) {
+      steps.push(iq);
+    }
+    if (steps.length === 0) steps.push(iqMin);
+    return steps[index % steps.length];
+  }
+  
+  // Distribuição padrão
   const pct = (index / totalBots) * 100;
   if (pct < 30) return 80;
   if (pct < 50) return 90;
@@ -64,14 +76,14 @@ function getErrorRate(iq: number): number {
 /**
  * Cria um bot player com IQ distribuído
  */
-export function createBot(index: number, totalBots: number = 99): BotPlayer {
+export function createBot(index: number, totalBots: number = 99, iqMin?: number, iqMax?: number): BotPlayer {
   const name = BOT_NAMES[index % BOT_NAMES.length];
   const avatar = BOT_AVATARS[index % BOT_AVATARS.length];
   
   return {
     id: `bot-${index}-${Date.now()}`,
     name: `${name}${index > BOT_NAMES.length ? index : ''}`,
-    iq: assignBotIQ(index, totalBots),
+    iq: assignBotIQ(index, totalBots, iqMin, iqMax),
     avatar,
     isBot: true,
   };

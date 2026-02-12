@@ -26,6 +26,8 @@ export interface ArenaConfig {
   buyIn: number;
   rakeFee: number;
   botCount: number;
+  iqMin?: number;
+  iqMax?: number;
 }
 
 interface TournamentLobbyProps {
@@ -153,6 +155,8 @@ export function TournamentLobby({
       buyIn: arena.buy_in,
       rakeFee: arena.rake_fee,
       botCount: arena.bot_count,
+      iqMin: arena.iq_min,
+      iqMax: arena.iq_max,
     });
     setIsStarting(true);
     setCountdown(COUNTDOWN_SECONDS);
