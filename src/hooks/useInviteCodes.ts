@@ -261,13 +261,17 @@ export function useInviteCodes(profileId: string | null, playerTier: string | nu
         console.error('[INVITE_CODES] Cancel error:', error);
         return false;
       }
-      await fetchCodes();
+      // Refetch and auto-generate a replacement code
+      const updatedCodes = await fetchCodes();
+      if (updatedCodes) {
+        await autoGenerateCodes(updatedCodes);
+      }
       return true;
     } catch (e) {
       console.error('[INVITE_CODES] Cancel unexpected error:', e);
       return false;
     }
-  }, [profileId, fetchCodes]);
+  }, [profileId, fetchCodes, autoGenerateCodes]);
 
   return {
     codes,
