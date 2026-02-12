@@ -78,6 +78,8 @@ export type Database = {
           created_at: string
           creator_id: string
           id: string
+          iq_max: number
+          iq_min: number
           max_entries: number
           name: string
           rake_fee: number
@@ -90,6 +92,8 @@ export type Database = {
           created_at?: string
           creator_id: string
           id?: string
+          iq_max?: number
+          iq_min?: number
           max_entries?: number
           name: string
           rake_fee?: number
@@ -102,6 +106,8 @@ export type Database = {
           created_at?: string
           creator_id?: string
           id?: string
+          iq_max?: number
+          iq_min?: number
           max_entries?: number
           name?: string
           rake_fee?: number

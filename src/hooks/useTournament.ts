@@ -60,6 +60,8 @@ export function useTournament() {
   const [buyIn, setBuyIn] = useState(TOURNAMENT_ENTRY_FEE);
   const [rakeFee, setRakeFee] = useState(TOURNAMENT_RAKE_FEE);
   const [botCount, setBotCount] = useState(BOT_COUNT);
+  const [iqMin, setIqMin] = useState<number | undefined>(undefined);
+  const [iqMax, setIqMax] = useState<number | undefined>(undefined);
   
   const botSimulationRef = useRef<TournamentResult[]>([]);
   const revealIntervalRef = useRef<number | null>(null);
@@ -76,7 +78,7 @@ export function useTournament() {
     };
     
     const bots: TournamentPlayer[] = Array.from({ length: botCount }, (_, i) => {
-      const bot = createBot(i, botCount);
+      const bot = createBot(i, botCount, iqMin, iqMax);
       return {
         id: bot.id,
         name: bot.name,
@@ -93,7 +95,7 @@ export function useTournament() {
     setHumanSecretCode([]);
     setArenaPool(pool);
     activePoolRef.current = pool;
-  }, [humanPlayerId, botCount, buyIn, rakeFee]);
+  }, [humanPlayerId, botCount, buyIn, rakeFee, iqMin, iqMax]);
   
   // Inicializa apenas no mount - NÃO re-executa quando deps mudam
   // (evita race condition onde initializeLobby reseta status/pool durante o jogo)
@@ -122,7 +124,7 @@ export function useTournament() {
 
   // Inicia torneio - chama Edge Function para economia
   // Accepts optional override config for arena params
-  const startTournament = useCallback(async (arenaConfig?: { buyIn: number; rakeFee: number; botCount: number }) => {
+  const startTournament = useCallback(async (arenaConfig?: { buyIn: number; rakeFee: number; botCount: number; iqMin?: number; iqMax?: number }) => {
     if (isProcessing) return { success: false, error: 'Processando...' };
     setIsProcessing(true);
     
@@ -130,12 +132,16 @@ export function useTournament() {
     const effectiveBuyIn = arenaConfig?.buyIn ?? buyIn;
     const effectiveRakeFee = arenaConfig?.rakeFee ?? rakeFee;
     const effectiveBotCount = arenaConfig?.botCount ?? botCount;
+    const effectiveIqMin = arenaConfig?.iqMin ?? iqMin;
+    const effectiveIqMax = arenaConfig?.iqMax ?? iqMax;
 
     // Update state to match
     if (arenaConfig) {
       setBuyIn(effectiveBuyIn);
       setRakeFee(effectiveRakeFee);
       setBotCount(effectiveBotCount);
+      setIqMin(effectiveIqMin);
+      setIqMax(effectiveIqMax);
     }
     
     try {
@@ -193,7 +199,7 @@ export function useTournament() {
       if (botPlayers.length !== actualBotCount) {
         const { createBot: createBotFn } = await import('@/lib/botAI');
         botPlayers = Array.from({ length: actualBotCount }, (_, i) => {
-          const bot = createBotFn(i, actualBotCount);
+          const bot = createBotFn(i, actualBotCount, effectiveIqMin, effectiveIqMax);
           return {
             id: bot.id,
             name: bot.name,
