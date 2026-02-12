@@ -81,9 +81,12 @@ export const PlanetFace = forwardRef<SVGSVGElement, { className?: string; varian
         {/* Blush / rosy cheeks */}
         <ellipse cx="18" cy="42" rx="6" ry="4" fill="url(#pf-cheek-l)" />
         <ellipse cx="62" cy="42" rx="6" ry="4" fill="url(#pf-cheek-r)" />
-        {/* Mouth — cute open smile with tongue hint */}
-        <path d="M32 50 Q40 60 48 50" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
-        <path d="M36 52 Q40 56 44 52" fill="currentColor" opacity="0.15" />
+        {/* Mouth — wide expressive smile with lips and tongue */}
+        <path d="M30 48 Q40 62 50 48" stroke="currentColor" strokeWidth="2.8" fill="none" strokeLinecap="round" />
+        <path d="M32 50 Q40 58 48 50" fill="currentColor" opacity="0.12" />
+        <path d="M36 53 Q40 57 44 53" fill="#e85d75" opacity="0.45" />
+        {/* Upper lip accent */}
+        <path d="M34 48.5 Q40 46 46 48.5" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" opacity="0.3" />
         {/* Sparkle accents */}
         <g opacity="0.6" fill="currentColor">
           <polygon points="14,18 15,15 16,18 15,19" />
@@ -117,8 +120,11 @@ export const PlanetFace = forwardRef<SVGSVGElement, { className?: string; varian
       {/* Blush / rosy cheeks */}
       <ellipse cx="18" cy="42" rx="6" ry="3.5" fill="url(#pf-blush-l)" />
       <ellipse cx="62" cy="42" rx="6" ry="3.5" fill="url(#pf-blush-r)" />
-      {/* Serene smile — soft double curve */}
-      <path d="M30 50 Q40 60 50 50" stroke="currentColor" strokeWidth="2.2" fill="none" strokeLinecap="round" />
+      {/* Serene smile — fuller lips with subtle shading */}
+      <path d="M28 49 Q40 62 52 49" stroke="currentColor" strokeWidth="2.8" fill="none" strokeLinecap="round" />
+      <path d="M32 51 Q40 57 48 51" fill="currentColor" opacity="0.1" />
+      {/* Upper lip line */}
+      <path d="M33 49 Q40 46.5 47 49" stroke="currentColor" strokeWidth="1" fill="none" strokeLinecap="round" opacity="0.25" />
       {/* Tiny stars / sparkles near face */}
       <g opacity="0.5" fill="currentColor">
         <circle cx="12" cy="20" r="1.2" />
