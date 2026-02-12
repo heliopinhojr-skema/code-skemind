@@ -77,6 +77,7 @@ export type Database = {
           buy_in: number
           created_at: string
           creator_id: string
+          difficulty: string
           id: string
           iq_max: number
           iq_min: number
@@ -91,6 +92,7 @@ export type Database = {
           buy_in?: number
           created_at?: string
           creator_id: string
+          difficulty?: string
           id?: string
           iq_max?: number
           iq_min?: number
@@ -105,6 +107,7 @@ export type Database = {
           buy_in?: number
           created_at?: string
           creator_id?: string
+          difficulty?: string
           id?: string
           iq_max?: number
           iq_min?: number
