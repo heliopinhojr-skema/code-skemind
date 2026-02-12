@@ -414,22 +414,62 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
         </CardContent>
       </Card>
 
-      {/* Alerta Bot Treasury ≤ 110.000 */}
-      {!isLoading && (stats?.botTreasuryBalance || 0) <= 110_000 && (
-        <Card className="border border-destructive/40 bg-destructive/10 backdrop-blur-sm animate-pulse">
-          <CardContent className="p-4 flex items-center gap-3">
-            <AlertTriangle className="h-6 w-6 text-destructive shrink-0" />
-            <div>
-              <p className="text-sm font-semibold text-destructive">
-                ⚠️ Bot Treasury em nível crítico: {formatEnergyUtil(stats?.botTreasuryBalance || 0)}
-              </p>
-              <p className="text-xs text-destructive/80">
-                Saldo abaixo de k$ 110.000,00 — considere doar do HX para manter arenas funcionando
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Alerta Bot Treasury — níveis de proximidade à meta de 110.000 */}
+      {!isLoading && (() => {
+        const bal = stats?.botTreasuryBalance || 0;
+        const target = 110_000;
+        // Faixas: ≤110k crítico, ≤120k alerta, ≤135k atenção
+        if (bal > 135_000) return null;
+        
+        const isCritical = bal <= target;
+        const isWarning = !isCritical && bal <= 120_000;
+        // else: atenção (120k-135k)
+
+        const borderColor = isCritical ? 'border-destructive/50' : isWarning ? 'border-amber-500/50' : 'border-yellow-500/30';
+        const bgColor = isCritical ? 'bg-destructive/10' : isWarning ? 'bg-amber-500/10' : 'bg-yellow-500/5';
+        const textColor = isCritical ? 'text-destructive' : isWarning ? 'text-amber-400' : 'text-yellow-400';
+        const icon = isCritical ? '🚨' : isWarning ? '⚠️' : '📊';
+        const label = isCritical 
+          ? 'CRÍTICO — Meta de 110k atingida!' 
+          : isWarning 
+            ? `Atenção — A ${formatEnergyUtil(bal - target)} da meta de 110k` 
+            : `Monitorando — A ${formatEnergyUtil(bal - target)} da meta de 110k`;
+        const desc = isCritical
+          ? 'Saldo atingiu k$ 110.000,00 — doe do HX para manter arenas funcionando'
+          : isWarning
+            ? 'Bot Treasury se aproximando do limite mínimo — considere reforçar'
+            : 'Bot Treasury entrando na zona de monitoramento';
+
+        return (
+          <Card className={`border ${borderColor} ${bgColor} backdrop-blur-sm ${isCritical ? 'animate-pulse' : ''}`}>
+            <CardContent className="p-4 flex items-center gap-3">
+              <AlertTriangle className={`h-6 w-6 ${textColor} shrink-0`} />
+              <div>
+                <p className={`text-sm font-semibold ${textColor}`}>
+                  {icon} {label}
+                </p>
+                <p className={`text-xs ${textColor}/80`}>
+                  {desc} — Saldo atual: {formatEnergyUtil(bal)}
+                </p>
+                {/* Barra visual de proximidade */}
+                <div className="mt-2 w-full max-w-xs">
+                  <div className="flex justify-between text-[9px] text-muted-foreground mb-0.5">
+                    <span>110k (meta)</span>
+                    <span>135k</span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-muted/40 overflow-hidden">
+                    {(() => {
+                      const pct = Math.max(0, Math.min(100, ((bal - target) / (135_000 - target)) * 100));
+                      const barColor = isCritical ? 'bg-destructive' : isWarning ? 'bg-amber-500' : 'bg-yellow-400';
+                      return <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />;
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Live Counters Strip */}
       <div className="grid grid-cols-3 gap-3">
