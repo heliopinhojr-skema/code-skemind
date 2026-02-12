@@ -316,6 +316,7 @@ export type Database = {
           stats_races: number
           stats_wins: number
           status: string
+          terms_accepted_at: string | null
           updated_at: string
           user_id: string
         }
@@ -336,6 +337,7 @@ export type Database = {
           stats_races?: number
           stats_wins?: number
           status?: string
+          terms_accepted_at?: string | null
           updated_at?: string
           user_id: string
         }
@@ -356,6 +358,7 @@ export type Database = {
           stats_races?: number
           stats_wins?: number
           status?: string
+          terms_accepted_at?: string | null
           updated_at?: string
           user_id?: string
         }
