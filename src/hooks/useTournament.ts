@@ -76,7 +76,7 @@ export function useTournament() {
     };
     
     const bots: TournamentPlayer[] = Array.from({ length: botCount }, (_, i) => {
-      const bot = createBot(i);
+      const bot = createBot(i, botCount);
       return {
         id: bot.id,
         name: bot.name,
@@ -193,7 +193,7 @@ export function useTournament() {
       if (botPlayers.length !== actualBotCount) {
         const { createBot: createBotFn } = await import('@/lib/botAI');
         botPlayers = Array.from({ length: actualBotCount }, (_, i) => {
-          const bot = createBotFn(i);
+          const bot = createBotFn(i, actualBotCount);
           return {
             id: bot.id,
             name: bot.name,
@@ -206,7 +206,7 @@ export function useTournament() {
       }
       const botResults: TournamentResult[] = botPlayers.map(bot => {
         const botSecret = generateSecret(symbolIds);
-        const gameResult = simulateBotGame(botSecret, UI_SYMBOLS, MAX_ATTEMPTS, GAME_DURATION);
+        const gameResult = simulateBotGame(botSecret, UI_SYMBOLS, MAX_ATTEMPTS, GAME_DURATION, bot.iq ?? 80);
         
         return {
           playerId: bot.id,
