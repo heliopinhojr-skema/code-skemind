@@ -14,10 +14,10 @@ import { useSupabasePlayer } from '@/hooks/useSupabasePlayer';
 import { useInviteCodes } from '@/hooks/useInviteCodes';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, Zap, Box, Gift, Trophy, TrendingUp, Copy, Check, Share2, Link, ArrowDownRight, Dna, TreePine, Heart, Loader2, Calendar, Receipt, Radio, UserPlus, Activity } from 'lucide-react';
+import { Users, Zap, Box, Gift, Trophy, TrendingUp, Copy, Check, Share2, Link, ArrowDownRight, Dna, TreePine, Heart, Loader2, Calendar, Receipt, Radio, UserPlus, Activity, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { calculateBalanceBreakdown, formatEnergy as formatEnergyUtil } from '@/lib/tierEconomy';
+import { calculateBalanceBreakdown, formatEnergy as formatEnergyUtil, getTierEconomy } from '@/lib/tierEconomy';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -473,6 +473,56 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Alerta: Jogadores que atingiram o limite de convites */}
+      {referralNodes && (() => {
+        const playersAtLimit = referralNodes
+          .filter(n => n.player_tier !== 'master_admin' && n.player_tier !== 'jogador' && n.player_tier !== 'Ploft')
+          .map(n => {
+            const config = getTierEconomy(n.player_tier);
+            if (config.maxInvites <= 0) return null;
+            return {
+              id: n.id,
+              name: n.name,
+              emoji: n.emoji,
+              tier: n.player_tier,
+              invitesSent: n.invites_sent,
+              maxInvites: config.maxInvites,
+              invitedTierLabel: config.invitedTierLabel,
+            };
+          })
+          .filter((p): p is NonNullable<typeof p> => p !== null && p.invitesSent >= p.maxInvites);
+
+        if (playersAtLimit.length === 0) return null;
+
+        return (
+          <Card className="border border-amber-500/30 bg-amber-500/5 backdrop-blur-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-400" />
+                Jogadores com Slots Esgotados ({playersAtLimit.length})
+              </CardTitle>
+              <p className="text-[10px] text-muted-foreground">
+                Esses jogadores usaram todos os convites do tier — avaliar se devem receber mais slots
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1 max-h-[200px] overflow-y-auto pr-1">
+                {playersAtLimit.map(p => (
+                  <div key={p.id} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded bg-muted/30">
+                    <span>{p.emoji}</span>
+                    <span className="font-medium text-foreground truncate flex-1">{p.name}</span>
+                    <Badge variant="outline" className="text-[10px] shrink-0">{p.tier}</Badge>
+                    <span className="text-amber-400 font-mono shrink-0">
+                      {p.invitesSent}/{p.maxInvites} {p.invitedTierLabel}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Visão Geral */}
       <h2 className="text-xl font-semibold text-foreground">Visão Geral</h2>
