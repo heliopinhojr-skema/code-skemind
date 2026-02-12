@@ -57,6 +57,7 @@ export default function Skema() {
       id: skemaPlayer.player.id,
       name: skemaPlayer.player.name,
       emoji: skemaPlayer.player.emoji,
+      mood: skemaPlayer.player.mood,
     } : null
   );
   

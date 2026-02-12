@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN mood text NOT NULL DEFAULT 'happy';
