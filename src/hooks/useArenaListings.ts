@@ -16,6 +16,7 @@ export interface ArenaListing {
   bot_count: number;
   iq_min: number;
   iq_max: number;
+  difficulty: string;
   status: string;
   total_entries: number;
   created_at: string;
