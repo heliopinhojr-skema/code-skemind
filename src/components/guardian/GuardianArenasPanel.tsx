@@ -21,7 +21,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useArenaListings, useCreateArena, useCloseArena, useDeleteArena, useUpdateArena, useBotTreasuryBalance } from '@/hooks/useArenaListings';
+import { useArenaListings, useCreateArena, useCloseArena, useDeleteArena, useUpdateArena, useBotTreasuryBalance, ArenaListing } from '@/hooks/useArenaListings';
 import { useSupabasePlayer } from '@/hooks/useSupabasePlayer';
 import {
   ARENA_BOT_OPTIONS,
@@ -64,6 +64,9 @@ export function GuardianArenasPanel() {
   const [editName, setEditName] = useState('');
   const [editBuyInInput, setEditBuyInInput] = useState('');
   const [editBots, setEditBots] = useState(99);
+  const [editDifficulty, setEditDifficulty] = useState('MEDIO');
+
+  const DIFFICULTY_OPTIONS = ['FACIL', 'MEDIO', 'MEDIO HARD', 'HARD'] as const;
 
   const parsedBuyIn = parseFloat(customBuyInInput) || 0;
   const { buyIn, rakeFee } = computeBuyInAndRake(parsedBuyIn);
@@ -135,6 +138,7 @@ export function GuardianArenasPanel() {
     setEditName(arena.name);
     setEditBuyInInput(String(Number(arena.buy_in) + Number(arena.rake_fee)));
     setEditBots(arena.bot_count);
+    setEditDifficulty(arena.difficulty || 'MEDIO');
   };
 
   const handleUpdate = async () => {
@@ -146,6 +150,7 @@ export function GuardianArenasPanel() {
         buy_in: editComputed.buyIn,
         rake_fee: editComputed.rakeFee,
         bot_count: editBots,
+        difficulty: editDifficulty,
       });
       toast({ title: '✏️ Arena atualizada', description: `"${editName}" foi editada.` });
       setEditingArena(null);
@@ -289,6 +294,7 @@ export function GuardianArenasPanel() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Arena</TableHead>
+                  <TableHead>Dificuldade</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Criador</TableHead>
                   <TableHead>Buy-in</TableHead>
@@ -302,14 +308,14 @@ export function GuardianArenasPanel() {
                 {isLoading ? (
                   Array.from({ length: 3 }).map((_, i) => (
                     <TableRow key={i}>
-                      {Array.from({ length: 8 }).map((_, j) => (
+                      {Array.from({ length: 9 }).map((_, j) => (
                         <TableCell key={j}><Skeleton className="h-6 w-16" /></TableCell>
                       ))}
                     </TableRow>
                   ))
                 ) : arenas?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                       Nenhuma arena criada
                     </TableCell>
                   </TableRow>
@@ -321,6 +327,22 @@ export function GuardianArenasPanel() {
                     return (
                       <TableRow key={arena.id}>
                         <TableCell className="font-medium">{arena.name}</TableCell>
+                        <TableCell>
+                          {(() => {
+                            const diffStyles: Record<string, string> = {
+                              'FACIL': 'bg-green-500/20 text-green-400 border-green-500/30',
+                              'MEDIO': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+                              'MEDIO HARD': 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+                              'HARD': 'bg-red-500/20 text-red-400 border-red-500/30',
+                            };
+                            const d = (arena as any).difficulty || 'MEDIO';
+                            return (
+                              <Badge variant="outline" className={diffStyles[d] || diffStyles['MEDIO']}>
+                                {d}
+                              </Badge>
+                            );
+                          })()}
+                        </TableCell>
                         <TableCell>
                           <Badge variant="outline" className={statusColors[arena.status] || ''}>
                             {statusLabels[arena.status] || arena.status}
@@ -449,6 +471,20 @@ export function GuardianArenasPanel() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Dificuldade</Label>
+              <Select value={editDifficulty} onValueChange={setEditDifficulty}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DIFFICULTY_OPTIONS.map((d) => (
+                    <SelectItem key={d} value={d}>{d}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="bg-muted/30 rounded-lg p-3 space-y-1 text-sm border border-border/50">

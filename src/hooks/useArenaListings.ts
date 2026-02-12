@@ -196,12 +196,14 @@ export function useUpdateArena() {
       buy_in?: number;
       rake_fee?: number;
       bot_count?: number;
+      difficulty?: string;
     }) => {
       const updateData: Record<string, any> = {};
       if (params.name !== undefined) updateData.name = params.name;
       if (params.buy_in !== undefined) updateData.buy_in = params.buy_in;
       if (params.rake_fee !== undefined) updateData.rake_fee = params.rake_fee;
       if (params.bot_count !== undefined) updateData.bot_count = params.bot_count;
+      if (params.difficulty !== undefined) updateData.difficulty = params.difficulty;
 
       const { error } = await supabase
         .from('arena_listings')
