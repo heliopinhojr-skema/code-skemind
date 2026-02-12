@@ -11,6 +11,7 @@ import Tournament from "./pages/Tournament";
 import Auth from "./pages/Auth";
 import Guardian from "./pages/Guardian";
 import NotFound from "./pages/NotFound";
+import Terms from "./pages/Terms";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +39,9 @@ const App = () => (
             <Route path="/invite/:code" element={<ProtectedRoute playerOnly><Skema /></ProtectedRoute>} />
             <Route path="/classic" element={<ProtectedRoute playerOnly><Index /></ProtectedRoute>} />
             <Route path="/tournament" element={<ProtectedRoute playerOnly><Tournament /></ProtectedRoute>} />
+            
+            {/* Public pages */}
+            <Route path="/termos" element={<Terms />} />
             
             {/* Fallback */}
             <Route path="*" element={<ProtectedRoute playerOnly><Skema /></ProtectedRoute>} />
