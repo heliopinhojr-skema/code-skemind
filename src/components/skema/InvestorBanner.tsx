@@ -6,6 +6,7 @@ import { Sparkles, Calendar, Clock, Users, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import investorImg from '@/assets/skema-investor.jpeg';
+import skemaEmojis from '@/assets/skema-emojis.jpeg';
 
 interface InvestorBannerProps {
   playerId: string;
@@ -76,11 +77,11 @@ export function InvestorBanner({ playerId, playerName }: InvestorBannerProps) {
           <div className="absolute inset-0 bg-black/50" />
           <div className="relative z-10 flex items-center gap-3 px-4 py-3">
             <motion.div
-              animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
+              animate={{ scale: [1, 1.05, 1] }}
               transition={{ duration: 3, repeat: Infinity }}
-              className="text-2xl"
+              className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0"
             >
-              💎
+              <img src={skemaEmojis} alt="" className="w-full h-full object-cover" />
             </motion.div>
             <div className="flex-1">
               <p className="text-sm font-bold text-yellow-200/70">
