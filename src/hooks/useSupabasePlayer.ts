@@ -32,6 +32,7 @@ export interface SkemaPlayer {
   isKeeper: boolean;
   generationColor: string | null;
   termsAcceptedAt: string | null;
+  mood: string;
   stats: {
     wins: number;
     races: number;
@@ -169,7 +170,8 @@ export function useSupabasePlayer() {
           stats_best_time,
           player_tier,
           generation_color,
-          terms_accepted_at
+          terms_accepted_at,
+          mood
         `)
         .eq('user_id', userId)
         .maybeSingle();
@@ -223,6 +225,7 @@ export function useSupabasePlayer() {
         isKeeper,
         generationColor: (profile as any).generation_color || null,
         termsAcceptedAt: (profile as any).terms_accepted_at || null,
+        mood: (profile as any).mood || 'happy',
         stats: {
           wins: profile.stats_wins || 0,
           races: profile.stats_races || 0,

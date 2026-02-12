@@ -347,6 +347,7 @@ export type Database = {
           invited_by: string | null
           invited_by_name: string | null
           last_refill_date: string | null
+          mood: string
           name: string
           pin: string | null
           player_tier: string | null
@@ -368,6 +369,7 @@ export type Database = {
           invited_by?: string | null
           invited_by_name?: string | null
           last_refill_date?: string | null
+          mood?: string
           name: string
           pin?: string | null
           player_tier?: string | null
@@ -389,6 +391,7 @@ export type Database = {
           invited_by?: string | null
           invited_by_name?: string | null
           last_refill_date?: string | null
+          mood?: string
           name?: string
           pin?: string | null
           player_tier?: string | null

@@ -24,12 +24,13 @@ interface PresenceState {
   [key: string]: OnlinePlayer[];
 }
 
-export function useOnlinePlayers(currentPlayer: { id: string; name: string; emoji: string } | null) {
+export function useOnlinePlayers(currentPlayer: { id: string; name: string; emoji: string; mood?: string } | null) {
   const [onlinePlayers, setOnlinePlayers] = useState<OnlinePlayer[]>([]);
   const [isConnected, setIsConnected] = useState(false);
-  const [currentMood, setCurrentMood] = useState<PlayerMood>('happy');
+  const initialMood = (currentPlayer?.mood as PlayerMood) || 'happy';
+  const [currentMood, setCurrentMood] = useState<PlayerMood>(initialMood);
   const channelRef = useRef<RealtimeChannel | null>(null);
-  const moodRef = useRef<PlayerMood>(currentMood);
+  const moodRef = useRef<PlayerMood>(initialMood);
 
   // Track current player's presence
   const trackPresence = useCallback(async (status: 'online' | 'playing' | 'away' = 'online', mood?: PlayerMood) => {
@@ -60,7 +61,23 @@ export function useOnlinePlayers(currentPlayer: { id: string; name: string; emoj
     moodRef.current = mood;
     setCurrentMood(mood);
     trackPresence(undefined, mood);
-  }, [trackPresence]);
+    // Persist mood to database
+    if (currentPlayer?.id) {
+      supabase.from('profiles').update({ mood } as any).eq('id', currentPlayer.id).then(({ error }) => {
+        if (error) console.error('[PRESENCE] Failed to persist mood:', error);
+        else console.log('[PRESENCE] Mood persisted:', mood);
+      });
+    }
+  }, [trackPresence, currentPlayer?.id]);
+
+  // Sync mood from profile when player data loads/changes
+  useEffect(() => {
+    if (currentPlayer?.mood) {
+      const m = currentPlayer.mood as PlayerMood;
+      moodRef.current = m;
+      setCurrentMood(m);
+    }
+  }, [currentPlayer?.mood]);
 
   useEffect(() => {
     if (!currentPlayer) {
