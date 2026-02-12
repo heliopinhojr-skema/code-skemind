@@ -9,7 +9,7 @@
  * - Economia de energia (Cloud)
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSupabasePlayer } from '@/hooks/useSupabasePlayer';
 import { useGame } from '@/hooks/useGame';
@@ -22,6 +22,7 @@ import { RaceSummary } from '@/components/tournament/RaceSummary';
 import { TournamentLeaderboard } from '@/components/tournament/TournamentLeaderboard';
 import { CosmicBackground } from '@/components/CosmicBackground';
 import { Button } from '@/components/ui/button';
+import { TermsAcceptanceGate } from '@/components/auth/TermsAcceptanceGate';
 import { ArrowLeft, Trophy } from 'lucide-react';
 import { UI_SYMBOLS } from '@/hooks/useGame';
 import { useSkemaBox } from '@/hooks/useSkemaBox';
@@ -163,6 +164,19 @@ export default function Skema() {
           <p className="text-white/40 text-xs">Código do convite: {pendingInviteCode}</p>
         </div>
       </div>
+    );
+  }
+
+  // === TERMS ACCEPTANCE GATE ===
+  if (skemaPlayer.isLoaded && skemaPlayer.isRegistered && skemaPlayer.player && !skemaPlayer.player.termsAcceptedAt) {
+    return (
+      <TermsAcceptanceGate
+        playerId={skemaPlayer.player.id}
+        playerName={skemaPlayer.player.name}
+        onAccepted={() => {
+          skemaPlayer.actions.refreshProfile?.();
+        }}
+      />
     );
   }
   
