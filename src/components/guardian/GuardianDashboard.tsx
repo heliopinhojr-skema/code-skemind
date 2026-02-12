@@ -414,57 +414,71 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
         </CardContent>
       </Card>
 
-      {/* Alerta Bot Treasury — níveis de proximidade à meta de 110.000 */}
+      {/* Alerta Bot Treasury — meta de crescimento (110k) e alerta de baixa (50k) */}
       {!isLoading && (() => {
         const bal = stats?.botTreasuryBalance || 0;
-        const target = 110_000;
-        // Faixas: ≤110k crítico, ≤120k alerta, ≤135k atenção
-        if (bal > 135_000) return null;
-        
-        const isCritical = bal <= target;
-        const isWarning = !isCritical && bal <= 120_000;
-        // else: atenção (120k-135k)
+        const growthTarget = 110_000;
+        const dangerTarget = 50_000;
 
-        const borderColor = isCritical ? 'border-destructive/50' : isWarning ? 'border-amber-500/50' : 'border-yellow-500/30';
-        const bgColor = isCritical ? 'bg-destructive/10' : isWarning ? 'bg-amber-500/10' : 'bg-yellow-500/5';
-        const textColor = isCritical ? 'text-destructive' : isWarning ? 'text-amber-400' : 'text-yellow-400';
-        const icon = isCritical ? '🚨' : isWarning ? '⚠️' : '📊';
-        const label = isCritical 
-          ? 'CRÍTICO — Meta de 110k atingida!' 
-          : isWarning 
-            ? `Atenção — A ${formatEnergyUtil(bal - target)} da meta de 110k` 
-            : `Monitorando — A ${formatEnergyUtil(bal - target)} da meta de 110k`;
-        const desc = isCritical
-          ? 'Saldo atingiu k$ 110.000,00 — doe do HX para manter arenas funcionando'
-          : isWarning
-            ? 'Bot Treasury se aproximando do limite mínimo — considere reforçar'
-            : 'Bot Treasury entrando na zona de monitoramento';
+        // Acima de 110k = meta atingida! 🎉
+        if (bal >= growthTarget) {
+          return (
+            <Card className="border border-emerald-500/50 bg-emerald-500/10 backdrop-blur-sm">
+              <CardContent className="p-4 flex items-center gap-3">
+                <TrendingUp className="h-6 w-6 text-emerald-400 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-emerald-400">
+                    🎯 Meta de 110k atingida! Bot Treasury: {formatEnergyUtil(bal)}
+                  </p>
+                  <p className="text-xs text-emerald-400/80">
+                    Saldo ultrapassou k$ 110.000,00 — bots bem capitalizados
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        }
 
-        return (
-          <Card className={`border ${borderColor} ${bgColor} backdrop-blur-sm ${isCritical ? 'animate-pulse' : ''}`}>
-            <CardContent className="p-4 flex items-center gap-3">
-              <AlertTriangle className={`h-6 w-6 ${textColor} shrink-0`} />
-              <div>
-                <p className={`text-sm font-semibold ${textColor}`}>
-                  {icon} {label}
-                </p>
-                <p className={`text-xs ${textColor}/80`}>
-                  {desc} — Saldo atual: {formatEnergyUtil(bal)}
-                </p>
-                {/* Barra visual de proximidade */}
-                <div className="mt-2 w-full max-w-xs">
-                  <div className="flex justify-between text-[9px] text-muted-foreground mb-0.5">
-                    <span>110k (meta)</span>
-                    <span>135k</span>
-                  </div>
-                  <div className="w-full h-2 rounded-full bg-muted/40 overflow-hidden">
-                    {(() => {
-                      const pct = Math.max(0, Math.min(100, ((bal - target) / (135_000 - target)) * 100));
-                      const barColor = isCritical ? 'bg-destructive' : isWarning ? 'bg-amber-500' : 'bg-yellow-400';
-                      return <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />;
-                    })()}
+        // Entre 50k e 110k — barra de progresso rumo à meta
+        if (bal > dangerTarget) {
+          const pct = Math.max(0, Math.min(100, ((bal - dangerTarget) / (growthTarget - dangerTarget)) * 100));
+          const barColor = pct >= 70 ? 'bg-emerald-500' : pct >= 40 ? 'bg-amber-400' : 'bg-orange-500';
+          return (
+            <Card className="border border-primary/30 bg-primary/5 backdrop-blur-sm">
+              <CardContent className="p-4 flex items-center gap-3">
+                <TrendingUp className="h-5 w-5 text-primary shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-foreground">
+                    📊 Bot Treasury: {formatEnergyUtil(bal)} — faltam {formatEnergyUtil(growthTarget - bal)} p/ meta de 110k
+                  </p>
+                  <div className="mt-2 w-full max-w-sm">
+                    <div className="flex justify-between text-[9px] text-muted-foreground mb-0.5">
+                      <span>50k (perigo)</span>
+                      <span>{Math.round(pct)}%</span>
+                      <span>110k (meta)</span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-muted/40 overflow-hidden">
+                      <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+                    </div>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          );
+        }
+
+        // ≤ 50k — PERIGO
+        return (
+          <Card className="border border-destructive/50 bg-destructive/10 backdrop-blur-sm animate-pulse">
+            <CardContent className="p-4 flex items-center gap-3">
+              <AlertTriangle className="h-6 w-6 text-destructive shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-destructive">
+                  🚨 PERIGO — Bot Treasury: {formatEnergyUtil(bal)}
+                </p>
+                <p className="text-xs text-destructive/80">
+                  Saldo abaixo de k$ 50.000,00 — doe do HX urgentemente para manter arenas
+                </p>
               </div>
             </CardContent>
           </Card>
