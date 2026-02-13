@@ -332,16 +332,18 @@ export function GuardianReferralTree() {
           <div className="flex items-center gap-2">
             <button 
               onClick={expandAll}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
             >
-              Expandir
+              <ChevronDown className="h-3 w-3" />
+              Abrir tudo
             </button>
             <span className="text-muted-foreground">|</span>
             <button 
               onClick={collapseAll}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
             >
-              Colapsar
+              <ChevronRight className="h-3 w-3" />
+              Fechar tudo
             </button>
             <div className="relative ml-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
