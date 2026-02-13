@@ -511,10 +511,10 @@ export function SkemaLobby({
             <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-black/70" />
             <div className="relative z-10 h-full flex flex-col items-center justify-center text-center px-4">
               <h2 className="text-xl font-black tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-white to-purple-300">
-                SKEMA
+                S<span className="text-transparent bg-clip-text bg-gradient-to-b from-orange-400 via-orange-500 to-red-600">K</span>EMA
               </h2>
-              <p className="text-[10px] tracking-[0.12em] uppercase text-white/90 font-medium mt-0.5" style={{ textShadow: '0 1px 6px rgba(0,0,0,0.9)' }}>
-                {t.auth.tagline}
+              <p className="text-[11px] tracking-[0.18em] text-white/80 font-light mt-1 italic" style={{ textShadow: '0 0 12px rgba(255,255,255,0.15), 0 1px 4px rgba(0,0,0,0.9)' }}>
+                Antes da luz.
               </p>
             </div>
           </motion.div>
