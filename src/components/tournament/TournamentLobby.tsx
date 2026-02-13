@@ -326,21 +326,6 @@ export function TournamentLobby({
             </motion.div>
           </div>
           
-          {/* Mini stats */}
-          <div className="grid grid-cols-3 gap-2">
-            <div className="bg-white/5 rounded-lg p-2 text-center">
-              <div className="text-lg font-bold text-green-400">{playerStats.wins}</div>
-              <div className="text-xs text-white/50">Vitórias</div>
-            </div>
-            <div className="bg-white/5 rounded-lg p-2 text-center">
-              <div className="text-lg font-bold text-blue-400">{playerStats.races}</div>
-              <div className="text-xs text-white/50">Corridas</div>
-            </div>
-            <div className="bg-white/5 rounded-lg p-2 text-center">
-              <div className="text-lg font-bold text-purple-400">{playerStats.bestTime}</div>
-              <div className="text-xs text-white/50">Melhor</div>
-            </div>
-          </div>
         </motion.header>
 
         {/* Conteúdo rolável */}
@@ -619,6 +604,28 @@ export function TournamentLobby({
           )}
         </AnimatePresence>
 
+          {/* Mini stats */}
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="mx-4 mt-6"
+          >
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-white/5 rounded-lg p-2 text-center">
+                <div className="text-lg font-bold text-green-400">{playerStats.wins}</div>
+                <div className="text-xs text-white/50">Vitórias</div>
+              </div>
+              <div className="bg-white/5 rounded-lg p-2 text-center">
+                <div className="text-lg font-bold text-blue-400">{playerStats.races}</div>
+                <div className="text-xs text-white/50">Corridas</div>
+              </div>
+              <div className="bg-white/5 rounded-lg p-2 text-center">
+                <div className="text-lg font-bold text-purple-400">{playerStats.bestTime}</div>
+                <div className="text-xs text-white/50">Melhor</div>
+              </div>
+            </div>
+          </motion.section>
         </div>
         
         {/* Botão de iniciar */}
