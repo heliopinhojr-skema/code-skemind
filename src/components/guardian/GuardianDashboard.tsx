@@ -21,6 +21,7 @@ import { calculateBalanceBreakdown, formatEnergy as formatEnergyUtil, getTierEco
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { GENERATION_COLORS, PlanetFace } from '@/components/skema/GenerationColorPicker';
+import { buildInviteUrl } from '@/lib/inviteUrl';
 
 interface GuardianDashboardProps {
   onNavigateTab?: (tab: string) => void;
@@ -244,7 +245,7 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
   };
 
   const handleCopyLink = async (code: string) => {
-    const link = `${window.location.origin}/auth?convite=${code}`;
+    const link = buildInviteUrl(code);
     try {
       await navigator.clipboard.writeText(link);
       setCopied(`link-${code}`);
