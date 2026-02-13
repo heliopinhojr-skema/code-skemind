@@ -32,7 +32,11 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
   const { data: referralNodes } = useReferralTree();
   const { data: sboxTransactions } = useSkemaBoxTransactions();
   const { player } = useSupabasePlayer();
-  const { codes, isLoading: isLoadingCodes, isAutoGenerating, unusedCount, usedCount, shareCode } = useInviteCodes(player?.id || null, player?.playerTier || null);
+  const { codes, isLoading: isLoadingCodes, isAutoGenerating, unusedCount, usedCount, sharedCount, shareCode } = useInviteCodes(player?.id || null, player?.playerTier || null);
+  const tierConfig = getTierEconomy(player?.playerTier || null);
+  const costPerInvite = tierConfig.costPerInvite;
+  const pendingEnergy = sharedCount * costPerInvite;
+  const unusedEnergy = unusedCount * costPerInvite;
   const [copied, setCopied] = useState<string | null>(null);
   const [shareTarget, setShareTarget] = useState<{ codeId: string; code: string; type: 'code' | 'link' } | null>(null);
   const [inviteeName, setInviteeName] = useState('');
@@ -968,6 +972,30 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
           <p className="text-sm text-muted-foreground">
             Cada código é único e de uso único — compartilhe individualmente
           </p>
+          {/* Energy breakdown for pending invites */}
+          {costPerInvite > 0 && (pendingEnergy > 0 || unusedEnergy > 0) && (
+            <div className="grid grid-cols-3 gap-2 mt-2">
+              {pendingEnergy > 0 && (
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-2 text-center">
+                  <p className="text-[10px] text-amber-400">⏳ Em trânsito</p>
+                  <p className="text-sm font-bold text-amber-300">{formatEnergyUtil(pendingEnergy)}</p>
+                  <p className="text-[9px] text-amber-400/70">{sharedCount} convite(s) aguardando</p>
+                </div>
+              )}
+              {unusedEnergy > 0 && (
+                <div className="bg-primary/10 border border-primary/20 rounded-lg p-2 text-center">
+                  <p className="text-[10px] text-muted-foreground">🔒 Reservado</p>
+                  <p className="text-sm font-bold text-primary">{formatEnergyUtil(unusedEnergy)}</p>
+                  <p className="text-[9px] text-muted-foreground">{unusedCount} código(s) disponíveis</p>
+                </div>
+              )}
+              <div className="bg-muted/20 border border-border/40 rounded-lg p-2 text-center">
+                <p className="text-[10px] text-muted-foreground">✅ Aceitos</p>
+                <p className="text-sm font-bold text-foreground">{formatEnergyUtil(usedCount * costPerInvite)}</p>
+                <p className="text-[9px] text-muted-foreground">{usedCount} convite(s) aceito(s)</p>
+              </div>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="space-y-3">
           {isLoadingCodes ? (
@@ -1002,10 +1030,18 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
                         {isPending && code.sharedToName && (
                           <span className="text-xs font-sans font-normal text-amber-400/80 ml-2">
                             ⏳ para <span className="font-semibold">{code.sharedToName}</span>
+                            {costPerInvite > 0 && <span className="ml-1 text-amber-300/70">({formatEnergyUtil(costPerInvite)})</span>}
                           </span>
                         )}
                         {isPending && !code.sharedToName && (
-                          <span className="text-xs font-sans font-normal text-amber-400/60 ml-2">⏳ compartilhado</span>
+                          <span className="text-xs font-sans font-normal text-amber-400/60 ml-2">
+                            ⏳ compartilhado {costPerInvite > 0 && `(${formatEnergyUtil(costPerInvite)})`}
+                          </span>
+                        )}
+                        {!isUsed && !isPending && costPerInvite > 0 && (
+                          <span className="text-xs font-sans font-normal text-muted-foreground/60 ml-2">
+                            🔒 {formatEnergyUtil(costPerInvite)}
+                          </span>
                         )}
                       </div>
                       {isUsed ? (
