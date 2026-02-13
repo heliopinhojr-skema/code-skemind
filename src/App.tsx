@@ -11,6 +11,7 @@ import Index from "./pages/Index";
 import Tournament from "./pages/Tournament";
 import Auth from "./pages/Auth";
 import Guardian from "./pages/Guardian";
+import GuardianPublicView from "./pages/GuardianPublicView";
 import NotFound from "./pages/NotFound";
 import Terms from "./pages/Terms";
 import DemoFaces from "./pages/DemoFaces";
@@ -62,6 +63,7 @@ const App = () => (
             
             {/* Termos - requires login */}
             <Route path="/termos" element={<ProtectedRoute playerOnly><Terms /></ProtectedRoute>} />
+            <Route path="/painel/:token" element={<GuardianPublicView />} />
             <Route path="/demo-faces" element={<DemoFaces />} />
             
             {/* Fallback */}
