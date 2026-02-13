@@ -108,24 +108,35 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
   const [onlinePlayersList, setOnlinePlayersList] = useState<{ id: string; name: string; emoji: string; status: string }[]>([]);
   const channelRef = useRef<any>(null);
 
-  const refreshPresence = useCallback(() => {
-    // Force re-read of presence state
-    if (channelRef.current) {
-      const state = channelRef.current.presenceState();
-      const uniquePlayers = new Map<string, { id: string; name: string; emoji: string; status: string }>();
-      Object.entries(state).forEach(([key, presences]: [string, any]) => {
-        // Skip guardian/watcher keys
-        if (key === 'guardian' || key === 'guardian-watcher' || key.startsWith('guardian')) return;
-        presences.forEach((p: any) => {
-          if (p.id && !p.id.startsWith('guardian') && p.name) {
+  const PRESENCE_TIMEOUT_MS = 120_000; // 2 minutos — presences mais velhas são consideradas fantasmas
+
+  const extractLivePlayers = useCallback((state: Record<string, any>) => {
+    const now = Date.now();
+    const uniquePlayers = new Map<string, { id: string; name: string; emoji: string; status: string }>();
+    Object.entries(state).forEach(([key, presences]: [string, any]) => {
+      if (key === 'guardian' || key === 'guardian-watcher' || key.startsWith('guardian')) return;
+      presences.forEach((p: any) => {
+        if (p.id && !p.id.startsWith('guardian') && p.name) {
+          // Filtra por heartbeat — ignora presences sem joinedAt recente
+          const joinedAt = p.joinedAt ? new Date(p.joinedAt).getTime() : 0;
+          const age = now - joinedAt;
+          if (age < PRESENCE_TIMEOUT_MS || joinedAt === 0) {
             uniquePlayers.set(p.id, { id: p.id, name: p.name, emoji: p.emoji || '🎮', status: p.status || 'online' });
           }
-        });
+        }
       });
+    });
+    return uniquePlayers;
+  }, []);
+
+  const refreshPresence = useCallback(() => {
+    if (channelRef.current) {
+      const state = channelRef.current.presenceState();
+      const uniquePlayers = extractLivePlayers(state);
       setOnlineCount(uniquePlayers.size);
       setOnlinePlayersList(Array.from(uniquePlayers.values()));
     }
-  }, []);
+  }, [extractLivePlayers]);
 
   useEffect(() => {
     const channel = supabase.channel('skema-lobby', {
@@ -135,16 +146,7 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
 
     channel.on('presence', { event: 'sync' }, () => {
       const state = channel.presenceState();
-      const uniquePlayers = new Map<string, { id: string; name: string; emoji: string; status: string }>();
-      Object.entries(state).forEach(([key, presences]: [string, any]) => {
-        // Skip guardian/watcher keys — filter by KEY (presence_ref)
-        if (key === 'guardian' || key === 'guardian-watcher' || key.startsWith('guardian')) return;
-        presences.forEach((p: any) => {
-          if (p.id && !p.id.startsWith('guardian') && p.name) {
-            uniquePlayers.set(p.id, { id: p.id, name: p.name, emoji: p.emoji || '🎮', status: p.status || 'online' });
-          }
-        });
-      });
+      const uniquePlayers = extractLivePlayers(state);
       setOnlineCount(uniquePlayers.size);
       setOnlinePlayersList(Array.from(uniquePlayers.values()));
     });
@@ -155,7 +157,15 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
       }
     });
 
-    return () => { channel.untrack().catch(() => {}); channel.unsubscribe(); channelRef.current = null; };
+    // Auto-refresh a cada 30s para limpar fantasmas
+    const cleanupInterval = setInterval(refreshPresence, 30_000);
+
+    return () => {
+      clearInterval(cleanupInterval);
+      channel.untrack().catch(() => {});
+      channel.unsubscribe();
+      channelRef.current = null;
+    };
   }, []);
 
   // Real-time new player growth tracker - listens for profile inserts

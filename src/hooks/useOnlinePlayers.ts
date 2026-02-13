@@ -176,9 +176,28 @@ export function useOnlinePlayers(currentPlayer: { id: string; name: string; emoj
       }
     });
 
+    // Heartbeat: re-track a cada 60s para manter joinedAt fresco
+    const heartbeatInterval = setInterval(async () => {
+      if (channelRef.current) {
+        try {
+          await channelRef.current.track({
+            id: currentPlayer.id,
+            name: currentPlayer.name,
+            emoji: currentPlayer.emoji,
+            status: 'online',
+            mood: moodRef.current,
+            joinedAt: new Date().toISOString(),
+          });
+        } catch (e) {
+          // silently ignore heartbeat failures
+        }
+      }
+    }, 60_000);
+
     // Cleanup — untrack first so other clients see the leave immediately
     return () => {
       console.log('[PRESENCE] Cleaning up channel');
+      clearInterval(heartbeatInterval);
       channel.untrack().then(() => {
         console.log('[PRESENCE] Untracked successfully');
         channel.unsubscribe();
