@@ -1,210 +1,163 @@
 
 
-# Simplificar Auth: Convite + Nickname + PIN de 4 Digitos
+# Documentacao Completa do Projeto SKEMA para Backend Laravel
 
-## O Que Muda
+## Objetivo
 
-O fluxo atual exige **email + senha + codigo de convite** para registro e **email + senha** para login. Isso causa muita friccao (87% bounce rate).
+Criar uma pasta `docs/` na raiz do projeto contendo arquivos `.md` com toda a documentacao necessaria para reconstruir o backend em Laravel, incluindo schemas de banco de dados, logica de negocio, regras economicas, funcoes RPC, Edge Functions e fluxos de autenticacao.
 
-### Novo Fluxo de Registro
+## Arquivos a Criar
 
-```text
-1. Codigo de Convite (ja preenchido se veio pelo link)
-   [VALIDAR]
-        |
-        v
-2. Codigo valido! Convidado por Gabriel
-   - Escolha seu avatar (emoji)
-   - Escolha seu nickname unico
-   - Crie uma senha de 4 digitos
-   - "Guarde seu nickname e PIN!"
-   [ENTRAR NO SKEMA]
-```
+### `docs/README.md`
+Indice geral com links para todos os documentos, visao geral do projeto e stack atual.
 
-### Novo Fluxo de Login (Retorno)
+### `docs/01-DATABASE-SCHEMA.md`
+Schema completo de todas as 12 tabelas com:
+- Colunas, tipos, defaults, nullable
+- Foreign keys e indices
+- Politicas RLS (traduzidas para middleware/policies Laravel)
+- Enum `app_role` (master_admin, guardiao, grao_mestre, mestre, jogador)
 
-```text
-1. Seu Nickname: [__________]
-   Sua Senha:    [_ _ _ _]  (4 digitos)
-   [ENTRAR]
-```
+### `docs/02-AUTHENTICATION.md`
+Fluxo de autenticacao detalhado:
+- Login por nickname + PIN de 4 digitos (email derivado: `nickname@skema.game`)
+- Senha: `PIN + "SK"` (ex: `1234SK`)
+- Registro com codigo de convite obrigatorio
+- Sem recuperacao de conta (regra de negocio intencional)
+- Codigos master: SKEMA1, SKEMA2024, PRIMEIROSJOGADORES, BETATESTER, DEUSPAI
+- Persistencia do ultimo nickname no localStorage
 
-### O Que Sai
+### `docs/03-TIER-HIERARCHY.md`
+Hierarquia completa de tiers e economia de convites:
+- HX (master_admin): 10M k$ iniciais, convida Criadores (k$ 200.000 cada, 7 vagas)
+- Criador: convida Grao Mestre (k$ 15.000, 10 vagas)
+- Grao Mestre: convida Mestre (k$ 1.300, 10 vagas)
+- Mestre: convida Boom (k$ 130, 10 vagas)
+- Boom: convida Ploft (k$ 10, 10 vagas)
+- Ploft: nivel base, k$ 2 bloqueados, k$ 8 livres
+- Mapeamento tier para role no `user_roles`
+- Calculo de saldo bloqueado/disponivel (`tierEconomy.ts`)
 
-- Campo de email (removido completamente)
-- Senha longa (minimo 6 chars) -- substituida por PIN de 4 digitos
-- Icones Mail, Lock, Eye, EyeOff (desnecessarios)
+### `docs/04-INVITE-SYSTEM.md`
+Sistema de convites DNA:
+- Codigos SKINV (gerados automaticamente via RPC `generate_invite_code`)
+- Ciclo de vida: gerado -> compartilhado -> aceito
+- Validacao via RPC `validate_invite_code` (master codes + SKINV + legacy SK codes)
+- Debito do saldo do convidador apenas na redencao
+- Cancelamento de convites com re-geracao
+- Links de convite: `https://dominio/auth?convite=CODE`
 
----
+### `docs/05-ECONOMY-ZERO-SUM.md`
+Sistema economico fechado de 10M k$:
+- 4 pilares: HX, Jogadores, Skema Box, Bot Treasury
+- Skema Box: coleta rake de arenas (9.09%), taxa de corridas (k$ 0.10), taxa de transferencias (6.43%)
+- Bot Treasury: financia participacao de bots em arenas
+- Transferencias P2P: apenas Grao Mestre+, taxa 6.43% para Skema Box
+- Formatacao monetaria: `k$ 200.000,00` (formato brasileiro)
+- Aritmetica em centavos para evitar floating-point
 
-## Como Funciona por Baixo
+### `docs/06-GAME-ENGINE.md`
+Motor do jogo Mastermind (SKEMIND):
+- 6 simbolos: circle (vermelho), square (azul), triangle (verde), diamond (amarelo), star (roxo), hexagon (ciano)
+- Codigo secreto: 4 simbolos unicos (sem repeticao)
+- Maximo 8 tentativas, timer de 180 segundos
+- Feedback: whites (posicao correta) + grays (simbolo correto, posicao errada)
+- Algoritmo de avaliacao em 2 passos (classico Mastermind)
+- Pontuacao: WHITE=60, GRAY=25, WIN=1000, TIME_BONUS (100-700)
+- RNG ambiental (seeded, apenas visual, nao afeta logica)
 
-### Autenticacao Supabase (Anonima + Perfil)
+### `docs/07-BOT-AI.md`
+Inteligencia artificial dos bots:
+- 4 niveis de IQ: 80 (20% erro), 90 (12%), 100 (6%), 110 (2%)
+- Distribuicao padrao: 30% IQ80, 20% IQ90, 30% IQ100, 20% IQ110
+- Estrategias por IQ: eliminacao basica (80) ate deducao precisa (110)
+- Tempo de "pensamento" proporcional ao IQ
+- Simulacao completa de partida (`simulateBotGame`)
 
-Como nao teremos mais email, usaremos **Supabase Anonymous Sign-In**:
+### `docs/08-ARENA-ECONOMY.md`
+Edge Function `process-arena-economy`:
+- Acao `enter`: debita jogador, debita Bot Treasury, credita rake ao Skema Box
+- Acao `finish`: credita premio ao jogador (se ITM), credita premios dos bots ao Bot Treasury
+- Tabela de premios ITM (25% do field): distribuicao em milesimos com redistribuicao dinamica
+- Buy-ins pre-definidos: k$ 0.55 / 1.10 / 2.20 / 5.50 / 11.00
+- Opcoes de bots: 3, 9, 19, 49, 99
+- Rollback em caso de falha
 
-1. No registro, o sistema chama `supabase.auth.signInAnonymously()` para criar uma sessao
-2. O PIN de 4 digitos sera salvo no perfil do jogador (campo `pin` na tabela `profiles`)
-3. O nickname sera unico (indice case-insensitive no banco)
-4. No login, o sistema busca o perfil pelo nickname, valida o PIN, e cria sessao anonima vinculada
+### `docs/09-OFFICIAL-RACES.md`
+Corridas oficiais:
+- Tabela `official_races` com status: registration -> playing -> finished
+- Inscricao com taxa (entry_fee) e estorno ao cancelar
+- Submissao de resultado via Edge Function `submit-race-result`
+- Score server-side: BASE(1000) + TIME_BONUS(time*2) + ATTEMPT_BONUS((11-attempts)*50)
 
-### Migracao SQL Necessaria
+### `docs/10-TRANSFER-ENERGY.md`
+Edge Function `transfer-energy`:
+- Restricao: apenas Grao Mestre e acima
+- Validacao de saldo disponivel (exclui bloqueado por convites)
+- Taxa de 6.43% para o Skema Box
+- Operacao atomica com rollback
+- Validacao: conta bloqueada, auto-transferencia, destinatario bloqueado
 
-Tres mudancas no banco:
+### `docs/11-RPC-FUNCTIONS.md`
+Todas as 13 funcoes RPC documentadas:
+- `register_player`: registro atomico com hierarquia de tiers
+- `validate_invite_code`: validacao de codigos (master + SKINV + legacy)
+- `generate_invite_code`: geracao de codigos SKINV unicos
+- `share_invite_code` / `cancel_invite_code`: gestao de convites
+- `choose_generation_color`: cor de geracao para Criadores (propagacao recursiva)
+- `update_player_energy` / `update_skema_box` / `update_bot_treasury`: operacoes atomicas
+- `admin_*`: funcoes administrativas (adjust_energy, set_status, delete_player)
+- `has_role`: verificacao de role sem recursao RLS
+- `set_user_role_and_tier`: gestao de roles por master_admin
 
-1. **Adicionar coluna `pin`** na tabela `profiles` (TEXT, 4 digitos)
-2. **Criar indice unico** no nome (case-insensitive) para garantir nicknames unicos
-3. **Criar funcao `login_by_nickname`** que valida nickname + PIN e retorna dados do perfil
-4. **Criar funcao `check_nickname_available`** para verificacao em tempo real
+### `docs/12-GUARDIAN-PANEL.md`
+Painel administrativo Guardian:
+- Auditoria de soma zero (10M k$)
+- Gestao de jogadores (bloquear, ajustar saldo, deletar)
+- Gestao de arenas (criar, editar, fechar)
+- Arvore de referrals
+- Monitoramento de interesse em investir
+- Gestao de corridas oficiais
 
----
+### `docs/13-SECURITY-POLICIES.md`
+Mapeamento de todas as politicas RLS para middleware/gates Laravel:
+- Cada tabela com suas regras de acesso (SELECT, INSERT, UPDATE, DELETE)
+- Funcao `has_role` como gate/middleware
+- Roles e permissoes por tier
 
-## Mudancas nos Arquivos
-
-### 1. Auth.tsx (reescrever)
-
-**Registro - Step 1 (Credenciais):**
-- Remove campo de email
-- Remove campo de senha longa
-- Mantem campo de codigo de convite
-- Botao "Validar Codigo" fica habilitado apenas com codigo preenchido (sem depender de email/senha)
-
-**Registro - Step 2 (Perfil):**
-- Mantem seletor de emoji
-- Mantem campo de nickname
-- Adiciona campo de PIN com 4 slots visuais (usando input-otp ou 4 inputs individuais)
-- Aviso claro: "Guarde seu nickname e PIN de 4 digitos -- voce vai precisar para voltar!"
-- Mantem TierBenefitsCard
-
-**Login:**
-- Campo de nickname (texto)
-- Campo de PIN (4 digitos visuais)
-- Botao Entrar
-- Remove email e senha
-
-**Logica interna:**
-- `handleRegister`: chama `signInAnonymously()` em vez de `signUp(email, password)`, depois chama `register_player` (que sera atualizado para aceitar PIN)
-- `handleLogin`: chama RPC `login_by_nickname(nickname, pin)`, se valido faz `signInAnonymously()` e vincula ao perfil
-- Remove imports de Mail, Lock, Eye, EyeOff
-- Remove estados `email`, `showPassword`
-
-### 2. Migracao SQL (nova)
-
-```sql
--- Coluna PIN na tabela profiles
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS pin TEXT;
-
--- Indice unico case-insensitive no nome
-CREATE UNIQUE INDEX IF NOT EXISTS profiles_name_unique_ci 
-  ON profiles (LOWER(TRIM(name)));
-
--- Funcao para verificar nickname disponivel
-CREATE OR REPLACE FUNCTION public.check_nickname_available(p_nickname TEXT)
-RETURNS BOOLEAN
-LANGUAGE plpgsql SECURITY DEFINER AS $$
-BEGIN
-  RETURN NOT EXISTS (
-    SELECT 1 FROM public.profiles 
-    WHERE LOWER(TRIM(name)) = LOWER(TRIM(p_nickname))
-  );
-END;
-$$;
-
--- Funcao de login por nickname + PIN
-CREATE OR REPLACE FUNCTION public.login_by_nickname(p_nickname TEXT, p_pin TEXT)
-RETURNS JSONB
-LANGUAGE plpgsql SECURITY DEFINER AS $$
-DECLARE
-  v_profile profiles;
-BEGIN
-  SELECT * INTO v_profile
-  FROM public.profiles
-  WHERE LOWER(TRIM(name)) = LOWER(TRIM(p_nickname));
-  
-  IF NOT FOUND THEN
-    RETURN jsonb_build_object('found', false, 'error', 'Nickname nao encontrado');
-  END IF;
-  
-  IF v_profile.pin IS NULL OR v_profile.pin != p_pin THEN
-    RETURN jsonb_build_object('found', true, 'valid', false, 'error', 'PIN incorreto');
-  END IF;
-  
-  RETURN jsonb_build_object(
-    'found', true,
-    'valid', true,
-    'user_id', v_profile.user_id,
-    'player_id', v_profile.id,
-    'name', v_profile.name,
-    'emoji', v_profile.emoji,
-    'energy', v_profile.energy,
-    'player_tier', v_profile.player_tier
-  );
-END;
-$$;
-```
-
-### 3. register_player RPC (atualizar)
-
-Adicionar parametro `p_pin` a funcao `register_player` existente para salvar o PIN junto com o perfil.
-
-### 4. useSupabasePlayer.ts (ajustar)
-
-- Login e register ja delegam para /auth, entao mudancas minimas
-- Garantir que `signInAnonymously()` funciona com o fluxo existente de `onAuthStateChange`
-
-### 5. ProtectedRoute.tsx
-
-- Nenhuma mudanca necessaria (sessao anonima gera sessao valida igual)
-
----
-
-## UX do PIN de 4 Digitos
-
-O PIN sera exibido como 4 caixas separadas, estilo OTP, usando o componente `input-otp` que ja esta instalado no projeto:
-
-```text
-Crie sua senha de 4 digitos:
-
-  [ 1 ] [ 2 ] [ 3 ] [ 4 ]
-
-  Facil de lembrar, facil de digitar!
-```
-
-- Teclado numerico no mobile (inputMode="numeric")
-- Auto-avanca para proximo slot
-- Feedback visual quando completo
-
----
-
-## Ordem de Implementacao
-
-1. **Migracao SQL** -- Adicionar coluna `pin`, indice unico, funcoes RPC
-2. **Atualizar register_player** -- Aceitar parametro `p_pin`
-3. **Reescrever Auth.tsx** -- Novo fluxo sem email, com PIN de 4 digitos
-4. **Testar fluxos** -- Registro e login com nickname + PIN
+### `docs/14-API-ENDPOINTS.md`
+Mapeamento de todas as operacoes para endpoints REST Laravel:
+- Auth: POST /auth/login, POST /auth/register
+- Profiles: GET/PUT /profile
+- Arenas: CRUD /arenas, POST /arenas/enter, POST /arenas/finish
+- Races: CRUD /races, POST /races/register, POST /races/submit
+- Transfers: POST /transfers
+- Invites: GET/POST/DELETE /invites
+- Admin: /admin/* (protegido por middleware)
 
 ---
 
 ## Secao Tecnica
 
-### Dependencias
-- Nenhuma nova dependencia (input-otp ja instalado)
-
 ### Arquivos Criados
 | Arquivo | Descricao |
 |---------|-----------|
-| Nova migracao SQL | Coluna pin, indice unico, funcoes RPC |
+| `docs/README.md` | Indice e visao geral |
+| `docs/01-DATABASE-SCHEMA.md` | Schema completo das 12 tabelas |
+| `docs/02-AUTHENTICATION.md` | Fluxo de autenticacao |
+| `docs/03-TIER-HIERARCHY.md` | Hierarquia de tiers e economia |
+| `docs/04-INVITE-SYSTEM.md` | Sistema de convites DNA |
+| `docs/05-ECONOMY-ZERO-SUM.md` | Economia fechada de 10M |
+| `docs/06-GAME-ENGINE.md` | Motor do jogo Mastermind |
+| `docs/07-BOT-AI.md` | IA dos bots multi-IQ |
+| `docs/08-ARENA-ECONOMY.md` | Economia das arenas |
+| `docs/09-OFFICIAL-RACES.md` | Corridas oficiais |
+| `docs/10-TRANSFER-ENERGY.md` | Transferencias P2P |
+| `docs/11-RPC-FUNCTIONS.md` | Todas as funcoes RPC |
+| `docs/12-GUARDIAN-PANEL.md` | Painel administrativo |
+| `docs/13-SECURITY-POLICIES.md` | Politicas de seguranca |
+| `docs/14-API-ENDPOINTS.md` | Mapeamento de endpoints REST |
 
 ### Arquivos Modificados
-| Arquivo | Mudanca |
-|---------|---------|
-| `src/pages/Auth.tsx` | Reescrever: remover email/senha, adicionar nickname + PIN 4 digitos |
-| `src/integrations/supabase/types.ts` | Regenerado apos migracao (novo campo pin, novas funcoes) |
-
-### Arquivos Inalterados
-| Arquivo | Motivo |
-|---------|--------|
-| `src/components/auth/ProtectedRoute.tsx` | Sessao anonima funciona igual |
-| `src/hooks/useSupabasePlayer.ts` | Ja delega auth para /auth |
-| `src/App.tsx` | Rotas permanecem iguais |
+Nenhum arquivo existente sera modificado.
 
