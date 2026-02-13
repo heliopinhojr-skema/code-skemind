@@ -510,8 +510,8 @@ export function SkemaLobby({
               <h2 className="text-xl font-black tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-white to-purple-300">
                 SKEMA
               </h2>
-              <p className="text-[9px] tracking-[0.12em] uppercase text-purple-200/70 font-light mt-0.5">
-                Cada escolha uma renúncia, uma consequência TESTE...
+              <p className="text-[10px] tracking-[0.12em] uppercase text-white/90 font-medium mt-0.5" style={{ textShadow: '0 1px 6px rgba(0,0,0,0.9)' }}>
+                Cada escolha uma renúncia, uma consequência...
               </p>
             </div>
           </motion.div>
