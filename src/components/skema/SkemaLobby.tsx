@@ -1,49 +1,64 @@
 /**
  * SkemaLobby - Hub principal do jogador SKEMA (PokerStars-style)
- * 
+ *
  * Layout:
  * - Header com perfil e saldo
  * - Tabs: Sit & Go (arenas) | Torneios (corridas agendadas) | Treinar
  * - Tabela de mesas/arenas com buy-in, jogadores, pool, ação
  */
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
-import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
-import { formatEnergy, calculateBalanceBreakdown } from '@/lib/tierEconomy';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { getColorConfig, PlanetFace, PLANET_MOODS, PlanetMood } from './GenerationColorPicker';
-import { 
-  Zap, Trophy, Users, Clock, Brain, Swords, Target,
-  Rocket, Sparkles, Calendar, Crown, AlertCircle, LogOut, UserCheck, Bot,
-  Coins, Loader2, Globe
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { SkemaPlayer, getSkemaHour, PlayerTier } from '@/hooks/useSupabasePlayer';
-import { useOfficialRaces } from '@/hooks/useOfficialRace';
-import { useOpenArenas, ArenaListing } from '@/hooks/useArenaListings';
-import { calculateArenaPool, getScaledArenaPrize } from '@/lib/arenaPayouts';
-import { OnlinePlayer, PlayerMood } from '@/hooks/useOnlinePlayers';
-import { ReferralHistoryPanel } from './ReferralHistoryPanel';
-import { LanguageSelector } from '@/components/LanguageSelector';
+import { useState, useCallback, useMemo, useEffect } from "react";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { formatEnergy, calculateBalanceBreakdown } from "@/lib/tierEconomy";
+import { motion, AnimatePresence } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { getColorConfig, PlanetFace, PLANET_MOODS, PlanetMood } from "./GenerationColorPicker";
+import {
+  Zap,
+  Trophy,
+  Users,
+  Clock,
+  Brain,
+  Swords,
+  Target,
+  Rocket,
+  Sparkles,
+  Calendar,
+  Crown,
+  AlertCircle,
+  LogOut,
+  UserCheck,
+  Bot,
+  Coins,
+  Loader2,
+  Globe,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { SkemaPlayer, getSkemaHour, PlayerTier } from "@/hooks/useSupabasePlayer";
+import { useOfficialRaces } from "@/hooks/useOfficialRace";
+import { useOpenArenas, ArenaListing } from "@/hooks/useArenaListings";
+import { calculateArenaPool, getScaledArenaPrize } from "@/lib/arenaPayouts";
+import { OnlinePlayer, PlayerMood } from "@/hooks/useOnlinePlayers";
+import { ReferralHistoryPanel } from "./ReferralHistoryPanel";
+import { LanguageSelector } from "@/components/LanguageSelector";
 
-import { CreatorDescendancyPanel } from './CreatorDescendancyPanel';
-import { TransferPanel } from './TransferPanel';
-import { PlayerGameHistory } from './PlayerGameHistory';
-import { GenerationColorPicker } from './GenerationColorPicker';
-import universeBg from '@/assets/universe-bg.jpg';
-import skemaNebula from '@/assets/skema-nebula.jpeg';
-import { InvestorBanner } from './InvestorBanner';
-import { CreatorsMissionBoard } from './CreatorsMissionBoard';
+import { CreatorDescendancyPanel } from "./CreatorDescendancyPanel";
+import { TransferPanel } from "./TransferPanel";
+import { PlayerGameHistory } from "./PlayerGameHistory";
+import { GenerationColorPicker } from "./GenerationColorPicker";
+import universeBg from "@/assets/universe-bg.jpg";
+import skemaNebula from "@/assets/skema-nebula.jpeg";
+import { InvestorBanner } from "./InvestorBanner";
+import { CreatorsMissionBoard } from "./CreatorsMissionBoard";
 
 // Type for online presence passed from parent
 interface OnlinePresenceData {
   onlinePlayers: OnlinePlayer[];
   isConnected: boolean;
-  updateStatus: (status: 'online' | 'playing' | 'away') => void;
+  updateStatus: (status: "online" | "playing" | "away") => void;
   updateMood: (mood: PlayerMood) => void;
   currentMood: PlayerMood;
   onlineCount: number;
@@ -53,8 +68,16 @@ interface OnlinePresenceData {
 interface SkemaBoxData {
   balance: number;
   isLoading: boolean;
-  addToBox: (amount: number, type: 'arena_rake' | 'official_rake' | 'party_rake', description?: string) => Promise<number | null>;
-  subtractFromBox: (amount: number, type: 'official_refund' | 'adjustment', description?: string) => Promise<number | null>;
+  addToBox: (
+    amount: number,
+    type: "arena_rake" | "official_rake" | "party_rake",
+    description?: string,
+  ) => Promise<number | null>;
+  subtractFromBox: (
+    amount: number,
+    type: "official_refund" | "adjustment",
+    description?: string,
+  ) => Promise<number | null>;
   resetBalance: () => Promise<boolean>;
   refreshBalance: () => Promise<void>;
 }
@@ -82,50 +105,60 @@ const COUNTDOWN_SECONDS = 10;
 // Helper component to display player tier badge
 function TierBadge({ tier }: { tier: PlayerTier }) {
   const config: Record<string, { emoji: string; label: string; className: string }> = {
-    master_admin: { 
-      emoji: '🔴', label: 'CD HX', 
-      className: 'bg-gradient-to-r from-red-500/30 to-rose-500/30 border-red-500/50 text-red-300' 
+    master_admin: {
+      emoji: "🔴",
+      label: "CD HX",
+      className: "bg-gradient-to-r from-red-500/30 to-rose-500/30 border-red-500/50 text-red-300",
     },
-    'Criador': { 
-      emoji: '⭐', label: 'Criador', 
-      className: 'bg-gradient-to-r from-amber-500/30 to-yellow-500/30 border-amber-500/50 text-amber-300' 
+    Criador: {
+      emoji: "⭐",
+      label: "Criador",
+      className: "bg-gradient-to-r from-amber-500/30 to-yellow-500/30 border-amber-500/50 text-amber-300",
     },
-    guardiao: { 
-      emoji: '⭐', label: 'Criador', 
-      className: 'bg-gradient-to-r from-amber-500/30 to-yellow-500/30 border-amber-500/50 text-amber-300' 
+    guardiao: {
+      emoji: "⭐",
+      label: "Criador",
+      className: "bg-gradient-to-r from-amber-500/30 to-yellow-500/30 border-amber-500/50 text-amber-300",
     },
-    'Grão Mestre': { 
-      emoji: '👑', label: 'Grão Mestre', 
-      className: 'bg-gradient-to-r from-purple-500/30 to-pink-500/30 border-purple-500/50 text-purple-300' 
+    "Grão Mestre": {
+      emoji: "👑",
+      label: "Grão Mestre",
+      className: "bg-gradient-to-r from-purple-500/30 to-pink-500/30 border-purple-500/50 text-purple-300",
     },
-    grao_mestre: { 
-      emoji: '👑', label: 'Grão Mestre', 
-      className: 'bg-gradient-to-r from-purple-500/30 to-pink-500/30 border-purple-500/50 text-purple-300' 
+    grao_mestre: {
+      emoji: "👑",
+      label: "Grão Mestre",
+      className: "bg-gradient-to-r from-purple-500/30 to-pink-500/30 border-purple-500/50 text-purple-300",
     },
-    'Mestre': { 
-      emoji: '⚔️', label: 'Mestre', 
-      className: 'bg-gradient-to-r from-blue-500/30 to-cyan-500/30 border-blue-500/50 text-blue-300' 
+    Mestre: {
+      emoji: "⚔️",
+      label: "Mestre",
+      className: "bg-gradient-to-r from-blue-500/30 to-cyan-500/30 border-blue-500/50 text-blue-300",
     },
-    mestre: { 
-      emoji: '⚔️', label: 'Mestre', 
-      className: 'bg-gradient-to-r from-blue-500/30 to-cyan-500/30 border-blue-500/50 text-blue-300' 
+    mestre: {
+      emoji: "⚔️",
+      label: "Mestre",
+      className: "bg-gradient-to-r from-blue-500/30 to-cyan-500/30 border-blue-500/50 text-blue-300",
     },
-    'Boom': { 
-      emoji: '🚀', label: 'Boom', 
-      className: 'bg-gradient-to-r from-green-500/30 to-emerald-500/30 border-green-500/50 text-green-300' 
+    Boom: {
+      emoji: "🚀",
+      label: "Boom",
+      className: "bg-gradient-to-r from-green-500/30 to-emerald-500/30 border-green-500/50 text-green-300",
     },
-    'Ploft': { 
-      emoji: '🎮', label: 'Ploft', 
-      className: 'bg-gradient-to-r from-slate-500/30 to-gray-500/30 border-slate-500/50 text-slate-300' 
+    Ploft: {
+      emoji: "🎮",
+      label: "Ploft",
+      className: "bg-gradient-to-r from-slate-500/30 to-gray-500/30 border-slate-500/50 text-slate-300",
     },
-    jogador: { 
-      emoji: '🎮', label: 'Ploft', 
-      className: 'bg-gradient-to-r from-slate-500/30 to-gray-500/30 border-slate-500/50 text-slate-300' 
+    jogador: {
+      emoji: "🎮",
+      label: "Ploft",
+      className: "bg-gradient-to-r from-slate-500/30 to-gray-500/30 border-slate-500/50 text-slate-300",
     },
   };
-  
+
   const { emoji, label, className } = config[tier] || config.jogador;
-  
+
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-medium ${className}`}>
       <span>{emoji}</span>
@@ -136,12 +169,12 @@ function TierBadge({ tier }: { tier: PlayerTier }) {
 // Contador global compacto para o grid de stats
 function UniversePlayerCounter() {
   const { data: count } = useQuery({
-    queryKey: ['universe-player-count'],
+    queryKey: ["universe-player-count"],
     queryFn: async () => {
       const { count } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .neq('player_tier', 'master_admin');
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+        .neq("player_tier", "master_admin");
       return count || 0;
     },
     staleTime: 30_000,
@@ -155,7 +188,7 @@ function UniversePlayerCounter() {
         animate={{ scale: 1, opacity: 1 }}
         className="text-lg font-bold text-purple-300"
       >
-        {count ?? '...'}
+        {count ?? "..."}
       </motion.div>
       <div className="text-[10px] text-purple-300/60">Universo</div>
     </>
@@ -183,8 +216,8 @@ export function SkemaLobby({
   const { data: openArenas, isLoading: arenasLoading } = useOpenArenas();
   const { onlinePlayers, isConnected, updateStatus, updateMood, currentMood, onlineCount } = onlinePresence;
   const skemaHour = getSkemaHour();
-  
-  const [activeTab, setActiveTab] = useState<string>('sitgo');
+
+  const [activeTab, setActiveTab] = useState<string>("sitgo");
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -192,14 +225,16 @@ export function SkemaLobby({
   const [moodPickerOpen, setMoodPickerOpen] = useState(false);
 
   // Estrelas animadas
-  const stars = useMemo(() => 
-    Array.from({ length: 40 }, (_, i) => ({
-      id: i,
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      size: Math.random() * 2 + 1,
-      delay: Math.random() * 3,
-    })), []
+  const stars = useMemo(
+    () =>
+      Array.from({ length: 40 }, (_, i) => ({
+        id: i,
+        x: Math.random() * 100,
+        y: Math.random() * 100,
+        size: Math.random() * 2 + 1,
+        delay: Math.random() * 3,
+      })),
+    [],
   );
 
   // removed single-race vars, now handled per-race in the list
@@ -208,12 +243,15 @@ export function SkemaLobby({
   const DEFAULT_ENTRY_CENTS = 55;
   const canAffordDefaultArena = Math.round(player.energy * 100) >= DEFAULT_ENTRY_CENTS;
 
-  const handleStartCountdownForAction = useCallback((action: () => void) => {
-    if (isStarting) return;
-    setIsStarting(true);
-    setPendingAction(() => action);
-    setCountdown(COUNTDOWN_SECONDS);
-  }, [isStarting]);
+  const handleStartCountdownForAction = useCallback(
+    (action: () => void) => {
+      if (isStarting) return;
+      setIsStarting(true);
+      setPendingAction(() => action);
+      setCountdown(COUNTDOWN_SECONDS);
+    },
+    [isStarting],
+  );
 
   const handleCancelCountdown = useCallback(() => {
     setIsStarting(false);
@@ -224,9 +262,9 @@ export function SkemaLobby({
   // Countdown timer
   useEffect(() => {
     if (countdown === null || countdown < 0) return;
-    
+
     if (countdown === 0) {
-      updateStatus('playing');
+      updateStatus("playing");
       if (pendingAction) {
         pendingAction();
       }
@@ -234,30 +272,33 @@ export function SkemaLobby({
       setPendingAction(null);
       return;
     }
-    
+
     const timer = setTimeout(() => {
-      setCountdown(prev => (prev !== null ? prev - 1 : null));
+      setCountdown((prev) => (prev !== null ? prev - 1 : null));
     }, 1000);
-    
+
     return () => clearTimeout(timer);
   }, [countdown, pendingAction, updateStatus]);
 
   // Handle arena click (custom or default)
-  const handleJoinArena = useCallback((buyIn: number, rakeFee: number, botCount: number) => {
-    const canAfford = Math.round(player.energy * 100) >= Math.round(buyIn * 100);
-    if (!canAfford) {
-      setError('Saldo insuficiente');
-      return;
-    }
-    handleStartCountdownForAction(() => {
-      onStartBotRace(buyIn, rakeFee, botCount).then(result => {
-        if (!result.success) {
-          setError(result.error || 'Erro ao iniciar');
-          updateStatus('online');
-        }
+  const handleJoinArena = useCallback(
+    (buyIn: number, rakeFee: number, botCount: number) => {
+      const canAfford = Math.round(player.energy * 100) >= Math.round(buyIn * 100);
+      if (!canAfford) {
+        setError("Saldo insuficiente");
+        return;
+      }
+      handleStartCountdownForAction(() => {
+        onStartBotRace(buyIn, rakeFee, botCount).then((result) => {
+          if (!result.success) {
+            setError(result.error || "Erro ao iniciar");
+            updateStatus("online");
+          }
+        });
       });
-    });
-  }, [player.energy, handleStartCountdownForAction, onStartBotRace, updateStatus]);
+    },
+    [player.energy, handleStartCountdownForAction, onStartBotRace, updateStatus],
+  );
 
   // Handle training
   const handleTraining = useCallback(() => {
@@ -271,10 +312,10 @@ export function SkemaLobby({
       {/* Background */}
       <div className="fixed inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${universeBg})` }} />
       <div className="fixed inset-0 bg-black/70" />
-      
+
       {/* Estrelas */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        {stars.map(star => (
+        {stars.map((star) => (
           <motion.div
             key={star.id}
             className="absolute rounded-full bg-white"
@@ -284,7 +325,7 @@ export function SkemaLobby({
           />
         ))}
       </div>
-      
+
       {/* Countdown overlay */}
       <AnimatePresence>
         {isStarting && countdown !== null && countdown > 0 && (
@@ -301,19 +342,23 @@ export function SkemaLobby({
               initial={{ scale: 2, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
             >
               <div className="text-9xl font-black text-transparent bg-clip-text bg-gradient-to-b from-primary to-purple-500 tabular-nums">
                 {countdown}
               </div>
             </motion.div>
-            <Button variant="ghost" onClick={handleCancelCountdown} className="mt-8 text-muted-foreground hover:text-white">
+            <Button
+              variant="ghost"
+              onClick={handleCancelCountdown}
+              className="mt-8 text-muted-foreground hover:text-white"
+            >
               Cancelar
             </Button>
           </motion.div>
         )}
       </AnimatePresence>
-      
+
       {/* Conteúdo */}
       <div className="relative z-10 min-h-screen flex flex-col">
         {/* Header - Perfil */}
@@ -328,16 +373,24 @@ export function SkemaLobby({
               <div className="relative">
                 {(() => {
                   const genColor = getColorConfig(player.generationColor);
-                  const avatarClick = () => setMoodPickerOpen(prev => !prev);
+                  const avatarClick = () => setMoodPickerOpen((prev) => !prev);
                   if (genColor) {
                     return (
-                      <button onClick={avatarClick} className={`w-12 h-12 rounded-full flex items-center justify-center ${genColor.bg} ${genColor.glow} transition-transform hover:scale-110 cursor-pointer`} title="Mudar humor">
+                      <button
+                        onClick={avatarClick}
+                        className={`w-12 h-12 rounded-full flex items-center justify-center ${genColor.bg} ${genColor.glow} transition-transform hover:scale-110 cursor-pointer`}
+                        title="Mudar humor"
+                      >
                         <PlanetFace className={genColor.face} variant={currentMood} />
                       </button>
                     );
                   }
                   return (
-                    <button onClick={avatarClick} className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-2xl transition-transform hover:scale-110 cursor-pointer" title="Mudar humor">
+                    <button
+                      onClick={avatarClick}
+                      className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-2xl transition-transform hover:scale-110 cursor-pointer"
+                      title="Mudar humor"
+                    >
                       {player.emoji}
                     </button>
                   );
@@ -352,17 +405,22 @@ export function SkemaLobby({
                       exit={{ opacity: 0, scale: 0.8, y: -5 }}
                       className="absolute top-14 left-0 z-50 bg-black/90 backdrop-blur-md border border-white/20 rounded-xl p-2 flex gap-1 shadow-xl"
                     >
-                      {PLANET_MOODS.map(m => {
+                      {PLANET_MOODS.map((m) => {
                         const isActive = currentMood === m.id;
                         const genColor = getColorConfig(player.generationColor);
                         return (
                           <button
                             key={m.id}
-                            onClick={() => { updateMood(m.id); setMoodPickerOpen(false); }}
-                            className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-all ${isActive ? 'bg-white/20 ring-1 ring-primary' : 'hover:bg-white/10'}`}
+                            onClick={() => {
+                              updateMood(m.id);
+                              setMoodPickerOpen(false);
+                            }}
+                            className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-all ${isActive ? "bg-white/20 ring-1 ring-primary" : "hover:bg-white/10"}`}
                             title={m.label}
                           >
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center ${genColor ? genColor.bg : 'bg-gradient-to-br from-primary to-purple-500'}`}>
+                            <div
+                              className={`w-9 h-9 rounded-full flex items-center justify-center ${genColor ? genColor.bg : "bg-gradient-to-br from-primary to-purple-500"}`}
+                            >
                               {genColor ? (
                                 <PlanetFace className={genColor.face} variant={m.id} size="w-7 h-7" />
                               ) : (
@@ -385,7 +443,9 @@ export function SkemaLobby({
                 </div>
                 <div className="flex items-center gap-2 text-xs text-white/60">
                   <Calendar className="w-3 h-3" />
-                  <span>Ano {skemaYear} • Dia {skemaDay} • {String(skemaHour).padStart(2, '0')}h</span>
+                  <span>
+                    Ano {skemaYear} • Dia {skemaDay} • {String(skemaHour).padStart(2, "0")}h
+                  </span>
                   <span className="text-white/30">•</span>
                   <span className="flex items-center gap-1">
                     {isConnected ? (
@@ -406,9 +466,9 @@ export function SkemaLobby({
                 )}
               </div>
             </div>
-            
+
             <div className="flex flex-col items-end gap-1">
-              <motion.div 
+              <motion.div
                 className="flex items-center gap-2 bg-gradient-to-r from-yellow-500/30 to-orange-500/30 px-4 py-2 rounded-full border border-yellow-500/50"
                 whileHover={{ scale: 1.05 }}
               >
@@ -432,7 +492,7 @@ export function SkemaLobby({
               </div>
             </div>
           </div>
-          
+
           {/* Stats rápidos + contador universo */}
           <div className="grid grid-cols-4 gap-2">
             <div className="bg-white/5 rounded-lg p-2 text-center">
@@ -445,7 +505,9 @@ export function SkemaLobby({
             </div>
             <div className="bg-white/5 rounded-lg p-2 text-center">
               <div className="text-lg font-bold text-purple-400">
-                {player.stats.bestTime ? `${Math.floor(player.stats.bestTime / 60)}:${String(player.stats.bestTime % 60).padStart(2, '0')}` : '-'}
+                {player.stats.bestTime
+                  ? `${Math.floor(player.stats.bestTime / 60)}:${String(player.stats.bestTime % 60).padStart(2, "0")}`
+                  : "-"}
               </div>
               <div className="text-xs text-white/50">Melhor</div>
             </div>
@@ -453,7 +515,7 @@ export function SkemaLobby({
               <UniversePlayerCounter />
             </div>
           </div>
-          {player.playerTier === 'master_admin' && (
+          {player.playerTier === "master_admin" && (
             <div className="mt-2 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-lg p-2 text-center border border-yellow-500/30">
               <div className="text-lg font-bold text-yellow-400">k${skemaBox.balance.toFixed(2)}</div>
               <div className="text-xs text-yellow-400/70">Skema Box</div>
@@ -464,23 +526,20 @@ export function SkemaLobby({
         {/* Conteúdo rolável */}
         <div className="flex-1 overflow-y-auto pb-6">
           {/* Banner SKEMA - compacto no topo */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.05 }}
             className="relative mx-4 mt-3 rounded-xl overflow-hidden h-20"
           >
-            <div 
-              className="absolute inset-0 bg-cover bg-center" 
-              style={{ backgroundImage: `url(${skemaNebula})` }} 
-            />
+            <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${skemaNebula})` }} />
             <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-black/70" />
             <div className="relative z-10 h-full flex flex-col items-center justify-center text-center px-4">
               <h2 className="text-xl font-black tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-white to-purple-300">
                 SKEMA
               </h2>
               <p className="text-[9px] tracking-[0.12em] uppercase text-purple-200/70 font-light mt-0.5">
-                Cada escolha uma renúncia, uma consequência...
+                Cada escolha uma renúncia, uma consequência TESTE...
               </p>
             </div>
           </motion.div>
@@ -499,15 +558,24 @@ export function SkemaLobby({
           >
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="w-full bg-white/5 border border-white/10 h-11">
-                <TabsTrigger value="sitgo" className="flex-1 gap-1.5 data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
+                <TabsTrigger
+                  value="sitgo"
+                  className="flex-1 gap-1.5 data-[state=active]:bg-primary/20 data-[state=active]:text-primary"
+                >
                   <Swords className="w-4 h-4" />
                   Sit & Go
                 </TabsTrigger>
-                <TabsTrigger value="tournaments" className="flex-1 gap-1.5 data-[state=active]:bg-yellow-500/20 data-[state=active]:text-yellow-400">
+                <TabsTrigger
+                  value="tournaments"
+                  className="flex-1 gap-1.5 data-[state=active]:bg-yellow-500/20 data-[state=active]:text-yellow-400"
+                >
                   <Crown className="w-4 h-4" />
                   Torneios
                 </TabsTrigger>
-                <TabsTrigger value="practice" className="flex-1 gap-1.5 data-[state=active]:bg-blue-500/20 data-[state=active]:text-blue-400">
+                <TabsTrigger
+                  value="practice"
+                  className="flex-1 gap-1.5 data-[state=active]:bg-blue-500/20 data-[state=active]:text-blue-400"
+                >
                   <Brain className="w-4 h-4" />
                   Treinar
                 </TabsTrigger>
@@ -539,25 +607,30 @@ export function SkemaLobby({
                     // Merge default arena with custom arenas, sort all by buy-in desc
                     const getDifficultyStyle = (diff: string) => {
                       switch (diff) {
-                        case 'FACIL': return { color: 'text-green-400', bg: 'bg-green-500/20', label: '🟢 FÁCIL' };
-                        case 'MEDIO': return { color: 'text-yellow-400', bg: 'bg-yellow-500/20', label: '🟡 MÉDIO' };
-                        case 'MEDIO HARD': return { color: 'text-orange-400', bg: 'bg-orange-500/20', label: '🟠 MÉDIO HARD' };
-                        case 'HARD': return { color: 'text-red-400', bg: 'bg-red-500/20', label: '🔴 HARD' };
-                        default: return { color: 'text-yellow-400', bg: 'bg-yellow-500/20', label: '🟡 MÉDIO' };
+                        case "FACIL":
+                          return { color: "text-green-400", bg: "bg-green-500/20", label: "🟢 FÁCIL" };
+                        case "MEDIO":
+                          return { color: "text-yellow-400", bg: "bg-yellow-500/20", label: "🟡 MÉDIO" };
+                        case "MEDIO HARD":
+                          return { color: "text-orange-400", bg: "bg-orange-500/20", label: "🟠 MÉDIO HARD" };
+                        case "HARD":
+                          return { color: "text-red-400", bg: "bg-red-500/20", label: "🔴 HARD" };
+                        default:
+                          return { color: "text-yellow-400", bg: "bg-yellow-500/20", label: "🟡 MÉDIO" };
                       }
                     };
                     const defaultArena = {
-                      id: 'default',
-                      name: '🎯 Arena Padrão',
+                      id: "default",
+                      name: "🎯 Arena Padrão",
                       buy_in: 0.55,
                       rake_fee: 0.05,
                       bot_count: 99,
-                      creator_name: 'SKEMA',
-                      creator_emoji: '',
-                      difficulty: 'MEDIO',
+                      creator_name: "SKEMA",
+                      creator_emoji: "",
+                      difficulty: "MEDIO",
                       isDefault: true,
                     };
-                    const customArenas = (openArenas || []).map(a => ({
+                    const customArenas = (openArenas || []).map((a) => ({
                       id: a.id,
                       name: `${a.creator_emoji} ${a.name}`,
                       buy_in: Number(a.buy_in),
@@ -565,7 +638,7 @@ export function SkemaLobby({
                       bot_count: a.bot_count,
                       creator_name: a.creator_name,
                       creator_emoji: a.creator_emoji,
-                      difficulty: a.difficulty || 'MEDIO',
+                      difficulty: a.difficulty || "MEDIO",
                       isDefault: false,
                     }));
                     const allArenas = [defaultArena, ...customArenas].sort((a, b) => b.buy_in - a.buy_in);
@@ -579,9 +652,9 @@ export function SkemaLobby({
                           key={arena.id}
                           whileHover={{ scale: 1.005 }}
                           className={`grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 items-center px-3 py-2.5 rounded-lg ${
-                            arena.isDefault 
-                              ? 'bg-white/5 border border-white/10 hover:border-primary/30' 
-                              : 'bg-gradient-to-r from-orange-500/5 to-red-500/5 border border-orange-500/20 hover:border-orange-500/40'
+                            arena.isDefault
+                              ? "bg-white/5 border border-white/10 hover:border-primary/30"
+                              : "bg-gradient-to-r from-orange-500/5 to-red-500/5 border border-orange-500/20 hover:border-orange-500/40"
                           } transition-colors`}
                         >
                           <div>
@@ -590,14 +663,17 @@ export function SkemaLobby({
                               {(() => {
                                 const ds = getDifficultyStyle(arena.difficulty);
                                 return (
-                                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${ds.bg} ${ds.color}`}>
+                                  <span
+                                    className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${ds.bg} ${ds.color}`}
+                                  >
                                     {ds.label}
                                   </span>
                                 );
                               })()}
                             </div>
                             <div className="text-[10px] text-white/40 mt-0.5">
-                              1º {formatEnergy(first)}{!arena.isDefault && ` • por ${arena.creator_name}`}
+                              1º {formatEnergy(first)}
+                              {!arena.isDefault && ` • por ${arena.creator_name}`}
                             </div>
                           </div>
                           <div className="text-right w-16">
@@ -626,9 +702,7 @@ export function SkemaLobby({
                 )}
 
                 {!arenasLoading && (!openArenas || openArenas.length === 0) && (
-                  <div className="text-center py-3 text-xs text-white/30">
-                    Apenas a Arena Padrão disponível
-                  </div>
+                  <div className="text-center py-3 text-xs text-white/30">Apenas a Arena Padrão disponível</div>
                 )}
               </TabsContent>
 
@@ -645,12 +719,12 @@ export function SkemaLobby({
                   </div>
                 ) : officialRaces.length > 0 ? (
                   officialRaces.map((race) => {
-                    const isRegistered = race.registeredPlayers.some(p => p.id === player.id);
+                    const isRegistered = race.registeredPlayers.some((p) => p.id === player.id);
                     const canAfford = Math.round(player.energy * 100) >= Math.round(race.entryFee * 100);
                     const pool = race.registeredPlayers.length * race.prizePerPlayer;
                     const timeUntil = (() => {
                       const diff = race.scheduledDate.getTime() - Date.now();
-                      if (diff <= 0) return 'Iniciando...';
+                      if (diff <= 0) return "Iniciando...";
                       const d = Math.floor(diff / 86400000);
                       const h = Math.floor((diff % 86400000) / 3600000);
                       const m = Math.floor((diff % 3600000) / 60000);
@@ -660,7 +734,10 @@ export function SkemaLobby({
                     })();
 
                     return (
-                      <div key={race.id} className="rounded-xl bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 p-4 space-y-3">
+                      <div
+                        key={race.id}
+                        className="rounded-xl bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 p-4 space-y-3"
+                      >
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="text-lg font-bold text-white flex items-center gap-2">
@@ -668,7 +745,13 @@ export function SkemaLobby({
                               {race.name}
                             </div>
                             <div className="text-sm text-white/60">
-                              {race.scheduledDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              {race.scheduledDate.toLocaleDateString("pt-BR", {
+                                day: "2-digit",
+                                month: "2-digit",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
                             </div>
                           </div>
                           <div className="text-right">
@@ -710,7 +793,10 @@ export function SkemaLobby({
                           {race.registeredPlayers.length > 0 && (
                             <div className="flex flex-wrap gap-1.5">
                               {race.registeredPlayers.map((p) => (
-                                <span key={p.id} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${p.id === player.id ? 'bg-green-500/20 border border-green-500/50 text-green-400' : 'bg-white/10 text-white/70'}`}>
+                                <span
+                                  key={p.id}
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${p.id === player.id ? "bg-green-500/20 border border-green-500/50 text-green-400" : "bg-white/10 text-white/70"}`}
+                                >
                                   {p.emoji} {p.name}
                                 </span>
                               ))}
@@ -721,19 +807,25 @@ export function SkemaLobby({
                         {!isRegistered ? (
                           <Button
                             onClick={async () => {
-                              if (!canAfford) { setError('Energia insuficiente'); return; }
+                              if (!canAfford) {
+                                setError("Energia insuficiente");
+                                return;
+                              }
                               const fee = Math.round(race.entryFee * 100) / 100;
                               const sbFee = Math.round(race.skemaBoxFee * 100) / 100;
                               const deducted = onDeductEnergy(fee);
-                              if (!deducted) { setError('Falha ao deduzir energia'); return; }
+                              if (!deducted) {
+                                setError("Falha ao deduzir energia");
+                                return;
+                              }
                               const { error: regErr } = await supabase
-                                .from('race_registrations')
+                                .from("race_registrations")
                                 .insert({ race_id: race.id, player_id: player.id });
                               if (regErr) {
                                 onAddEnergy(fee);
                                 setError(regErr.message);
                               } else {
-                                await skemaBox.addToBox(sbFee, 'official_rake');
+                                await skemaBox.addToBox(sbFee, "official_rake");
                                 refreshRaces();
                               }
                             }}
@@ -754,17 +846,17 @@ export function SkemaLobby({
                                 const fee = Math.round(race.entryFee * 100) / 100;
                                 const sbFee = Math.round(race.skemaBoxFee * 100) / 100;
                                 const { error: delErr } = await supabase
-                                  .from('race_registrations')
+                                  .from("race_registrations")
                                   .delete()
-                                  .eq('race_id', race.id)
-                                  .eq('player_id', player.id);
+                                  .eq("race_id", race.id)
+                                  .eq("player_id", player.id);
                                 if (!delErr) {
                                   onAddEnergy(fee);
-                                  await skemaBox.subtractFromBox(sbFee, 'official_refund');
+                                  await skemaBox.subtractFromBox(sbFee, "official_refund");
                                   refreshRaces();
                                   setError(null);
                                 } else {
-                                  setError(delErr.message || 'Erro ao cancelar');
+                                  setError(delErr.message || "Erro ao cancelar");
                                 }
                               }}
                               variant="outline"
@@ -799,9 +891,14 @@ export function SkemaLobby({
                     <p className="text-sm text-white/60 mt-1">Pratique sem gastar energia. Sem prêmios, sem pressão.</p>
                   </div>
                   <div className="flex items-center justify-center gap-4 text-xs text-white/50">
-                    <span><Users className="w-3 h-3 inline mr-1" />Solo</span>
+                    <span>
+                      <Users className="w-3 h-3 inline mr-1" />
+                      Solo
+                    </span>
                     <span className="text-green-400 font-medium">Grátis</span>
-                    <span><Clock className="w-3 h-3 inline mr-1" />3 min</span>
+                    <span>
+                      <Clock className="w-3 h-3 inline mr-1" />3 min
+                    </span>
                   </div>
                   <Button
                     onClick={handleTraining}
@@ -818,19 +915,34 @@ export function SkemaLobby({
           </motion.section>
 
           {/* Cor de Geração (Criador sem cor escolhida) */}
-          {['Criador', 'guardiao'].includes(player.playerTier) && !player.generationColor && (
-            <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.24 }} className="mx-4 mt-4">
+          {["Criador", "guardiao"].includes(player.playerTier) && !player.generationColor && (
+            <motion.section
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.24 }}
+              className="mx-4 mt-4"
+            >
               <GenerationColorPicker playerId={player.id} onColorChosen={() => onRefreshProfile()} />
             </motion.section>
           )}
 
           {/* Descendência (Criador+) */}
-          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="mx-4 mt-4">
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+            className="mx-4 mt-4"
+          >
             <CreatorDescendancyPanel playerId={player.id} playerTier={player.playerTier} />
           </motion.section>
 
           {/* Convites */}
-          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.27 }} className="mx-4 mt-3">
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.27 }}
+            className="mx-4 mt-3"
+          >
             <ReferralHistoryPanel
               playerId={player.id}
               inviteCode={player.inviteCode}
@@ -841,7 +953,12 @@ export function SkemaLobby({
           </motion.section>
 
           {/* Transferências */}
-          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.29 }} className="mx-4 mt-3">
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.29 }}
+            className="mx-4 mt-3"
+          >
             <TransferPanel
               playerId={player.id}
               playerName={player.name}
@@ -853,16 +970,26 @@ export function SkemaLobby({
           </motion.section>
 
           {/* Extrato */}
-          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.31 }} className="mx-4 mt-3">
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.31 }}
+            className="mx-4 mt-3"
+          >
             <PlayerGameHistory playerId={player.id} />
           </motion.section>
 
           {/* Taxa */}
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.33 }} className="mx-4 mt-3 flex items-center gap-2 text-xs text-white/40">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.33 }}
+            className="mx-4 mt-3 flex items-center gap-2 text-xs text-white/40"
+          >
             <AlertCircle className="w-3 h-3" />
             <span>Taxa de transferência: {(transferTax * 100).toFixed(2)}%</span>
           </motion.div>
-          
+
           {/* Erro */}
           <AnimatePresence>
             {error && (
