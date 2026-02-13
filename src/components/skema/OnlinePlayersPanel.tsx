@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Users, Circle, Gamepad2 } from 'lucide-react';
 import { OnlinePlayer } from '@/hooks/useOnlinePlayers';
 import { getColorConfig, PlanetFace, PlanetMood } from './GenerationColorPicker';
+import { useI18n } from '@/i18n/I18nContext';
 
 interface OnlinePlayersPanelProps {
   players: OnlinePlayer[];
@@ -14,7 +15,7 @@ interface OnlinePlayersPanelProps {
 }
 
 export function OnlinePlayersPanel({ players, currentPlayerId, isConnected }: OnlinePlayersPanelProps) {
-  // Filter out current player and limit display
+  const { t } = useI18n();
   const otherPlayers = players.filter(p => p.id !== currentPlayerId);
   const displayPlayers = otherPlayers.slice(0, 10);
   const extraCount = Math.max(0, otherPlayers.length - 10);
@@ -41,6 +42,14 @@ export function OnlinePlayersPanel({ players, currentPlayerId, isConnected }: On
     }
   };
 
+  const getStatusLabel = (status: OnlinePlayer['status']) => {
+    switch (status) {
+      case 'playing': return t.onlinePlayers.playing;
+      case 'away': return t.onlinePlayers.away;
+      default: return t.onlinePlayers.inLobby;
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -51,7 +60,7 @@ export function OnlinePlayersPanel({ players, currentPlayerId, isConnected }: On
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Users className="w-4 h-4 text-primary" />
-          <span className="text-sm font-medium text-white">Jogadores Online</span>
+          <span className="text-sm font-medium text-white">{t.onlinePlayers.title}</span>
         </div>
         <div className="flex items-center gap-2">
           {isConnected ? (
@@ -64,7 +73,7 @@ export function OnlinePlayersPanel({ players, currentPlayerId, isConnected }: On
             <div className="w-2 h-2 rounded-full bg-gray-500" />
           )}
           <span className="text-xs text-white/60">
-            {otherPlayers.length} online
+            {otherPlayers.length} {t.lobby.online}
           </span>
         </div>
       </div>
@@ -72,12 +81,8 @@ export function OnlinePlayersPanel({ players, currentPlayerId, isConnected }: On
       {/* Players list */}
       {displayPlayers.length === 0 ? (
         <div className="text-center py-4">
-          <p className="text-sm text-white/40">
-            Você é o único online agora
-          </p>
-          <p className="text-xs text-white/30 mt-1">
-            Convide amigos para jogar!
-          </p>
+          <p className="text-sm text-white/40">{t.onlinePlayers.youAreAlone}</p>
+          <p className="text-xs text-white/30 mt-1">{t.onlinePlayers.inviteFriends}</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -91,33 +96,24 @@ export function OnlinePlayersPanel({ players, currentPlayerId, isConnected }: On
                 layout
                 className={`flex items-center gap-3 p-2 rounded-lg border ${getStatusColor(player.status)}`}
               >
-                {/* Avatar with mood */}
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/50 to-purple-500/50 flex items-center justify-center text-lg">
                   <PlanetFace variant={(player.mood as PlanetMood) || 'happy'} size="w-6 h-6" />
                 </div>
-
-                {/* Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-white truncate">
-                      {player.name}
-                    </span>
+                    <span className="text-sm font-medium text-white truncate">{player.name}</span>
                     {getStatusIcon(player.status)}
                   </div>
-                  <span className="text-xs text-white/40">
-                    {player.status === 'playing' ? 'Jogando' : 
-                     player.status === 'away' ? 'Ausente' : 'No lobby'}
-                  </span>
+                  <span className="text-xs text-white/40">{getStatusLabel(player.status)}</span>
                 </div>
               </motion.div>
             ))}
           </AnimatePresence>
 
-          {/* Extra count */}
           {extraCount > 0 && (
             <div className="text-center py-2">
               <span className="text-xs text-white/40">
-                +{extraCount} mais online
+                +{extraCount} {t.onlinePlayers.moreOnline}
               </span>
             </div>
           )}

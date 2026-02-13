@@ -9,6 +9,7 @@ import { ChevronDown, ChevronUp, Users, Crown, Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { getColorConfig, PlanetFace } from './GenerationColorPicker';
+import { useI18n } from '@/i18n/I18nContext';
 
 // Max slots per tier for invite mission
 const CREATOR_SLOTS = 10; // Criador convida até 10 Grão Mestres
@@ -25,6 +26,7 @@ interface CreatorData {
 
 export function CreatorsMissionBoard() {
   const [expanded, setExpanded] = useState(false);
+  const { t } = useI18n();
 
   const { data, isLoading } = useQuery({
     queryKey: ['creators-mission-board'],
@@ -52,17 +54,13 @@ export function CreatorsMissionBoard() {
         childrenMap.get(r.inviter_id)!.push(r.invited_id);
       });
 
-      const creatorIds = new Set(creators.map(c => c.id));
-
       const result: CreatorData[] = creators.map(c => {
-        // Direct invites (Grão Mestres)
         const directKids = childrenMap.get(c.id) || [];
         const directInvites = directKids.filter(kid => {
           const p = profileMap.get(kid);
           return p && ['grao_mestre', 'Grão Mestre'].includes(p.player_tier || '');
         }).length;
 
-        // BFS for all descendants
         const queue = [c.id];
         const visited = new Set<string>();
         let totalDescendants = 0;
@@ -94,7 +92,6 @@ export function CreatorsMissionBoard() {
         };
       });
 
-      // Sort by total descendants desc
       return result.sort((a, b) => b.totalDescendants - a.totalDescendants);
     },
     staleTime: 60_000,
@@ -120,7 +117,7 @@ export function CreatorsMissionBoard() {
       >
         <div className="flex items-center gap-2">
           <Crown className="w-4 h-4 text-amber-400" />
-          <span className="text-sm font-bold text-white drop-shadow-md">Missão dos Criadores</span>
+          <span className="text-sm font-bold text-white drop-shadow-md">{t.creators.title}</span>
           <span className="text-[10px] font-medium text-white/60">({creators.length})</span>
         </div>
         <div className="flex items-center gap-2">
@@ -205,14 +202,14 @@ export function CreatorsMissionBoard() {
                       <div className="flex items-center gap-3 text-[10px]">
                         <span className="text-white/50 flex items-center gap-1">
                           <Users className="w-3 h-3" />
-                          {c.totalDescendants} desc.
+                          {c.totalDescendants} {t.creators.desc}
                         </span>
                         <span className={c.activeDescendants > 0 ? 'text-emerald-400' : 'text-red-400/50'}>
-                          {c.activeDescendants} ativo{c.activeDescendants !== 1 ? 's' : ''}
+                          {c.activeDescendants} {c.activeDescendants !== 1 ? t.creators.actives : t.creators.active}
                         </span>
                         {c.totalDescendants > 0 && (
                           <span className="text-white/30">
-                            {Math.round((c.activeDescendants / c.totalDescendants) * 100)}% engajado
+                            {Math.round((c.activeDescendants / c.totalDescendants) * 100)}% {t.creators.engaged}
                           </span>
                         )}
                       </div>
