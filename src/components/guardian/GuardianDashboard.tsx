@@ -119,8 +119,9 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
         if (p.id && !p.id.startsWith('guardian') && p.name) {
           // Filtra por heartbeat — ignora presences sem joinedAt recente
           const joinedAt = p.joinedAt ? new Date(p.joinedAt).getTime() : 0;
+          if (joinedAt === 0) return; // sem timestamp = fantasma, ignorar
           const age = now - joinedAt;
-          if (age < PRESENCE_TIMEOUT_MS || joinedAt === 0) {
+          if (age < PRESENCE_TIMEOUT_MS) {
             uniquePlayers.set(p.id, { id: p.id, name: p.name, emoji: p.emoji || '🎮', status: p.status || 'online' });
           }
         }
