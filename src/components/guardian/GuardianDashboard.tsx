@@ -108,6 +108,25 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
   const [onlinePlayersList, setOnlinePlayersList] = useState<{ id: string; name: string; emoji: string; status: string }[]>([]);
   const channelRef = useRef<any>(null);
 
+  const refreshPresence = useCallback(() => {
+    // Force re-read of presence state
+    if (channelRef.current) {
+      const state = channelRef.current.presenceState();
+      const uniquePlayers = new Map<string, { id: string; name: string; emoji: string; status: string }>();
+      Object.entries(state).forEach(([key, presences]: [string, any]) => {
+        // Skip guardian/watcher keys
+        if (key === 'guardian' || key === 'guardian-watcher' || key.startsWith('guardian')) return;
+        presences.forEach((p: any) => {
+          if (p.id && !p.id.startsWith('guardian') && p.name) {
+            uniquePlayers.set(p.id, { id: p.id, name: p.name, emoji: p.emoji || '🎮', status: p.status || 'online' });
+          }
+        });
+      });
+      setOnlineCount(uniquePlayers.size);
+      setOnlinePlayersList(Array.from(uniquePlayers.values()));
+    }
+  }, []);
+
   useEffect(() => {
     const channel = supabase.channel('skema-lobby', {
       config: { presence: { key: 'guardian-watcher' } },
@@ -117,9 +136,11 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
     channel.on('presence', { event: 'sync' }, () => {
       const state = channel.presenceState();
       const uniquePlayers = new Map<string, { id: string; name: string; emoji: string; status: string }>();
-      Object.values(state).forEach((presences: any) => {
+      Object.entries(state).forEach(([key, presences]: [string, any]) => {
+        // Skip guardian/watcher keys — filter by KEY (presence_ref)
+        if (key === 'guardian' || key === 'guardian-watcher' || key.startsWith('guardian')) return;
         presences.forEach((p: any) => {
-          if (p.id && p.id !== 'guardian' && p.id !== 'guardian-watcher' && p.name) {
+          if (p.id && !p.id.startsWith('guardian') && p.name) {
             uniquePlayers.set(p.id, { id: p.id, name: p.name, emoji: p.emoji || '🎮', status: p.status || 'online' });
           }
         });
@@ -558,6 +579,15 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
                 <p className="text-2xl font-bold text-foreground">{onlineCount}</p>
                 <p className="text-[10px] text-muted-foreground">online agora</p>
               </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 ml-auto"
+                onClick={refreshPresence}
+                title="Atualizar lista"
+              >
+                <Radio className="h-3 w-3" />
+              </Button>
             </div>
             {onlinePlayersList.length > 0 ? (
               <div className="space-y-0.5 max-h-24 overflow-y-auto">
