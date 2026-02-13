@@ -82,7 +82,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
             >
               Cada escolha uma renúncia,
               <br />
-              uma consequência...
+              uma consequência... TESTE
             </motion.p>
 
             {/* Tap to continue */}
