@@ -120,8 +120,8 @@ export function CreatorsMissionBoard() {
       >
         <div className="flex items-center gap-2">
           <Crown className="w-4 h-4 text-amber-400" />
-          <span className="text-sm font-semibold text-white">Missão dos Criadores</span>
-          <span className="text-[10px] text-white/40">({creators.length})</span>
+          <span className="text-sm font-bold text-white drop-shadow-md">Missão dos Criadores</span>
+          <span className="text-[10px] font-medium text-white/60">({creators.length})</span>
         </div>
         <div className="flex items-center gap-2">
           {/* Mini avatars preview */}
