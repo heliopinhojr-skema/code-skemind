@@ -113,16 +113,19 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
   const extractLivePlayers = useCallback((state: Record<string, any>) => {
     const now = Date.now();
     const uniquePlayers = new Map<string, { id: string; name: string; emoji: string; status: string }>();
+    console.log('[GUARDIAN-PRESENCE] Raw state keys:', Object.keys(state));
     Object.entries(state).forEach(([key, presences]: [string, any]) => {
       if (key === 'guardian' || key === 'guardian-watcher' || key.startsWith('guardian')) return;
       presences.forEach((p: any) => {
         if (p.id && !p.id.startsWith('guardian') && p.name) {
-          // Filtra por heartbeat — ignora presences sem joinedAt recente
           const joinedAt = p.joinedAt ? new Date(p.joinedAt).getTime() : 0;
-          if (joinedAt === 0) return; // sem timestamp = fantasma, ignorar
           const age = now - joinedAt;
+          console.log(`[GUARDIAN-PRESENCE] Player: ${p.name}, key: ${key}, joinedAt: ${p.joinedAt}, age: ${Math.round(age/1000)}s`);
+          if (joinedAt === 0) return; // sem timestamp = fantasma
           if (age < PRESENCE_TIMEOUT_MS) {
             uniquePlayers.set(p.id, { id: p.id, name: p.name, emoji: p.emoji || '🎮', status: p.status || 'online' });
+          } else {
+            console.log(`[GUARDIAN-PRESENCE] EXPIRED: ${p.name} (age ${Math.round(age/1000)}s > ${PRESENCE_TIMEOUT_MS/1000}s)`);
           }
         }
       });
