@@ -15,6 +15,7 @@ import { ReferralEntry, useReferralHistory } from '@/hooks/useReferralHistory';
 import { useInviteCodes, InviteCode } from '@/hooks/useInviteCodes';
 import { getTierEconomy, formatEnergy } from '@/lib/tierEconomy';
 import { toast } from '@/components/ui/use-toast';
+import { buildInviteUrl } from '@/lib/inviteUrl';
 
 interface ReferralHistoryPanelProps {
   playerId: string;
@@ -66,7 +67,7 @@ export function ReferralHistoryPanel({
 
     // Copy to clipboard
     const textToCopy = type === 'link' 
-      ? `${window.location.origin}/auth?convite=${encodeURIComponent(code)}`
+      ? buildInviteUrl(code)
       : code;
 
     try {
