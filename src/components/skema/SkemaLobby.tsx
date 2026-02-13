@@ -493,34 +493,6 @@ export function SkemaLobby({
             </div>
           </div>
 
-          {/* Stats rápidos + contador universo */}
-          <div className="grid grid-cols-4 gap-2">
-            <div className="bg-white/5 rounded-lg p-2 text-center">
-              <div className="text-lg font-bold text-green-400">{player.stats.wins}</div>
-              <div className="text-xs text-white/50">Vitórias</div>
-            </div>
-            <div className="bg-white/5 rounded-lg p-2 text-center">
-              <div className="text-lg font-bold text-blue-400">{player.stats.races}</div>
-              <div className="text-xs text-white/50">Corridas</div>
-            </div>
-            <div className="bg-white/5 rounded-lg p-2 text-center">
-              <div className="text-lg font-bold text-purple-400">
-                {player.stats.bestTime
-                  ? `${Math.floor(player.stats.bestTime / 60)}:${String(player.stats.bestTime % 60).padStart(2, "0")}`
-                  : "-"}
-              </div>
-              <div className="text-xs text-white/50">Melhor</div>
-            </div>
-            <div className="bg-gradient-to-br from-purple-500/15 to-indigo-500/15 rounded-lg p-2 text-center border border-purple-500/20">
-              <UniversePlayerCounter />
-            </div>
-          </div>
-          {player.playerTier === "master_admin" && (
-            <div className="mt-2 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-lg p-2 text-center border border-yellow-500/30">
-              <div className="text-lg font-bold text-yellow-400">k${skemaBox.balance.toFixed(2)}</div>
-              <div className="text-xs text-yellow-400/70">Skema Box</div>
-            </div>
-          )}
         </motion.header>
 
         {/* Conteúdo rolável */}
@@ -977,6 +949,42 @@ export function SkemaLobby({
             className="mx-4 mt-3"
           >
             <PlayerGameHistory playerId={player.id} />
+          </motion.section>
+
+          {/* Stats rápidos + contador universo */}
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.32 }}
+            className="mx-4 mt-3"
+          >
+            <div className="grid grid-cols-4 gap-2">
+              <div className="bg-white/5 rounded-lg p-2 text-center">
+                <div className="text-lg font-bold text-green-400">{player.stats.wins}</div>
+                <div className="text-xs text-white/50">Vitórias</div>
+              </div>
+              <div className="bg-white/5 rounded-lg p-2 text-center">
+                <div className="text-lg font-bold text-blue-400">{player.stats.races}</div>
+                <div className="text-xs text-white/50">Corridas</div>
+              </div>
+              <div className="bg-white/5 rounded-lg p-2 text-center">
+                <div className="text-lg font-bold text-purple-400">
+                  {player.stats.bestTime
+                    ? `${Math.floor(player.stats.bestTime / 60)}:${String(player.stats.bestTime % 60).padStart(2, "0")}`
+                    : "-"}
+                </div>
+                <div className="text-xs text-white/50">Melhor</div>
+              </div>
+              <div className="bg-gradient-to-br from-purple-500/15 to-indigo-500/15 rounded-lg p-2 text-center border border-purple-500/20">
+                <UniversePlayerCounter />
+              </div>
+            </div>
+            {player.playerTier === "master_admin" && (
+              <div className="mt-2 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-lg p-2 text-center border border-yellow-500/30">
+                <div className="text-lg font-bold text-yellow-400">k${skemaBox.balance.toFixed(2)}</div>
+                <div className="text-xs text-yellow-400/70">Skema Box</div>
+              </div>
+            )}
           </motion.section>
 
           {/* Taxa */}
