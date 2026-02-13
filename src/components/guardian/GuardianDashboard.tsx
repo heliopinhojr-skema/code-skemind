@@ -32,8 +32,11 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
   const { data: referralNodes } = useReferralTree();
   const { data: sboxTransactions } = useSkemaBoxTransactions();
   const { player } = useSupabasePlayer();
-  const { codes, isLoading: isLoadingCodes, isAutoGenerating, unusedCount, usedCount } = useInviteCodes(player?.id || null, player?.playerTier || null);
+  const { codes, isLoading: isLoadingCodes, isAutoGenerating, unusedCount, usedCount, shareCode } = useInviteCodes(player?.id || null, player?.playerTier || null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [shareTarget, setShareTarget] = useState<{ codeId: string; code: string; type: 'code' | 'link' } | null>(null);
+  const [inviteeName, setInviteeName] = useState('');
+  const inviteeInputRef = useRef<HTMLInputElement>(null);
   const [showDonate, setShowDonate] = useState(false);
   const [donateAmount, setDonateAmount] = useState('');
   const [isDonating, setIsDonating] = useState(false);
@@ -233,27 +236,47 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
     return { totalLocked: locked, totalAvailable: available };
   })();
 
-  const handleCopyCode = async (code: string) => {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(code);
-      toast.success('Código copiado!');
-      setTimeout(() => setCopied(null), 2000);
-    } catch {
-      toast.error('Erro ao copiar');
-    }
+  const handleStartShare = (codeId: string, code: string, type: 'code' | 'link') => {
+    setShareTarget({ codeId, code, type });
+    setInviteeName('');
+    setTimeout(() => inviteeInputRef.current?.focus(), 100);
   };
 
-  const handleCopyLink = async (code: string) => {
-    const link = buildInviteUrl(code);
+  const handleConfirmShare = async () => {
+    if (!shareTarget) return;
+    const name = inviteeName.trim();
+    if (!name) {
+      inviteeInputRef.current?.focus();
+      return;
+    }
+    // Share (mark as shared with name)
+    const codeObj = codes.find(c => c.id === shareTarget.codeId);
+    if (codeObj && !codeObj.sharedAt) {
+      const ok = await shareCode(shareTarget.codeId, name);
+      if (!ok) {
+        toast.error('Erro ao compartilhar convite');
+        return;
+      }
+    }
+    // Copy to clipboard
     try {
-      await navigator.clipboard.writeText(link);
-      setCopied(`link-${code}`);
-      toast.success('Link copiado!');
+      const textToCopy = shareTarget.type === 'link' 
+        ? buildInviteUrl(shareTarget.code) 
+        : shareTarget.code;
+      await navigator.clipboard.writeText(textToCopy);
+      setCopied(shareTarget.type === 'link' ? `link-${shareTarget.code}` : shareTarget.code);
+      toast.success(`${shareTarget.type === 'link' ? 'Link' : 'Código'} copiado! Convite para "${name}"`);
       setTimeout(() => setCopied(null), 2000);
     } catch {
       toast.error('Erro ao copiar');
     }
+    setShareTarget(null);
+    setInviteeName('');
+  };
+
+  const handleCancelShare = () => {
+    setShareTarget(null);
+    setInviteeName('');
   };
 
   if (error) {
@@ -957,52 +980,90 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
             <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
               {codes.map((code) => {
                 const isUsed = !!code.usedById;
+                const isPending = !isUsed && !!code.sharedAt;
+                const isShareOpen = shareTarget?.codeId === code.id;
                 return (
                   <div
                     key={code.id}
                     className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 border transition-colors",
+                      "rounded-lg px-3 py-2 border transition-colors",
                       isUsed
                         ? "bg-muted/30 border-border/30 opacity-60"
-                        : "bg-background/80 border-primary/20 hover:border-primary/40"
+                        : isPending
+                          ? "bg-amber-500/10 border-amber-500/20"
+                          : "bg-background/80 border-primary/20 hover:border-primary/40"
                     )}
                   >
-                    <div className="flex-1 font-mono text-sm font-bold tracking-wider">
-                      <span className={isUsed ? "text-muted-foreground line-through" : "text-primary"}>
-                        {code.code}
-                      </span>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 font-mono text-sm font-bold tracking-wider">
+                        <span className={isUsed ? "text-muted-foreground line-through" : isPending ? "text-amber-200" : "text-primary"}>
+                          {code.code}
+                        </span>
+                        {isPending && code.sharedToName && (
+                          <span className="text-xs font-sans font-normal text-amber-400/80 ml-2">
+                            ⏳ para <span className="font-semibold">{code.sharedToName}</span>
+                          </span>
+                        )}
+                        {isPending && !code.sharedToName && (
+                          <span className="text-xs font-sans font-normal text-amber-400/60 ml-2">⏳ compartilhado</span>
+                        )}
+                      </div>
+                      {isUsed ? (
+                        <Badge variant="outline" className="text-xs border-muted text-muted-foreground">
+                          ✓ {code.usedByName || 'usado'}
+                        </Badge>
+                      ) : !isPending ? (
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleStartShare(code.id, code.code, 'code')}
+                            title="Copiar código"
+                          >
+                            {copied === code.code ? (
+                              <Check className="h-3.5 w-3.5 text-primary" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleStartShare(code.id, code.code, 'link')}
+                            title="Copiar link"
+                          >
+                            {copied === `link-${code.code}` ? (
+                              <Check className="h-3.5 w-3.5 text-primary" />
+                            ) : (
+                              <Link className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
-                    {isUsed ? (
-                      <Badge variant="outline" className="text-xs border-muted text-muted-foreground">
-                        ✓ {code.usedByName || 'usado'}
-                      </Badge>
-                    ) : (
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => handleCopyCode(code.code)}
-                          title="Copiar código"
-                        >
-                          {copied === code.code ? (
-                            <Check className="h-3.5 w-3.5 text-primary" />
-                          ) : (
-                            <Copy className="h-3.5 w-3.5" />
-                          )}
+                    {/* Input para nome do convidado */}
+                    {isShareOpen && (
+                      <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-border/30">
+                        <UserPlus className="w-3.5 h-3.5 text-primary shrink-0" />
+                        <Input
+                          ref={inviteeInputRef}
+                          type="text"
+                          placeholder="Nome do convidado..."
+                          value={inviteeName}
+                          onChange={(e) => setInviteeName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleConfirmShare();
+                            if (e.key === 'Escape') handleCancelShare();
+                          }}
+                          className="h-7 text-xs flex-1"
+                        />
+                        <Button size="sm" className="h-7 text-xs px-2" onClick={handleConfirmShare}>
+                          <Check className="w-3 h-3 mr-1" /> OK
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => handleCopyLink(code.code)}
-                          title="Copiar link"
-                        >
-                          {copied === `link-${code.code}` ? (
-                            <Check className="h-3.5 w-3.5 text-primary" />
-                          ) : (
-                            <Link className="h-3.5 w-3.5" />
-                          )}
+                        <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={handleCancelShare}>
+                          ✕
                         </Button>
                       </div>
                     )}
