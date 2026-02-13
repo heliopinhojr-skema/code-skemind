@@ -176,10 +176,15 @@ export function useOnlinePlayers(currentPlayer: { id: string; name: string; emoj
       }
     });
 
-    // Cleanup
+    // Cleanup — untrack first so other clients see the leave immediately
     return () => {
       console.log('[PRESENCE] Cleaning up channel');
-      channel.unsubscribe();
+      channel.untrack().then(() => {
+        console.log('[PRESENCE] Untracked successfully');
+        channel.unsubscribe();
+      }).catch(() => {
+        channel.unsubscribe();
+      });
       channelRef.current = null;
       setIsConnected(false);
     };
