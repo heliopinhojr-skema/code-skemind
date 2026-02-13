@@ -78,11 +78,12 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 1.8, duration: 1 }}
-              className="text-sm md:text-base tracking-[0.15em] uppercase text-purple-200/80 font-light max-w-sm"
+              className="text-base md:text-lg tracking-[0.12em] uppercase text-white font-medium max-w-sm drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
+              style={{ textShadow: '0 0 20px rgba(0,0,0,0.9), 0 2px 4px rgba(0,0,0,0.8)' }}
             >
               Cada escolha uma renúncia,
               <br />
-              uma consequência... TESTE
+              uma consequência...
             </motion.p>
 
             {/* Tap to continue */}
