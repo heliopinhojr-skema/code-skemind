@@ -119,7 +119,7 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
       const uniquePlayers = new Map<string, { id: string; name: string; emoji: string; status: string }>();
       Object.values(state).forEach((presences: any) => {
         presences.forEach((p: any) => {
-          if (p.id && p.id !== 'guardian' && p.name) {
+          if (p.id && p.id !== 'guardian' && p.id !== 'guardian-watcher' && p.name) {
             uniquePlayers.set(p.id, { id: p.id, name: p.name, emoji: p.emoji || '🎮', status: p.status || 'online' });
           }
         });
@@ -134,7 +134,7 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
       }
     });
 
-    return () => { channel.unsubscribe(); channelRef.current = null; };
+    return () => { channel.untrack().catch(() => {}); channel.unsubscribe(); channelRef.current = null; };
   }, []);
 
   // Real-time new player growth tracker - listens for profile inserts
