@@ -10,9 +10,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Gift, Copy, Check, Clock, Coins, ChevronDown, ChevronUp, Users, Loader2, Share2, Ticket, Dna, Lock, Sparkles, X, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { ptBR as ptBRLocale, enUS as enUSLocale } from 'date-fns/locale';
 import { ReferralEntry, useReferralHistory } from '@/hooks/useReferralHistory';
 import { useInviteCodes, InviteCode } from '@/hooks/useInviteCodes';
+import { useI18n } from '@/i18n/I18nContext';
 import { getTierEconomy, formatEnergy } from '@/lib/tierEconomy';
 import { toast } from '@/components/ui/use-toast';
 import { buildInviteUrl } from '@/lib/inviteUrl';
@@ -34,6 +35,7 @@ export function ReferralHistoryPanel({
 }: ReferralHistoryPanelProps) {
   const { referrals, isLoading: referralsLoading, error: referralsError, pendingRewardsCount, pendingRewardsTotal, refetch: refetchReferrals } = useReferralHistory(playerId);
   const { codes, isLoading: codesLoading, isAutoGenerating, error: codesError, unusedCount, usedCount, sharedCount, refetch: refetchCodes, shareCode, cancelCode } = useInviteCodes(playerId, playerTier);
+  const { t, locale } = useI18n();
   
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [isCardExpanded, setIsCardExpanded] = useState(false);
@@ -56,8 +58,8 @@ export function ReferralHistoryPanel({
       const ok = await shareCode(codeId, sharedToName);
       if (!ok) {
         toast({
-          title: '❌ Erro ao compartilhar',
-          description: 'Saldo insuficiente ou erro no servidor.',
+          title: t.referral.shareError,
+          description: t.referral.insufficientOrServerError,
           variant: 'destructive',
         });
         return;
@@ -74,10 +76,10 @@ export function ReferralHistoryPanel({
       await navigator.clipboard.writeText(textToCopy);
       setCopiedCode(type === 'link' ? `link-${code}` : code);
       toast({
-        title: '✅ ' + (type === 'link' ? 'Link copiado!' : 'Código copiado!'),
+        title: '✅ ' + (type === 'link' ? t.referral.linkCopied : t.referral.codeCopied),
         description: sharedToName 
-          ? `Convite para "${sharedToName}" — envie agora!`
-          : (type === 'link' ? 'Envie para seu convidado.' : `${code} — envie para seu convidado.`),
+          ? `${t.referral.inviteFor} "${sharedToName}" — ${t.referral.sendNow}`
+          : (type === 'link' ? t.referral.sendToInvitee : `${code} — ${t.referral.sendToInvitee}`),
       });
       setTimeout(() => setCopiedCode(null), 2000);
     } catch (e) {
@@ -89,14 +91,14 @@ export function ReferralHistoryPanel({
     const ok = await cancelCode(codeId);
     if (ok) {
       toast({
-        title: '↩️ Convite cancelado',
-        description: `Energia reembolsada (${formatEnergy(costPerInvite)}).`,
+        title: t.referral.inviteCancelled,
+        description: `${t.referral.energyRefunded} (${formatEnergy(costPerInvite)}).`,
       });
       onRefreshProfile();
     } else {
       toast({
-        title: '❌ Erro ao cancelar',
-        description: 'Convite já aceito ou erro no servidor.',
+        title: t.referral.cancelError,
+        description: t.referral.alreadyAcceptedOrError,
         variant: 'destructive',
       });
     }
@@ -111,23 +113,23 @@ export function ReferralHistoryPanel({
       
       if (result.total_reward > 0) {
         toast({
-          title: '💰 Recompensas Creditadas!',
-          description: `Você recebeu k$${result.total_reward.toFixed(2)} por ${result.processed} convite(s).`,
+          title: t.referral.rewardsRedeemed,
+          description: `${t.referral.youReceived} k$${result.total_reward.toFixed(2)} ${t.referral.forInvites}`,
         });
         await refetchReferrals();
         await refetchCodes();
         onRefreshProfile();
       } else {
         toast({
-          title: 'Nenhuma recompensa pendente',
-          description: 'Todos os seus convites já foram processados.',
+          title: t.referral.noPendingRewards,
+          description: t.referral.allProcessed,
         });
       }
     } catch (e) {
       console.error('[REFERRALS] Erro ao processar:', e);
       toast({
-        title: 'Erro ao processar',
-        description: 'Tente novamente mais tarde.',
+        title: t.referral.processError,
+        description: t.referral.tryLater,
         variant: 'destructive',
       });
     } finally {
@@ -137,9 +139,9 @@ export function ReferralHistoryPanel({
 
   const formatDate = (dateStr: string) => {
     try {
-      return formatDistanceToNow(new Date(dateStr), { addSuffix: true, locale: ptBR });
+      return formatDistanceToNow(new Date(dateStr), { addSuffix: true, locale: locale === 'pt-BR' ? ptBRLocale : enUSLocale });
     } catch {
-      return 'Data desconhecida';
+      return t.referral.unknownDate;
     }
   };
 
@@ -149,7 +151,7 @@ export function ReferralHistoryPanel({
       <div className="bg-white/5 border border-white/10 rounded-xl p-3">
         <div className="flex items-center gap-2 text-white/40">
           <Lock className="w-4 h-4" />
-          <span className="text-sm">Convites não disponíveis para seu tier</span>
+          <span className="text-sm">{t.referral.invitesNotAvailable}</span>
         </div>
       </div>
     );
@@ -167,9 +169,9 @@ export function ReferralHistoryPanel({
             <Dna className="w-3.5 h-3.5 text-purple-300" />
           </div>
           <div className="text-left">
-            <span className="font-medium text-white text-sm">Códigos DNA</span>
+            <span className="font-medium text-white text-sm">{t.referral.dnaCodes}</span>
             <div className="text-[10px] text-white/40">
-              Gera {invitedTierLabel} • {formatEnergy(costPerInvite)}/cada
+              {t.referral.generates} {invitedTierLabel} • {formatEnergy(costPerInvite)}/{t.referral.each}
             </div>
           </div>
         </div>
@@ -219,7 +221,7 @@ export function ReferralHistoryPanel({
             <div className="p-3 space-y-2">
               {/* Tier info strip */}
               <div className="flex items-center justify-between bg-white/5 rounded-lg px-3 py-2 text-xs">
-                <span className="text-white/50">Cada código gera um</span>
+                <span className="text-white/50">{t.referral.eachCodeGenerates}</span>
                 <span className="text-purple-300 font-medium flex items-center gap-1">
                   <Sparkles className="w-3 h-3" />
                   {invitedTierLabel} • {formatEnergy(costPerInvite)}
@@ -231,7 +233,7 @@ export function ReferralHistoryPanel({
                 <div className="flex flex-col items-center justify-center py-6 gap-2">
                   <Loader2 className="w-5 h-5 text-purple-400 animate-spin" />
                   <span className="text-xs text-white/40">
-                    {isAutoGenerating ? 'Gerando códigos DNA...' : 'Carregando...'}
+                    {isAutoGenerating ? t.referral.generatingDna : t.common.loading}
                   </span>
                 </div>
               ) : codes.length > 0 ? (
@@ -252,7 +254,7 @@ export function ReferralHistoryPanel({
                 <div className="bg-white/5 rounded-lg p-4 text-center">
                   <Ticket className="w-6 h-6 text-white/20 mx-auto mb-1" />
                   <p className="text-xs text-white/40">
-                    Nenhum código disponível para seu tier.
+                    {t.referral.noCodesForTier}
                   </p>
                 </div>
               )}
@@ -268,7 +270,7 @@ export function ReferralHistoryPanel({
                   className="w-full flex items-center justify-center gap-1 text-xs text-white/40 hover:text-white/70 transition-colors py-1.5 border-t border-white/5"
                 >
                   <Users className="w-3 h-3" />
-                  <span>Árvore de Convidados ({usedCount})</span>
+                  <span>{t.referral.inviteTree} ({usedCount})</span>
                   {isHistoryExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                 </button>
               )}
@@ -290,12 +292,12 @@ export function ReferralHistoryPanel({
                       <div className="text-center py-4">
                         <p className="text-sm text-red-400">{referralsError}</p>
                         <Button variant="ghost" size="sm" onClick={refetchReferrals} className="mt-2 text-xs">
-                          Tentar novamente
+                          {t.referral.tryAgain}
                         </Button>
                       </div>
                     ) : referrals.length === 0 ? (
                       <div className="text-center py-4">
-                        <p className="text-sm text-white/40">Nenhum convidado ainda</p>
+                        <p className="text-sm text-white/40">{t.referral.noInviteesYet}</p>
                       </div>
                     ) : (
                       referrals.map((referral) => (
@@ -318,7 +320,7 @@ export function ReferralHistoryPanel({
                   ) : (
                     <Coins className="w-4 h-4" />
                   )}
-                  Resgatar {formatEnergy(pendingRewardsTotal)}
+                  {t.referral.redeem} {formatEnergy(pendingRewardsTotal)}
                 </Button>
               )}
             </div>
@@ -346,6 +348,7 @@ function InviteCodeItem({
   onCancel: (codeId: string) => Promise<void>;
   formatDate: (d: string) => string;
 }) {
+  const { t, locale } = useI18n();
   const [isCancelling, setIsCancelling] = useState(false);
   const [showNameInput, setShowNameInput] = useState(false);
   const [inviteeName, setInviteeName] = useState('');
@@ -421,18 +424,18 @@ function InviteCodeItem({
           <div className="text-[10px] text-white/30 mt-0.5">
             {isUsed ? (
               <span className="text-emerald-300/80">
-                ✅ convite aceito e em uso por <span className="text-white/70 font-semibold">{code.usedByName || '?'}</span>
-                {code.usedAt && <span className="text-white/30 ml-1">• {new Date(code.usedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>}
+                ✅ {t.referral.inviteAcceptedBy} <span className="text-white/70 font-semibold">{code.usedByName || '?'}</span>
+                {code.usedAt && <span className="text-white/30 ml-1">• {new Date(code.usedAt).toLocaleDateString(locale === 'pt-BR' ? 'pt-BR' : 'en-US', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>}
               </span>
             ) : isPending ? (
               <span className="text-amber-400/80 flex items-center gap-1">
-                <Clock className="w-2.5 h-2.5 animate-pulse" /> em transformação
+                <Clock className="w-2.5 h-2.5 animate-pulse" /> {t.referral.pending}
                 {code.sharedToName && (
-                  <span className="text-white/50 ml-0.5">• para <span className="font-semibold text-amber-200">{code.sharedToName}</span></span>
+                  <span className="text-white/50 ml-0.5">• {t.referral.forPerson} <span className="font-semibold text-amber-200">{code.sharedToName}</span></span>
                 )}
               </span>
             ) : (
-              <span className="text-emerald-400/60">● disponível</span>
+              <span className="text-emerald-400/60">● {t.referral.available}</span>
             )}
           </div>
         </div>
@@ -446,7 +449,7 @@ function InviteCodeItem({
                 onClick={handleCancel}
                 disabled={isCancelling}
                 className="h-7 w-7 text-red-400/60 hover:text-red-400 hover:bg-red-500/10"
-                title="Cancelar convite"
+                title={t.lobby.cancel}
               >
                 {isCancelling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
               </Button>
@@ -461,7 +464,7 @@ function InviteCodeItem({
                     size="icon"
                     onClick={() => handleStartShare('code')}
                     className="h-7 w-7 text-white/40 hover:text-white"
-                    title="Copiar código"
+                    title={t.referral.copyCode}
                   >
                     {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                   </Button>
@@ -475,7 +478,7 @@ function InviteCodeItem({
                     size="icon"
                     onClick={() => handleStartShare('link')}
                     className="h-7 w-7 text-white/40 hover:text-white"
-                    title="Copiar link"
+                    title={t.referral.copyLink}
                   >
                     {isLinkCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
                   </Button>
@@ -501,7 +504,7 @@ function InviteCodeItem({
               <input
                 ref={nameInputRef}
                 type="text"
-                placeholder="Nome do convidado..."
+                placeholder={t.referral.guestNameInputPlaceholder}
                 value={inviteeName}
                 onChange={(e) => setInviteeName(e.target.value)}
                 onKeyDown={(e) => {

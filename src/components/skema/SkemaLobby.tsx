@@ -8,6 +8,7 @@
  */
 
 import { useState, useCallback, useMemo, useEffect } from "react";
+import { useI18n } from "@/i18n/I18nContext";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { formatEnergy, calculateBalanceBreakdown } from "@/lib/tierEconomy";
 import { motion, AnimatePresence } from "framer-motion";
@@ -168,6 +169,7 @@ function TierBadge({ tier }: { tier: PlayerTier }) {
 }
 // Contador global compacto para o grid de stats
 function UniversePlayerCounter() {
+  const { t } = useI18n();
   const { data: count } = useQuery({
     queryKey: ["universe-player-count"],
     queryFn: async () => {
@@ -190,7 +192,7 @@ function UniversePlayerCounter() {
       >
         {count ?? "..."}
       </motion.div>
-      <div className="text-[10px] text-purple-300/60">Universo</div>
+      <div className="text-[10px] text-purple-300/60">{t.lobby.universe}</div>
     </>
   );
 }
@@ -217,6 +219,7 @@ export function SkemaLobby({
   const { onlinePlayers, isConnected, updateStatus, updateMood, currentMood, onlineCount } = onlinePresence;
   const skemaHour = getSkemaHour();
 
+  const { t, locale } = useI18n();
   const [activeTab, setActiveTab] = useState<string>("sitgo");
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isStarting, setIsStarting] = useState(false);
@@ -285,13 +288,13 @@ export function SkemaLobby({
     (buyIn: number, rakeFee: number, botCount: number) => {
       const canAfford = Math.round(player.energy * 100) >= Math.round(buyIn * 100);
       if (!canAfford) {
-        setError("Saldo insuficiente");
+        setError(t.lobby.insufficientBalance);
         return;
       }
       handleStartCountdownForAction(() => {
         onStartBotRace(buyIn, rakeFee, botCount).then((result) => {
           if (!result.success) {
-            setError(result.error || "Erro ao iniciar");
+            setError(result.error || t.lobby.errorStarting);
             updateStatus("online");
           }
         });
@@ -336,7 +339,7 @@ export function SkemaLobby({
             className="fixed inset-0 z-50 bg-black/90 backdrop-blur-lg flex flex-col items-center justify-center"
           >
             <Rocket className="w-16 h-16 text-primary mx-auto mb-4 animate-bounce" />
-            <div className="text-2xl text-muted-foreground mb-4">LANÇAMENTO EM</div>
+            <div className="text-2xl text-muted-foreground mb-4">{t.lobby.launchIn}</div>
             <motion.div
               key={countdown}
               initial={{ scale: 2, opacity: 0 }}
@@ -353,7 +356,7 @@ export function SkemaLobby({
               onClick={handleCancelCountdown}
               className="mt-8 text-muted-foreground hover:text-white"
             >
-              Cancelar
+              {t.lobby.cancel}
             </Button>
           </motion.div>
         )}
@@ -379,7 +382,7 @@ export function SkemaLobby({
                       <button
                         onClick={avatarClick}
                         className={`w-12 h-12 rounded-full flex items-center justify-center ${genColor.bg} ${genColor.glow} transition-transform hover:scale-110 cursor-pointer`}
-                        title="Mudar humor"
+                        title={t.lobby.changeMood}
                       >
                         <PlanetFace className={genColor.face} variant={currentMood} />
                       </button>
@@ -389,7 +392,7 @@ export function SkemaLobby({
                     <button
                       onClick={avatarClick}
                       className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-2xl transition-transform hover:scale-110 cursor-pointer"
-                      title="Mudar humor"
+                      title={t.lobby.changeMood}
                     >
                       {player.emoji}
                     </button>
@@ -444,7 +447,7 @@ export function SkemaLobby({
                 <div className="flex items-center gap-2 text-xs text-white/60">
                   <Calendar className="w-3 h-3" />
                   <span>
-                    Ano {skemaYear} • Dia {skemaDay} • {String(skemaHour).padStart(2, "0")}h
+                    {t.lobby.year} {skemaYear} • {t.lobby.day} {skemaDay} • {String(skemaHour).padStart(2, "0")}h
                   </span>
                   <span className="text-white/30">•</span>
                   <span className="flex items-center gap-1">
@@ -453,7 +456,7 @@ export function SkemaLobby({
                     ) : (
                       <span className="w-1.5 h-1.5 rounded-full bg-gray-500" />
                     )}
-                    <span>{onlineCount} online</span>
+                    <span>{onlineCount} {t.lobby.online}</span>
                   </span>
                 </div>
                 <div className="mt-1">
@@ -461,7 +464,7 @@ export function SkemaLobby({
                 </div>
                 {player.invitedByName && (
                   <div className="text-xs text-purple-300 mt-0.5">
-                    🔗 Convidado por <span className="font-medium">{player.invitedByName}</span>
+                    🔗 {t.lobby.invitedBy} <span className="font-medium">{player.invitedByName}</span>
                   </div>
                 )}
               </div>
@@ -511,7 +514,7 @@ export function SkemaLobby({
                 SKEMA
               </h2>
               <p className="text-[10px] tracking-[0.12em] uppercase text-white/90 font-medium mt-0.5" style={{ textShadow: '0 1px 6px rgba(0,0,0,0.9)' }}>
-                Cada escolha uma renúncia, uma consequência...
+                {t.auth.tagline}
               </p>
             </div>
           </motion.div>
@@ -535,34 +538,34 @@ export function SkemaLobby({
                   className="flex-1 gap-1.5 data-[state=active]:bg-primary/20 data-[state=active]:text-primary"
                 >
                   <Swords className="w-4 h-4" />
-                  Sit & Go
+                  {t.lobby.sitAndGo}
                 </TabsTrigger>
                 <TabsTrigger
                   value="tournaments"
                   className="flex-1 gap-1.5 data-[state=active]:bg-yellow-500/20 data-[state=active]:text-yellow-400"
                 >
                   <Crown className="w-4 h-4" />
-                  Torneios
+                  {t.lobby.tournaments}
                 </TabsTrigger>
                 <TabsTrigger
                   value="practice"
                   className="flex-1 gap-1.5 data-[state=active]:bg-blue-500/20 data-[state=active]:text-blue-400"
                 >
                   <Brain className="w-4 h-4" />
-                  Treinar
+                  {t.lobby.training}
                 </TabsTrigger>
               </TabsList>
 
               {/* ─── Sit & Go (Arenas) ─── */}
               <TabsContent value="sitgo" className="mt-3 space-y-2">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-white/50">Mesas disponíveis</span>
-                  <span className="text-xs text-white/30">25 ITM • Poker-Style Payouts</span>
+                  <span className="text-xs text-white/50">{t.lobby.availableTables}</span>
+                  <span className="text-xs text-white/30">{t.lobby.itmPayouts}</span>
                 </div>
 
                 {/* Header da tabela */}
                 <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 px-3 py-1.5 text-[10px] text-white/40 uppercase tracking-wider border-b border-white/10">
-                  <span>Mesa</span>
+                  <span>{t.lobby.table}</span>
                   <span className="text-right w-16">Buy-in</span>
                   <span className="text-right w-14">Bots</span>
                   <span className="text-right w-20">Pool</span>
@@ -593,7 +596,7 @@ export function SkemaLobby({
                     };
                     const defaultArena = {
                       id: "default",
-                      name: "🎯 Arena Padrão",
+                      name: t.lobby.defaultArena,
                       buy_in: 0.55,
                       rake_fee: 0.05,
                       bot_count: 99,
@@ -645,7 +648,7 @@ export function SkemaLobby({
                             </div>
                             <div className="text-[10px] text-white/40 mt-0.5">
                               1º {formatEnergy(first)}
-                              {!arena.isDefault && ` • por ${arena.creator_name}`}
+                              {!arena.isDefault && ` • ${t.lobby.by} ${arena.creator_name}`}
                             </div>
                           </div>
                           <div className="text-right w-16">
@@ -664,7 +667,7 @@ export function SkemaLobby({
                               disabled={!canAfford || isStarting}
                               className="h-7 w-full text-xs"
                             >
-                              Jogar
+                              {t.lobby.play}
                             </Button>
                           </div>
                         </motion.div>
@@ -674,15 +677,15 @@ export function SkemaLobby({
                 )}
 
                 {!arenasLoading && (!openArenas || openArenas.length === 0) && (
-                  <div className="text-center py-3 text-xs text-white/30">Apenas a Arena Padrão disponível</div>
+                  <div className="text-center py-3 text-xs text-white/30">{t.lobby.onlyDefaultArena}</div>
                 )}
               </TabsContent>
 
               {/* ─── Torneios (Corridas Oficiais) ─── */}
               <TabsContent value="tournaments" className="mt-3 space-y-3">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-white/50">Torneios agendados ({officialRaces.length})</span>
-                  <span className="text-xs text-white/30">Multiplayer</span>
+                  <span className="text-xs text-white/50">{t.lobby.scheduledTournaments} ({officialRaces.length})</span>
+                  <span className="text-xs text-white/30">{t.lobby.multiplayer}</span>
                 </div>
 
                 {racesLoading ? (
@@ -696,7 +699,7 @@ export function SkemaLobby({
                     const pool = race.registeredPlayers.length * race.prizePerPlayer;
                     const timeUntil = (() => {
                       const diff = race.scheduledDate.getTime() - Date.now();
-                      if (diff <= 0) return "Iniciando...";
+                      if (diff <= 0) return t.lobby.starting;
                       const d = Math.floor(diff / 86400000);
                       const h = Math.floor((diff % 86400000) / 3600000);
                       const m = Math.floor((diff % 3600000) / 60000);
@@ -717,7 +720,7 @@ export function SkemaLobby({
                               {race.name}
                             </div>
                             <div className="text-sm text-white/60">
-                              {race.scheduledDate.toLocaleDateString("pt-BR", {
+                              {race.scheduledDate.toLocaleDateString(locale === 'pt-BR' ? 'pt-BR' : 'en-US', {
                                 day: "2-digit",
                                 month: "2-digit",
                                 year: "numeric",
@@ -727,22 +730,22 @@ export function SkemaLobby({
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="text-xs text-white/50">Início em</div>
+                            <div className="text-xs text-white/50">{t.lobby.startsIn}</div>
                             <div className="text-lg font-bold text-yellow-400 tabular-nums">{timeUntil}</div>
                           </div>
                         </div>
 
                         <div className="grid grid-cols-3 gap-2">
                           <div className="bg-black/30 rounded-lg p-2 text-center">
-                            <div className="text-xs text-white/50">Buy-in</div>
+                            <div className="text-xs text-white/50">{t.lobby.buyIn}</div>
                             <div className="font-bold text-white">k${race.entryFee.toFixed(2)}</div>
                           </div>
                           <div className="bg-black/30 rounded-lg p-2 text-center">
-                            <div className="text-xs text-white/50">Prêmio/Player</div>
+                            <div className="text-xs text-white/50">{t.lobby.prizePerPlayer}</div>
                             <div className="font-bold text-green-400">k${race.prizePerPlayer.toFixed(2)}</div>
                           </div>
                           <div className="bg-black/30 rounded-lg p-2 text-center">
-                            <div className="text-xs text-white/50">Rake</div>
+                            <div className="text-xs text-white/50">{t.lobby.rake}</div>
                             <div className="font-bold text-purple-400">k${race.skemaBoxFee.toFixed(2)}</div>
                           </div>
                         </div>
@@ -750,7 +753,7 @@ export function SkemaLobby({
                         <div className="bg-black/30 rounded-lg p-3 flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <Trophy className="w-5 h-5 text-yellow-400" />
-                            <span className="text-white/80">Pote Atual</span>
+                            <span className="text-white/80">{t.lobby.currentPot}</span>
                           </div>
                           <span className="text-xl font-bold text-yellow-400">k${pool.toFixed(2)}</span>
                         </div>
@@ -759,7 +762,7 @@ export function SkemaLobby({
                           <div className="flex items-center gap-2 mb-2">
                             <Users className="w-4 h-4 text-white/60" />
                             <span className="text-sm text-white/80">
-                              {race.registeredPlayers.length}/{race.maxPlayers} inscritos
+                              {race.registeredPlayers.length}/{race.maxPlayers} {t.lobby.enrolled}
                             </span>
                           </div>
                           {race.registeredPlayers.length > 0 && (
@@ -780,14 +783,14 @@ export function SkemaLobby({
                           <Button
                             onClick={async () => {
                               if (!canAfford) {
-                                setError("Energia insuficiente");
+                                setError(t.lobby.insufficientEnergy);
                                 return;
                               }
                               const fee = Math.round(race.entryFee * 100) / 100;
                               const sbFee = Math.round(race.skemaBoxFee * 100) / 100;
                               const deducted = onDeductEnergy(fee);
                               if (!deducted) {
-                                setError("Falha ao deduzir energia");
+                                setError(t.lobby.failedToDeduct);
                                 return;
                               }
                               const { error: regErr } = await supabase
@@ -805,13 +808,13 @@ export function SkemaLobby({
                             className="w-full"
                           >
                             <UserCheck className="w-4 h-4 mr-2" />
-                            Inscrever-se (k${race.entryFee.toFixed(2)})
+                            {t.lobby.enroll} (k${race.entryFee.toFixed(2)})
                           </Button>
                         ) : (
                           <div className="space-y-2">
                             <div className="flex items-center justify-center gap-2 p-3 bg-green-500/10 border border-green-500/30 rounded-lg text-green-400">
                               <UserCheck className="w-5 h-5" />
-                              <span className="font-medium">Você está inscrito!</span>
+                              <span className="font-medium">{t.lobby.youAreEnrolled}</span>
                             </div>
                             <Button
                               onClick={async () => {
@@ -828,13 +831,13 @@ export function SkemaLobby({
                                   refreshRaces();
                                   setError(null);
                                 } else {
-                                  setError(delErr.message || "Erro ao cancelar");
+                                  setError(delErr.message || t.lobby.cancelError);
                                 }
                               }}
                               variant="outline"
                               className="w-full text-red-400 border-red-500/30 hover:bg-red-500/10"
                             >
-                              Cancelar Inscrição (+k${race.entryFee.toFixed(2)})
+                              {t.lobby.cancelEnrollment} (+k${race.entryFee.toFixed(2)})
                             </Button>
                           </div>
                         )}
@@ -844,7 +847,7 @@ export function SkemaLobby({
                 ) : (
                   <div className="text-center py-8 text-white/30">
                     <Crown className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                    <p className="text-sm">Nenhum torneio agendado no momento</p>
+                    <p className="text-sm">{t.lobby.noTournaments}</p>
                   </div>
                 )}
               </TabsContent>
@@ -859,15 +862,15 @@ export function SkemaLobby({
                     <Brain className="w-8 h-8 text-blue-400" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-white">Treino Solo</h3>
-                    <p className="text-sm text-white/60 mt-1">Pratique sem gastar energia. Sem prêmios, sem pressão.</p>
+                    <h3 className="text-xl font-bold text-white">{t.lobby.soloTraining}</h3>
+                    <p className="text-sm text-white/60 mt-1">{t.lobby.soloTrainingDesc}</p>
                   </div>
                   <div className="flex items-center justify-center gap-4 text-xs text-white/50">
                     <span>
                       <Users className="w-3 h-3 inline mr-1" />
-                      Solo
+                      {t.lobby.solo}
                     </span>
-                    <span className="text-green-400 font-medium">Grátis</span>
+                    <span className="text-green-400 font-medium">{t.lobby.free}</span>
                     <span>
                       <Clock className="w-3 h-3 inline mr-1" />3 min
                     </span>
@@ -879,7 +882,7 @@ export function SkemaLobby({
                     size="lg"
                   >
                     <Brain className="w-5 h-5 mr-2" />
-                    Iniciar Treino
+                    {t.lobby.startTraining}
                   </Button>
                 </motion.div>
               </TabsContent>
@@ -961,11 +964,11 @@ export function SkemaLobby({
             <div className="grid grid-cols-4 gap-2">
               <div className="bg-white/5 rounded-lg p-2 text-center">
                 <div className="text-lg font-bold text-green-400">{player.stats.wins}</div>
-                <div className="text-xs text-white/50">Vitórias</div>
+                <div className="text-xs text-white/50">{t.lobby.wins}</div>
               </div>
               <div className="bg-white/5 rounded-lg p-2 text-center">
                 <div className="text-lg font-bold text-blue-400">{player.stats.races}</div>
-                <div className="text-xs text-white/50">Corridas</div>
+                <div className="text-xs text-white/50">{t.lobby.races}</div>
               </div>
               <div className="bg-white/5 rounded-lg p-2 text-center">
                 <div className="text-lg font-bold text-purple-400">
@@ -973,7 +976,7 @@ export function SkemaLobby({
                     ? `${Math.floor(player.stats.bestTime / 60)}:${String(player.stats.bestTime % 60).padStart(2, "0")}`
                     : "-"}
                 </div>
-                <div className="text-xs text-white/50">Melhor</div>
+                <div className="text-xs text-white/50">{t.lobby.best}</div>
               </div>
               <div className="bg-gradient-to-br from-purple-500/15 to-indigo-500/15 rounded-lg p-2 text-center border border-purple-500/20">
                 <UniversePlayerCounter />
@@ -982,7 +985,7 @@ export function SkemaLobby({
             {player.playerTier === "master_admin" && (
               <div className="mt-2 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-lg p-2 text-center border border-yellow-500/30">
                 <div className="text-lg font-bold text-yellow-400">k${skemaBox.balance.toFixed(2)}</div>
-                <div className="text-xs text-yellow-400/70">Skema Box</div>
+                <div className="text-xs text-yellow-400/70">{t.lobby.skemaBox}</div>
               </div>
             )}
           </motion.section>
@@ -994,8 +997,8 @@ export function SkemaLobby({
             transition={{ delay: 0.32 }}
             className="mx-4 mt-3 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 rounded-lg p-2.5 text-center"
           >
-            <span className="text-xs font-semibold text-emerald-400">25 ITM • Poker-Style Payout</span>
-            <span className="text-xs text-white/40 ml-1">— 25% do field premiado</span>
+            <span className="text-xs font-semibold text-emerald-400">{t.lobby.itmBadge}</span>
+            <span className="text-xs text-white/40 ml-1">{t.lobby.itmBadgeDesc}</span>
           </motion.div>
 
           {/* Taxa */}
@@ -1006,7 +1009,7 @@ export function SkemaLobby({
             className="mx-4 mt-3 flex items-center gap-2 text-xs text-white/40"
           >
             <AlertCircle className="w-3 h-3" />
-            <span>Taxa de transferência: {(transferTax * 100).toFixed(2)}%</span>
+            <span>{t.lobby.transferFee}: {(transferTax * 100).toFixed(2)}%</span>
           </motion.div>
 
           {/* Erro */}

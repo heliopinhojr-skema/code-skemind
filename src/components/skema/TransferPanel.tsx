@@ -1,9 +1,5 @@
 /**
  * TransferPanel - Painel de transferência de k$ entre jogadores
- * 
- * Permite que Grão Mestre e acima enviem k$ para qualquer jogador
- * por nickname, usando apenas saldo disponível (não bloqueado).
- * Taxa: 6,43% por transação.
  */
 
 import { useState, useCallback } from 'react';
@@ -15,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatEnergy, calculateBalanceBreakdown } from '@/lib/tierEconomy';
 import { PlayerTier } from '@/hooks/useSupabasePlayer';
 import { toast } from 'sonner';
+import { useI18n } from '@/i18n/I18nContext';
 
 const TRANSFER_TAX = 0.0643;
 
@@ -38,6 +35,7 @@ export function TransferPanel({
   referralsCount,
   onTransferComplete,
 }: TransferPanelProps) {
+  const { t } = useI18n();
   const [nickname, setNickname] = useState('');
   const [amount, setAmount] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -68,8 +66,7 @@ export function TransferPanel({
       });
 
       if (error) {
-        // Try to extract actual error message from the response
-        let errorMsg = 'Erro na transferência';
+        let errorMsg = t.transfer.transferError;
         try {
           if (error instanceof Error && 'context' in error) {
             const ctx = (error as any).context;
@@ -96,20 +93,20 @@ export function TransferPanel({
       } else if (data?.success) {
         setLastResult({
           success: true,
-          message: `✅ Enviado ${formatEnergy(data.transferred)} para ${data.recipientName} (taxa: ${formatEnergy(data.tax)})`,
+          message: `✅ ${t.transfer.sent} ${formatEnergy(data.transferred)} ${t.transfer.to} ${data.recipientName} (${t.transfer.tax}: ${formatEnergy(data.tax)})`,
         });
-        toast.success(`Transferência de ${formatEnergy(data.transferred)} realizada!`);
+        toast.success(`${t.transfer.transferSuccess} ${formatEnergy(data.transferred)}`);
         setNickname('');
         setAmount('');
         onTransferComplete();
       }
     } catch (err: any) {
-      setLastResult({ success: false, message: err.message || 'Erro desconhecido' });
-      toast.error('Erro na transferência');
+      setLastResult({ success: false, message: err.message || t.transfer.unknownError });
+      toast.error(t.transfer.transferError);
     } finally {
       setIsLoading(false);
     }
-  }, [nickname, parsedAmount, canAfford, onTransferComplete]);
+  }, [nickname, parsedAmount, canAfford, onTransferComplete, t]);
 
   if (!canTransfer) return null;
 
@@ -122,13 +119,13 @@ export function TransferPanel({
       {/* Header */}
       <div className="flex items-center gap-2 mb-3">
         <Send className="w-4 h-4 text-primary" />
-        <span className="text-sm font-medium text-white">Transferir k$</span>
-        <span className="text-[10px] text-white/40 ml-auto">Taxa: 6,43%</span>
+        <span className="text-sm font-medium text-white">{t.transfer.title}</span>
+        <span className="text-[10px] text-white/40 ml-auto">{t.transfer.fee}: 6,43%</span>
       </div>
 
       {/* Available balance */}
       <div className="text-xs text-white/50 mb-3">
-        Disponível: <span className="text-emerald-400 font-mono">{formatEnergy(balance.available)}</span>
+        {t.transfer.availableBalance}: <span className="text-emerald-400 font-mono">{formatEnergy(balance.available)}</span>
       </div>
 
       {/* Inputs */}
@@ -145,10 +142,9 @@ export function TransferPanel({
           disabled={isLoading}
         />
         <Input
-          placeholder="Valor k$"
+          placeholder={t.transfer.valuePlaceholder}
           value={amount}
           onChange={(e) => {
-            // Allow numbers and comma/dot
             const val = e.target.value.replace(/[^0-9.,]/g, '');
             setAmount(val);
             setLastResult(null);
@@ -167,21 +163,21 @@ export function TransferPanel({
           className="text-[11px] text-white/50 mb-2 space-y-0.5"
         >
           <div className="flex justify-between">
-            <span>Valor:</span>
+            <span>{t.transfer.value}:</span>
             <span className="font-mono">{formatEnergy(parsedAmount)}</span>
           </div>
           <div className="flex justify-between text-orange-400/70">
-            <span>Taxa (6,43%):</span>
+            <span>{t.transfer.tax} (6,43%):</span>
             <span className="font-mono">{formatEnergy(taxAmount)}</span>
           </div>
           <div className="flex justify-between font-medium text-white/70 border-t border-white/10 pt-0.5">
-            <span>Total debitado:</span>
+            <span>{t.transfer.totalDebited}:</span>
             <span className="font-mono">{formatEnergy(totalCost)}</span>
           </div>
           {!canAfford && totalCost > 0 && (
             <div className="flex items-center gap-1 text-red-400 mt-1">
               <AlertCircle className="w-3 h-3" />
-              <span>Saldo disponível insuficiente</span>
+              <span>{t.transfer.insufficientBalance}</span>
             </div>
           )}
         </motion.div>
@@ -197,13 +193,13 @@ export function TransferPanel({
         {isLoading ? (
           <>
             <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-            Transferindo...
+            {t.transfer.transferring}
           </>
         ) : (
           <>
             <ArrowRight className="w-3.5 h-3.5 mr-1.5" />
-            Enviar {parsedAmount > 0 ? formatEnergy(parsedAmount) : 'k$'}
-            {nickname.trim() ? ` para ${nickname.trim()}` : ''}
+            {t.transfer.send} {parsedAmount > 0 ? formatEnergy(parsedAmount) : 'k$'}
+            {nickname.trim() ? ` ${t.transfer.to} ${nickname.trim()}` : ''}
           </>
         )}
       </Button>
