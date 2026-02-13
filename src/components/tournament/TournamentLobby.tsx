@@ -626,6 +626,17 @@ export function TournamentLobby({
               </div>
             </div>
           </motion.section>
+
+          {/* ITM Badge */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.45 }}
+            className="mx-4 mt-3 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 rounded-lg p-2.5 text-center"
+          >
+            <span className="text-xs font-semibold text-emerald-400">25 ITM • Poker-Style Payout</span>
+            <span className="text-xs text-white/40 ml-1">— 25% do field premiado</span>
+          </motion.div>
         </div>
         
         {/* Botão de iniciar */}
