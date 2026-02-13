@@ -589,33 +589,7 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
         </Card>
       </div>
 
-      {/* Interesse em Investir */}
-      {investorInterest && investorInterest.length > 0 && (
-        <Card className="border border-primary/30 bg-primary/5 backdrop-blur-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <Briefcase className="h-4 w-4 text-primary" />
-              Interesse em Investir ({investorInterest.length})
-            </CardTitle>
-            <p className="text-[10px] text-muted-foreground">
-              Jogadores que sinalizaram interesse em investir no Universo Skema
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-1 max-h-[200px] overflow-y-auto pr-1">
-              {investorInterest.map(inv => (
-                <div key={inv.id} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded bg-muted/30">
-                  <Briefcase className="h-3 w-3 text-primary shrink-0" />
-                  <span className="font-medium text-foreground truncate flex-1">{inv.player_name}</span>
-                  <span className="text-muted-foreground text-[10px] shrink-0">
-                    {format(new Date(inv.created_at), "dd/MM HH:mm", { locale: ptBR })}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* (Investor interest moved to Visão Geral section) */}
 
       {/* Alerta: Jogadores que atingiram o limite de convites */}
       {referralNodes && (() => {
@@ -753,6 +727,34 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
           </Card>
         ))}
       </div>
+
+      {/* Oportunidade Skema — ao lado de Corridas */}
+      {investorInterest && investorInterest.length > 0 && (
+        <Card className="border border-primary/30 bg-primary/5 backdrop-blur-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <Briefcase className="h-4 w-4 text-primary" />
+              Oportunidade Skema ({investorInterest.length})
+            </CardTitle>
+            <p className="text-[10px] text-muted-foreground">
+              Jogadores que sinalizaram interesse em investir no Universo Skema
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-1 max-h-[200px] overflow-y-auto pr-1">
+              {investorInterest.map(inv => (
+                <div key={inv.id} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded bg-muted/30">
+                  <Briefcase className="h-3 w-3 text-primary shrink-0" />
+                  <span className="font-medium text-foreground truncate flex-1">{inv.player_name}</span>
+                  <span className="text-muted-foreground text-[10px] shrink-0">
+                    {format(new Date(inv.created_at), "dd/MM HH:mm", { locale: ptBR })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Evolução Diária de Convites */}
       {detailedReferrals && detailedReferrals.length > 0 && (
