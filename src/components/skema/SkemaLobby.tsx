@@ -48,6 +48,11 @@ import { ReferralHistoryPanel } from "./ReferralHistoryPanel";
 import { LanguageSelector } from "@/components/LanguageSelector";
 
 import { CreatorDescendancyPanel } from "./CreatorDescendancyPanel";
+
+const SKEMA_MONTH_NAMES = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+];
 import { TransferPanel } from "./TransferPanel";
 import { PlayerGameHistory } from "./PlayerGameHistory";
 import { GenerationColorPicker } from "./GenerationColorPicker";
@@ -451,7 +456,7 @@ export function SkemaLobby({
                 <div className="flex items-center gap-2 text-xs text-white/60">
                   <Calendar className="w-3 h-3" />
                   <span>
-                    {t.lobby.year} {skemaYear} • M{skemaMonth} • {t.lobby.day} {skemaDay} • {String(skemaHour).padStart(2, "0")}:{String(getSkemaMinute()).padStart(2, "0")}
+                    {t.lobby.year} {skemaYear} • {SKEMA_MONTH_NAMES[skemaMonth - 1] || `M${skemaMonth}`} • {t.lobby.day} {skemaDay} • {String(skemaHour).padStart(2, "0")}:{String(getSkemaMinute()).padStart(2, "0")}
                   </span>
                   <span className="text-white/30">•</span>
                   <span className="flex items-center gap-1">
