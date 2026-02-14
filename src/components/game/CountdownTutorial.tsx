@@ -51,7 +51,7 @@ export function CountdownTutorial({ countdown, gameId = 'skemind' }: CountdownTu
       {!hidden && (
         <AnimatePresence mode="wait">
           <motion.div
-            key={countdown}
+            key={step.step}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
@@ -136,38 +136,36 @@ function Peg({ color }: { color: string }) {
 }
 
 /* ─── Tutorial steps mapped to countdown seconds ─── */
-function getTutorialStep(countdown: number): { label: string; visual: JSX.Element; text: string } | null {
-  switch (countdown) {
-    case 10:
-      return {
-        label: 'Objetivo',
-        visual: (
-          <div className="flex justify-center gap-2">
-            {['?', '?', '?', '?'].map((_, i) => (
-              <div key={i} className="w-8 h-8 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center text-white/30 text-lg font-bold">?</div>
-            ))}
-          </div>
-        ),
-        text: 'Descubra o código secreto de 4 símbolos!',
-      };
+/* Steps are grouped into blocks of 2-3 seconds so the player has time to read */
+function getTutorialStep(countdown: number): { label: string; step: string; visual: JSX.Element; text: string } | null {
+  // 10-9: Objective
+  if (countdown >= 9) {
+    return {
+      label: 'Passo 1 de 5',
+      step: 'objetivo',
+      visual: (
+        <div className="flex justify-center gap-2">
+          {['?', '?', '?', '?'].map((_, i) => (
+            <div key={i} className="w-8 h-8 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center text-white/30 text-lg font-bold">?</div>
+          ))}
+        </div>
+      ),
+      text: 'Descubra o código secreto de 4 símbolos únicos!',
+    };
+  }
 
-    case 9:
-      return {
-        label: '6 Símbolos',
-        visual: (
+  // 8-7: Symbols & attempts
+  if (countdown >= 7) {
+    return {
+      label: 'Passo 2 de 5',
+      step: 'simbolos',
+      visual: (
+        <div className="space-y-2">
           <div className="flex justify-center gap-2">
             {SYMBOLS.map((s) => (
               <MiniSymbol key={s.id} id={s.id} color={s.color} />
             ))}
           </div>
-        ),
-        text: '6 formas disponíveis — escolha 4 únicas',
-      };
-
-    case 8:
-      return {
-        label: 'Tentativas',
-        visual: (
           <div className="flex justify-center items-end gap-1">
             {Array.from({ length: 8 }).map((_, i) => (
               <motion.div
@@ -180,113 +178,83 @@ function getTutorialStep(countdown: number): { label: string; visual: JSX.Elemen
               />
             ))}
           </div>
-        ),
-        text: 'Você tem 8 tentativas para acertar',
-      };
+        </div>
+      ),
+      text: '6 formas · escolha 4 únicas · 8 tentativas · 3 minutos',
+    };
+  }
 
-    case 7:
-      return {
-        label: 'Tempo',
-        visual: (
-          <div className="text-3xl font-black text-primary tabular-nums">
-            3:00
+  // 6-5: White peg feedback
+  if (countdown >= 5) {
+    return {
+      label: 'Passo 3 de 5',
+      step: 'branco',
+      visual: (
+        <div className="flex items-center justify-center gap-3">
+          <div className="flex gap-1">
+            <MiniSymbol id="circle" color={SYMBOLS[0].color} />
+            <MiniSymbol id="square" color={SYMBOLS[1].color} />
           </div>
-        ),
-        text: '180 segundos — quanto mais rápido, mais pontos!',
-      };
+          <span className="text-white/40 text-lg">→</span>
+          <div className="flex gap-1.5">
+            <Peg color="#FFFFFF" />
+            <Peg color="#FFFFFF" />
+          </div>
+        </div>
+      ),
+      text: '⬤ Pino branco = símbolo E posição corretos ✓',
+    };
+  }
 
-    case 6:
-      return {
-        label: 'Feedback — Pino Branco',
-        visual: (
+  // 4-3: Black peg + no peg
+  if (countdown >= 3) {
+    return {
+      label: 'Passo 4 de 5',
+      step: 'preto',
+      visual: (
+        <div className="space-y-2">
           <div className="flex items-center justify-center gap-3">
-            <div className="flex gap-1">
-              <MiniSymbol id="circle" color={SYMBOLS[0].color} />
-              <MiniSymbol id="square" color={SYMBOLS[1].color} />
-            </div>
-            <span className="text-white/40">→</span>
-            <div className="flex gap-1">
-              <Peg color="#FFFFFF" />
-              <Peg color="#FFFFFF" />
-            </div>
+            <MiniSymbol id="triangle" color={SYMBOLS[2].color} />
+            <span className="text-white/40 text-lg">→</span>
+            <Peg color="#1A1A1A" />
+            <span className="text-white/50 text-xs ml-1">posição errada</span>
           </div>
-        ),
-        text: 'Branco = símbolo E posição corretos ✓',
-      };
-
-    case 5:
-      return {
-        label: 'Feedback — Pino Preto',
-        visual: (
           <div className="flex items-center justify-center gap-3">
-            <div className="flex gap-1">
-              <MiniSymbol id="triangle" color={SYMBOLS[2].color} />
-              <MiniSymbol id="diamond" color={SYMBOLS[3].color} />
-            </div>
-            <span className="text-white/40">→</span>
-            <div className="flex gap-1">
-              <Peg color="#1A1A1A" />
-              <Peg color="#1A1A1A" />
-            </div>
+            <MiniSymbol id="star" color={SYMBOLS[4].color} />
+            <span className="text-white/40 text-lg">→</span>
+            <span className="text-white/30 text-xs">sem pino = não está no código</span>
           </div>
-        ),
-        text: 'Preto = símbolo certo, posição errada ↔',
-      };
+        </div>
+      ),
+      text: '⬤ Preto = símbolo certo, lugar errado · Sem pino = errado',
+    };
+  }
 
-    case 4:
-      return {
-        label: 'Sem pinos',
-        visual: (
-          <div className="flex items-center justify-center gap-3">
-            <div className="flex gap-1">
-              <MiniSymbol id="star" color={SYMBOLS[4].color} />
-            </div>
-            <span className="text-white/40">→</span>
-            <span className="text-white/30 text-sm">nenhum pino</span>
-          </div>
-        ),
-        text: 'Sem pino = símbolo não está no código ✗',
-      };
-
-    case 3:
-      return {
-        label: 'Vitória',
-        visual: (
+  // 2-1: Victory + good luck
+  if (countdown >= 1) {
+    return {
+      label: 'Passo 5 de 5',
+      step: 'vitoria',
+      visual: (
+        <div className="space-y-2">
           <div className="flex justify-center gap-1.5">
             <Peg color="#FFFFFF" />
             <Peg color="#FFFFFF" />
             <Peg color="#FFFFFF" />
             <Peg color="#FFFFFF" />
           </div>
-        ),
-        text: '4 pinos brancos = código decifrado! 🎉',
-      };
-
-    case 2:
-      return {
-        label: 'Dica',
-        visual: (
-          <div className="text-2xl">🧠</div>
-        ),
-        text: 'Use a lógica — elimine símbolos a cada rodada',
-      };
-
-    case 1:
-      return {
-        label: 'Prepare-se',
-        visual: (
           <motion.div
             animate={{ scale: [1, 1.15, 1] }}
             transition={{ duration: 0.6, repeat: Infinity }}
-            className="text-3xl"
+            className="text-2xl"
           >
             🚀
           </motion.div>
-        ),
-        text: 'Boa sorte, viajante!',
-      };
-
-    default:
-      return null;
+        </div>
+      ),
+      text: '4 brancos = vitória! Use a lógica e boa sorte!',
+    };
   }
+
+  return null;
 }
