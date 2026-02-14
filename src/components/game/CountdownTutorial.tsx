@@ -1,39 +1,86 @@
+import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SYMBOLS } from '@/lib/mastermindEngine';
 
 interface CountdownTutorialProps {
   countdown: number;
+  /** Unique game identifier so preference is per-game */
+  gameId?: string;
+}
+
+const STORAGE_KEY_PREFIX = 'skema_hide_tutorial_';
+
+function isTutorialHidden(gameId: string): boolean {
+  try {
+    return localStorage.getItem(`${STORAGE_KEY_PREFIX}${gameId}`) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function setTutorialHidden(gameId: string, hidden: boolean) {
+  try {
+    if (hidden) {
+      localStorage.setItem(`${STORAGE_KEY_PREFIX}${gameId}`, '1');
+    } else {
+      localStorage.removeItem(`${STORAGE_KEY_PREFIX}${gameId}`);
+    }
+  } catch {}
 }
 
 /**
  * Mini-tutorial shown during the 10-second countdown.
  * Each step teaches a key concept of the game in a visual, intuitive way.
  */
-export function CountdownTutorial({ countdown }: CountdownTutorialProps) {
+export function CountdownTutorial({ countdown, gameId = 'skemind' }: CountdownTutorialProps) {
+  const [hidden, setHidden] = useState(() => isTutorialHidden(gameId));
+  
+  const handleToggle = useCallback(() => {
+    setHidden(prev => {
+      const next = !prev;
+      setTutorialHidden(gameId, next);
+      return next;
+    });
+  }, [gameId]);
+
   const step = getTutorialStep(countdown);
   if (!step) return null;
 
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={countdown}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -20 }}
-        transition={{ duration: 0.35 }}
-        className="w-full max-w-xs mx-auto mt-6"
-      >
-        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl px-5 py-4 text-center space-y-3">
-          <div className="text-[11px] uppercase tracking-[0.25em] text-white/40 font-medium">
-            {step.label}
-          </div>
-          <div>{step.visual}</div>
-          <p className="text-sm text-white/80 leading-relaxed font-medium">
-            {step.text}
-          </p>
-        </div>
-      </motion.div>
-    </AnimatePresence>
+    <div className="w-full max-w-xs mx-auto mt-6 space-y-2">
+      {!hidden && (
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={countdown}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.35 }}
+          >
+            <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl px-5 py-4 text-center space-y-3">
+              <div className="text-[11px] uppercase tracking-[0.25em] text-white/40 font-medium">
+                {step.label}
+              </div>
+              <div>{step.visual}</div>
+              <p className="text-sm text-white/80 leading-relaxed font-medium">
+                {step.text}
+              </p>
+            </div>
+          </motion.div>
+        </AnimatePresence>
+      )}
+      <label className="flex items-center justify-center gap-2 cursor-pointer select-none group">
+        <input
+          type="checkbox"
+          checked={hidden}
+          onChange={handleToggle}
+          className="w-3.5 h-3.5 rounded border-white/30 bg-white/10 accent-primary cursor-pointer"
+        />
+        <span className="text-[11px] text-white/30 group-hover:text-white/50 transition-colors">
+          Não mostrar instruções
+        </span>
+      </label>
+    </div>
   );
 }
 
