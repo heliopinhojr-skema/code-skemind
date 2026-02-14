@@ -8,6 +8,7 @@
  */
 
 import { useState, useCallback, useMemo, useEffect } from "react";
+import { CountdownTutorial } from "@/components/game/CountdownTutorial";
 import { useI18n } from "@/i18n/I18nContext";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { formatEnergy, calculateBalanceBreakdown } from "@/lib/tierEconomy";
@@ -329,17 +330,17 @@ export function SkemaLobby({
         ))}
       </div>
 
-      {/* Countdown overlay */}
+      {/* Countdown overlay with tutorial */}
       <AnimatePresence>
         {isStarting && countdown !== null && countdown > 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/90 backdrop-blur-lg flex flex-col items-center justify-center"
+            className="fixed inset-0 z-50 bg-black/90 backdrop-blur-lg flex flex-col items-center justify-center overflow-y-auto py-8"
           >
-            <Rocket className="w-16 h-16 text-primary mx-auto mb-4 animate-bounce" />
-            <div className="text-2xl text-muted-foreground mb-4">{t.lobby.launchIn}</div>
+            <Rocket className="w-12 h-12 text-primary mx-auto mb-2 animate-bounce" />
+            <div className="text-lg text-muted-foreground mb-2">{t.lobby.launchIn}</div>
             <motion.div
               key={countdown}
               initial={{ scale: 2, opacity: 0 }}
@@ -347,14 +348,15 @@ export function SkemaLobby({
               exit={{ scale: 0, opacity: 0 }}
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
             >
-              <div className="text-9xl font-black text-transparent bg-clip-text bg-gradient-to-b from-primary to-purple-500 tabular-nums">
+              <div className="text-7xl font-black text-transparent bg-clip-text bg-gradient-to-b from-primary to-purple-500 tabular-nums">
                 {countdown}
               </div>
             </motion.div>
+            <CountdownTutorial countdown={countdown} />
             <Button
               variant="ghost"
               onClick={handleCancelCountdown}
-              className="mt-8 text-muted-foreground hover:text-white"
+              className="mt-4 text-muted-foreground hover:text-white"
             >
               {t.lobby.cancel}
             </Button>
