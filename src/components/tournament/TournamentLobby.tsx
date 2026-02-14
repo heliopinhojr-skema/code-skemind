@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { CountdownTutorial } from '@/components/game/CountdownTutorial';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Trophy, Coins, Play, Zap, Target, 
@@ -246,22 +247,22 @@ export function TournamentLobby({
         ))}
       </div>
       
-      {/* Countdown overlay */}
+      {/* Countdown overlay with tutorial */}
       <AnimatePresence>
         {isStarting && countdown !== null && countdown > 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/90 backdrop-blur-lg flex flex-col items-center justify-center"
+            className="fixed inset-0 z-50 bg-black/90 backdrop-blur-lg flex flex-col items-center justify-center overflow-y-auto py-8"
           >
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               className="text-center"
             >
-              <Rocket className="w-16 h-16 text-primary mx-auto mb-4 animate-bounce" />
-              <div className="text-2xl text-muted-foreground mb-4">LANÇAMENTO EM</div>
+              <Rocket className="w-12 h-12 text-primary mx-auto mb-2 animate-bounce" />
+              <div className="text-lg text-muted-foreground mb-2">LANÇAMENTO EM</div>
             </motion.div>
             
             <motion.div
@@ -272,25 +273,20 @@ export function TournamentLobby({
               transition={{ type: 'spring', stiffness: 300, damping: 20 }}
               className="relative"
             >
-              <div className="text-9xl font-black text-transparent bg-clip-text bg-gradient-to-b from-primary to-purple-500 tabular-nums">
+              <div className="text-7xl font-black text-transparent bg-clip-text bg-gradient-to-b from-primary to-purple-500 tabular-nums">
                 {countdown}
               </div>
             </motion.div>
             
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-              className="mt-8"
+            <CountdownTutorial countdown={countdown} />
+
+            <Button
+              variant="ghost"
+              onClick={handleCancelCountdown}
+              className="mt-4 text-muted-foreground hover:text-white"
             >
-              <Button
-                variant="ghost"
-                onClick={handleCancelCountdown}
-                className="text-muted-foreground hover:text-white"
-              >
-                Cancelar
-              </Button>
-            </motion.div>
+              Cancelar
+            </Button>
           </motion.div>
         )}
       </AnimatePresence>
