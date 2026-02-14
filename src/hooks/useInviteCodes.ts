@@ -131,12 +131,13 @@ export function useInviteCodes(profileId: string | null, playerTier: string | nu
     }
 
     const effectiveMax = Math.max(0, maxInvites - extraReferrals);
-    const totalCodes = currentCodes.length;
-    const missing = effectiveMax - totalCodes;
+    // Count ALL codes (used + unused) to avoid regenerating on every mount
+    const totalExistingCodes = currentCodes.length;
+    const missing = effectiveMax - totalExistingCodes;
 
     if (missing <= 0) return; // Already have all codes
 
-    console.log(`[INVITE_CODES] Auto-generating ${missing} codes for tier ${playerTier} (has ${totalCodes}/${maxInvites})`);
+    console.log(`[INVITE_CODES] Auto-generating ${missing} codes for tier ${playerTier} (has ${totalExistingCodes}/${maxInvites})`);
     setIsAutoGenerating(true);
 
     try {
