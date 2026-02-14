@@ -33,6 +33,7 @@ export interface SkemaPlayer {
   generationColor: string | null;
   termsAcceptedAt: string | null;
   mood: string;
+  status: string;
   stats: {
     wins: number;
     races: number;
@@ -170,8 +171,9 @@ export function useSupabasePlayer() {
           stats_best_time,
           player_tier,
           generation_color,
-          terms_accepted_at,
-          mood
+           terms_accepted_at,
+           mood,
+           status
         `)
         .eq('user_id', userId)
         .maybeSingle();
@@ -226,6 +228,7 @@ export function useSupabasePlayer() {
         generationColor: (profile as any).generation_color || null,
         termsAcceptedAt: (profile as any).terms_accepted_at || null,
         mood: (profile as any).mood || 'happy',
+        status: (profile as any).status || 'active',
         stats: {
           wins: profile.stats_wins || 0,
           races: profile.stats_races || 0,
