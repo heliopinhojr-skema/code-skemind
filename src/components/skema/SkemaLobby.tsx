@@ -460,7 +460,7 @@ export function SkemaLobby({
                   </span>
                 </div>
                 <div className="mt-1">
-                  <InvestorBanner playerId={player.id} playerName={player.name} />
+                  <InvestorBanner playerId={player.id} playerName={player.name} playerStatus={player.status} />
                 </div>
                 {player.invitedByName && (
                   <div className="text-xs text-purple-300 mt-0.5">

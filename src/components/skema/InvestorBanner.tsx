@@ -11,9 +11,10 @@ import skemaEmojis from '@/assets/skema-emojis.jpeg';
 interface InvestorBannerProps {
   playerId: string;
   playerName: string;
+  playerStatus?: string;
 }
 
-export function InvestorBanner({ playerId, playerName }: InvestorBannerProps) {
+export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorBannerProps) {
   const [count, setCount] = useState(0);
   const [registered, setRegistered] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -44,7 +45,13 @@ export function InvestorBanner({ playerId, playerName }: InvestorBannerProps) {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  const isPenalized = playerStatus === 'penalized';
+
   const handleToggle = async () => {
+    if (isPenalized) {
+      toast.error('Acesso restrito à Oportunidade Skema');
+      return;
+    }
     setLoading(true);
     try {
       if (registered) {
@@ -142,14 +149,16 @@ export function InvestorBanner({ playerId, playerName }: InvestorBannerProps) {
             {/* Botão de registro de interesse */}
             <Button
               onClick={handleToggle}
-              disabled={loading}
-              className={registered 
-                ? "w-full bg-green-600/30 border border-green-500/50 text-green-300 hover:bg-red-600/30 hover:border-red-500/50 hover:text-red-300"
-                : "w-full bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white font-bold"
+              disabled={loading || isPenalized}
+              className={isPenalized
+                ? "w-full bg-red-900/30 border border-red-500/30 text-red-400/60 cursor-not-allowed"
+                : registered 
+                  ? "w-full bg-green-600/30 border border-green-500/50 text-green-300 hover:bg-red-600/30 hover:border-red-500/50 hover:text-red-300"
+                  : "w-full bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white font-bold"
               }
               size="lg"
             >
-              {loading ? 'Processando...' : registered ? (
+              {isPenalized ? '🚫 Acesso restrito' : loading ? 'Processando...' : registered ? (
                 <span>✓ Interesse registrado — clique para cancelar</span>
               ) : (
                 <span>Tenho interesse em investir</span>
