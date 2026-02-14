@@ -49,7 +49,7 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
 
   const handleToggle = async () => {
     if (isPenalized) {
-      toast.error('Acesso restrito à Oportunidade Skema');
+      toast.error('Acesso negado à Oportunidade Skema');
       return;
     }
     setLoading(true);
@@ -158,7 +158,7 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
               }
               size="lg"
             >
-              {isPenalized ? '🚫 Acesso restrito' : loading ? 'Processando...' : registered ? (
+              {isPenalized ? '🚫 Acesso negado' : loading ? 'Processando...' : registered ? (
                 <span>✓ Interesse registrado — clique para cancelar</span>
               ) : (
                 <span>Tenho interesse em investir</span>
