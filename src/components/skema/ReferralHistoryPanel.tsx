@@ -169,7 +169,7 @@ export function ReferralHistoryPanel({
             <Dna className="w-3.5 h-3.5 text-purple-300" />
           </div>
           <div className="text-left">
-            <span className="font-medium text-white text-sm">{t.referral.dnaCodes}</span>
+            <span className="font-medium text-white text-sm">🧬 Convide Amigos</span>
             <div className="text-[10px] text-white/40">
               {t.referral.generates} {invitedTierLabel} • {formatEnergy(costPerInvite)}/{t.referral.each}
             </div>

@@ -528,6 +528,22 @@ export function SkemaLobby({
             </div>
           </motion.div>
 
+          {/* Convites DNA — Convide Amigos */}
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.06 }}
+            className="mx-4 mt-3"
+          >
+            <ReferralHistoryPanel
+              playerId={player.id}
+              inviteCode={player.inviteCode}
+              playerTier={player.playerTier}
+              onProcessRewards={onProcessReferralRewards}
+              onRefreshProfile={onRefreshProfile}
+            />
+          </motion.section>
+
           {/* Missão dos Criadores */}
           <CreatorsMissionBoard />
 
@@ -920,21 +936,7 @@ export function SkemaLobby({
             <CreatorDescendancyPanel playerId={player.id} playerTier={player.playerTier} />
           </motion.section>
 
-          {/* Convites */}
-          <motion.section
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.27 }}
-            className="mx-4 mt-3"
-          >
-            <ReferralHistoryPanel
-              playerId={player.id}
-              inviteCode={player.inviteCode}
-              playerTier={player.playerTier}
-              onProcessRewards={onProcessReferralRewards}
-              onRefreshProfile={onRefreshProfile}
-            />
-          </motion.section>
+          {/* Convites já movido para cima do banner */}
 
           {/* Transferências */}
           <motion.section
