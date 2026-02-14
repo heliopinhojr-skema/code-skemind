@@ -68,29 +68,53 @@ const MASTER_INVITE_CODES = ['SKEMA1', 'SKEMA2024', 'PRIMEIROSJOGADORES', 'BETAT
 const SKEMA_EPOCH = new Date('1970-07-12T00:18:00').getTime();
 const REAL_HOURS_PER_SKEMA_DAY = 2;
 const SKEMA_DAYS_PER_YEAR = 365;
+const SKEMA_DAYS_PER_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
-function getSkemaTimeSinceEpoch(): { years: number; days: number; hours: number } {
+function getSkemaTimeSinceEpoch(): { years: number; month: number; day: number; hours: number; minutes: number } {
   const now = Date.now();
   const msElapsed = now - SKEMA_EPOCH;
   const realHours = msElapsed / (1000 * 60 * 60);
   const totalSkemaDays = Math.floor(realHours / REAL_HOURS_PER_SKEMA_DAY);
   const years = Math.floor(totalSkemaDays / SKEMA_DAYS_PER_YEAR);
-  const days = (totalSkemaDays % SKEMA_DAYS_PER_YEAR) + 1;
+  const dayOfYear = (totalSkemaDays % SKEMA_DAYS_PER_YEAR) + 1;
+
+  let remaining = dayOfYear;
+  let month = 1;
+  for (let i = 0; i < SKEMA_DAYS_PER_MONTH.length; i++) {
+    if (remaining <= SKEMA_DAYS_PER_MONTH[i]) {
+      month = i + 1;
+      break;
+    }
+    remaining -= SKEMA_DAYS_PER_MONTH[i];
+  }
+  const day = remaining;
+
   const hoursIntoCurrentSkemaDay = (realHours % REAL_HOURS_PER_SKEMA_DAY);
-  const skemaHour = Math.floor((hoursIntoCurrentSkemaDay / REAL_HOURS_PER_SKEMA_DAY) * 24);
-  return { years: years + 1, days, hours: skemaHour };
+  const fractionalHour = (hoursIntoCurrentSkemaDay / REAL_HOURS_PER_SKEMA_DAY) * 24;
+  const skemaHour = Math.floor(fractionalHour);
+  const skemaMinute = Math.floor((fractionalHour - skemaHour) * 60);
+
+  return { years: years + 1, month, day, hours: skemaHour, minutes: skemaMinute };
 }
 
 function getSkemaYear(): number {
   return getSkemaTimeSinceEpoch().years;
 }
 
+function getSkemaMonth(): number {
+  return getSkemaTimeSinceEpoch().month;
+}
+
 function getSkemaDay(): number {
-  return getSkemaTimeSinceEpoch().days;
+  return getSkemaTimeSinceEpoch().day;
 }
 
 export function getSkemaHour(): number {
   return getSkemaTimeSinceEpoch().hours;
+}
+
+export function getSkemaMinute(): number {
+  return getSkemaTimeSinceEpoch().minutes;
 }
 
 function toCents(value: number): number {
@@ -581,6 +605,7 @@ export function useSupabasePlayer() {
     isRegistered: !!player,
     isGuardian,
     skemaYear: getSkemaYear(),
+    skemaMonth: getSkemaMonth(),
     skemaDay: getSkemaDay(),
     remainingReferralRewards,
     transferTax: TRANSFER_TAX,

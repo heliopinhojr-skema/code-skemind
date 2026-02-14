@@ -92,38 +92,55 @@ function generatePlayerId(): string {
 const SKEMA_EPOCH = new Date('1970-07-12T00:18:00').getTime();
 const REAL_HOURS_PER_SKEMA_DAY = 2;
 const SKEMA_DAYS_PER_YEAR = 365;
+const SKEMA_DAYS_PER_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
-function getSkemaTimeSinceEpoch(): { years: number; days: number; hours: number } {
+function getSkemaTimeSinceEpoch(): { years: number; month: number; day: number; hours: number; minutes: number } {
   const now = Date.now();
   const msElapsed = now - SKEMA_EPOCH;
-  
-  // Converte para horas reais
   const realHours = msElapsed / (1000 * 60 * 60);
-  
-  // Converte para dias Skema (2h real = 1 dia Skema)
   const totalSkemaDays = Math.floor(realHours / REAL_HOURS_PER_SKEMA_DAY);
-  
-  // Calcula anos e dias
   const years = Math.floor(totalSkemaDays / SKEMA_DAYS_PER_YEAR);
-  const days = (totalSkemaDays % SKEMA_DAYS_PER_YEAR) + 1; // 1-indexed
-  
-  // Hora dentro do dia Skema (0-23 equivalente)
+  const dayOfYear = (totalSkemaDays % SKEMA_DAYS_PER_YEAR) + 1;
+
+  // Calculate month and day-of-month
+  let remaining = dayOfYear;
+  let month = 1;
+  for (let i = 0; i < SKEMA_DAYS_PER_MONTH.length; i++) {
+    if (remaining <= SKEMA_DAYS_PER_MONTH[i]) {
+      month = i + 1;
+      break;
+    }
+    remaining -= SKEMA_DAYS_PER_MONTH[i];
+  }
+  const day = remaining;
+
+  // Hour and minute within the Skema day
   const hoursIntoCurrentSkemaDay = (realHours % REAL_HOURS_PER_SKEMA_DAY);
-  const skemaHour = Math.floor((hoursIntoCurrentSkemaDay / REAL_HOURS_PER_SKEMA_DAY) * 24);
-  
-  return { years: years + 1, days, hours: skemaHour }; // year 1-indexed
+  const fractionalHour = (hoursIntoCurrentSkemaDay / REAL_HOURS_PER_SKEMA_DAY) * 24;
+  const skemaHour = Math.floor(fractionalHour);
+  const skemaMinute = Math.floor((fractionalHour - skemaHour) * 60);
+
+  return { years: years + 1, month, day, hours: skemaHour, minutes: skemaMinute };
 }
 
 function getSkemaYear(): number {
   return getSkemaTimeSinceEpoch().years;
 }
 
+function getSkemaMonth(): number {
+  return getSkemaTimeSinceEpoch().month;
+}
+
 function getSkemaDay(): number {
-  return getSkemaTimeSinceEpoch().days;
+  return getSkemaTimeSinceEpoch().day;
 }
 
 export function getSkemaHour(): number {
   return getSkemaTimeSinceEpoch().hours;
+}
+
+export function getSkemaMinute(): number {
+  return getSkemaTimeSinceEpoch().minutes;
 }
 
 function getTodayDateString(): string {
@@ -750,6 +767,7 @@ export function useSkemaPlayer() {
     isRegistered: !!player,
     isGuardian: player?.id === GUARDIAN_PLAYER.id,
     skemaYear: getSkemaYear(),
+    skemaMonth: getSkemaMonth(),
     skemaDay: getSkemaDay(),
     remainingReferralRewards,
     transferTax: TRANSFER_TAX,

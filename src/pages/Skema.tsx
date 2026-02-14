@@ -244,6 +244,7 @@ export default function Skema() {
       <SkemaLobby
         player={skemaPlayer.player}
         skemaYear={skemaPlayer.skemaYear}
+        skemaMonth={skemaPlayer.skemaMonth}
         skemaDay={skemaPlayer.skemaDay}
         remainingReferralRewards={skemaPlayer.remainingReferralRewards}
         transferTax={skemaPlayer.transferTax}

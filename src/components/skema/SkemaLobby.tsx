@@ -39,7 +39,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { SkemaPlayer, getSkemaHour, PlayerTier } from "@/hooks/useSupabasePlayer";
+import { SkemaPlayer, getSkemaHour, getSkemaMinute, PlayerTier } from "@/hooks/useSupabasePlayer";
 import { useOfficialRaces } from "@/hooks/useOfficialRace";
 import { useOpenArenas, ArenaListing } from "@/hooks/useArenaListings";
 import { calculateArenaPool, getScaledArenaPrize } from "@/lib/arenaPayouts";
@@ -87,6 +87,7 @@ interface SkemaBoxData {
 interface SkemaLobbyProps {
   player: SkemaPlayer;
   skemaYear: number;
+  skemaMonth: number;
   skemaDay: number;
   remainingReferralRewards: number;
   transferTax: number;
@@ -201,6 +202,7 @@ function UniversePlayerCounter() {
 export function SkemaLobby({
   player,
   skemaYear,
+  skemaMonth,
   skemaDay,
   remainingReferralRewards,
   transferTax,
@@ -449,7 +451,7 @@ export function SkemaLobby({
                 <div className="flex items-center gap-2 text-xs text-white/60">
                   <Calendar className="w-3 h-3" />
                   <span>
-                    {t.lobby.year} {skemaYear} • {t.lobby.day} {skemaDay} • {String(skemaHour).padStart(2, "0")}h
+                    {t.lobby.year} {skemaYear} • M{skemaMonth} • {t.lobby.day} {skemaDay} • {String(skemaHour).padStart(2, "0")}:{String(getSkemaMinute()).padStart(2, "0")}
                   </span>
                   <span className="text-white/30">•</span>
                   <span className="flex items-center gap-1">
