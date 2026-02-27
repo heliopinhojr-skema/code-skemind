@@ -484,6 +484,19 @@ function InviteCodeItem({
               <span className="text-emerald-400/60">● {t.referral.available}</span>
             )}
           </div>
+          {/* Link sempre visível para convites disponíveis ou pendentes */}
+          {!isUsed && (
+            <div className="mt-1">
+              <input
+                type="text"
+                readOnly
+                value={buildInviteUrl(code.code)}
+                onFocus={(e) => e.target.select()}
+                onClick={(e) => (e.target as HTMLInputElement).select()}
+                className="w-full bg-white/5 border border-white/10 rounded px-1.5 py-0.5 text-[9px] text-emerald-300/70 font-mono select-all focus:outline-none focus:border-emerald-400/40 cursor-text"
+              />
+            </div>
+          )}
         </div>
 
         {!isUsed && (
