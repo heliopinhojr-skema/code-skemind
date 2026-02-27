@@ -1591,7 +1591,11 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
                           ref={inviteeInputRef}
                           type="text"
                           name="invite_guest_guardian"
-                          autoComplete="one-time-code"
+                          autoComplete="off"
+                          autoCorrect="off"
+                          data-lpignore="true"
+                          data-1p-ignore="true"
+                          data-form-type="other"
                           placeholder="Nome do convidado..."
                           value={inviteeName}
                           onChange={(e) => setInviteeName(e.target.value)}

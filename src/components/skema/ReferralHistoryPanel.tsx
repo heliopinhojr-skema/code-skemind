@@ -546,7 +546,13 @@ function InviteCodeItem({
                 ref={nameInputRef}
                 type="text"
                 name={"invite_guest_" + code.id}
-                autoComplete="one-time-code"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                data-lpignore="true"
+                data-1p-ignore="true"
+                data-form-type="other"
                 placeholder={t.referral.guestNameInputPlaceholder}
                 value={inviteeName}
                 onChange={(e) => setInviteeName(e.target.value)}
