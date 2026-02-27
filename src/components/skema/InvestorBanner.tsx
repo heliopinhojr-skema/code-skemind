@@ -154,7 +154,7 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           whileTap={{ scale: 0.97 }}
-          className="flex items-center gap-2 cursor-pointer bg-yellow-500/10 border border-yellow-500/30 rounded-full px-3 py-1"
+          className="flex items-center gap-1.5 cursor-pointer bg-yellow-500/10 border border-yellow-500/30 rounded-full px-3 py-1"
         >
           <motion.div
             animate={{ scale: [1, 1.08, 1] }}
@@ -164,18 +164,19 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
             <img src={skemaEmojis} alt="" className="w-full h-full object-cover" />
           </motion.div>
           <span className="text-[10px] font-bold text-yellow-200/80 whitespace-nowrap">
-            {negotiatedCount > 0 ? `${negotiatedCount} cota${negotiatedCount > 1 ? 's' : ''} negociada${negotiatedCount > 1 ? 's' : ''}` : 'Conheça oportunidades'}
+            Oportunidade
           </span>
-          {negotiatedCount > 0 && (
-            <span className="text-[9px] text-emerald-400 font-semibold">✅</span>
-          )}
+          <span className="text-[9px] text-emerald-400 font-semibold whitespace-nowrap">
+            {negotiatedCount}/{TOTAL_BLOCKS}
+          </span>
+          <span className="text-[9px] text-white/30">•</span>
           <motion.span
             key={count}
             initial={{ scale: 1.3, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="text-xs font-black text-yellow-300"
+            className="text-[9px] text-yellow-300/80 whitespace-nowrap"
           >
-            {count}
+            👥 {count}
           </motion.span>
         </motion.div>
       </DialogTrigger>
