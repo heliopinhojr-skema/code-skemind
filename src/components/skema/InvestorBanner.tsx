@@ -123,30 +123,8 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
               Universo Skema
             </motion.div>
             <h2 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-orange-400 to-yellow-300">
-              1️⃣ RODADA — Negociações
+              Oportunidade Skema
             </h2>
-
-            {/* Dados financeiros da 1ª Rodada */}
-            <div className="bg-white/5 border border-yellow-500/30 rounded-xl p-3 space-y-2 text-left">
-              <div className="text-center">
-                <span className="text-xs text-yellow-400/70 uppercase tracking-wider">Valuation atual</span>
-                <div className="text-2xl font-black text-yellow-300">R$ 620.000</div>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-center">
-                <div className="bg-black/30 rounded-lg p-2">
-                  <span className="text-[10px] text-white/50">Cota 2,5%</span>
-                  <div className="text-sm font-bold text-yellow-300">R$ 15.500</div>
-                </div>
-                <div className="bg-black/30 rounded-lg p-2">
-                  <span className="text-[10px] text-white/50">Parcelamento</span>
-                  <div className="text-sm font-bold text-yellow-300">6x R$ 2.583,33</div>
-                </div>
-              </div>
-              <div className="flex items-center justify-center gap-2 text-xs text-white/50">
-                <Calendar className="w-3.5 h-3.5 text-yellow-400/70" />
-                <span>Mar · Abr · Mai · Jun · Jul · Ago 2026</span>
-              </div>
-            </div>
 
             {/* Premissa */}
             <div className="bg-white/5 border border-yellow-500/20 rounded-xl p-3 space-y-1 text-left text-[11px]">
@@ -173,8 +151,8 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
                 <span className="text-emerald-300 font-medium">R$ 691.200</span>
               </div>
               <div className="flex justify-between text-white/60">
-                <span>2,5% valeria</span>
-                <span className="text-emerald-300 font-medium">R$ 17.280</span>
+                <span>1,5% valeria</span>
+                <span className="text-emerald-300 font-medium">R$ {Math.round(691200 * 0.015).toLocaleString('pt-BR')}</span>
               </div>
               <div className="flex justify-between text-white/60">
                 <span>Retorno sobre investimento</span>
@@ -208,7 +186,7 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
                       <div key={f.label} className="flex items-center justify-between text-white/60 py-0.5 border-b border-white/5 last:border-0">
                         <span className="font-medium text-white/80">{f.label} ({f.players.toLocaleString('pt-BR')} players)</span>
                         <span>Val. R$ {f.valuation.toLocaleString('pt-BR')}</span>
-                        <span className="text-yellow-300 font-medium">2,5% = R$ {Math.round(f.valuation * 0.025).toLocaleString('pt-BR')}</span>
+                        <span className="text-yellow-300 font-medium">1,5% = R$ {Math.round(f.valuation * 0.015).toLocaleString('pt-BR')}</span>
                       </div>
                     ))}
                   </div>
@@ -225,13 +203,13 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
                 <div className="space-y-1">
                   {soldBlocks.map((b, i) => (
                     <div key={i} className="flex items-center justify-between text-xs">
-                      <span className="text-yellow-300 font-medium">🔒 Bloco {i + 1} — 2,5%</span>
+                      <span className="text-yellow-300 font-medium">🔒 Bloco {i + 1} — 1,5%</span>
                       <span className="text-white/40 text-[10px]">{new Date(b.sold_at + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
                     </div>
                   ))}
                 </div>
                 <div className="mt-2 text-[10px] text-yellow-400/50 text-center">
-                  {soldBlocks.length * 2.5}% já captado de 25% disponíveis
+                  {soldBlocks.length * 1.5}% já captado de 15% disponíveis
                 </div>
               </div>
             )}
