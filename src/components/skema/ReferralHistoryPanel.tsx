@@ -95,7 +95,14 @@ export function ReferralHistoryPanel({
           ? `${t.referral.inviteFor} "${sharedToName}" — ${t.referral.sendNow}`
           : (type === 'link' ? t.referral.sendToInvitee : `${code} — ${t.referral.sendToInvitee}`),
       });
-      setTimeout(() => setCopiedCode(null), 2000);
+      setTimeout(() => setCopiedCode(null), 3000);
+    } else {
+      // Clipboard blocked — show toast with the text so user can copy manually
+      toast({
+        title: type === 'link' ? '🔗 Link do convite' : '📋 Código',
+        description: textToCopy,
+        duration: 15000,
+      });
     }
   };
 
