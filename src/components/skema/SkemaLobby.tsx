@@ -468,9 +468,6 @@ export function SkemaLobby({
                     <span>{onlineCount} {t.lobby.online}</span>
                   </span>
                 </div>
-                <div className="mt-1">
-                  <InvestorBanner playerId={player.id} playerName={player.name} playerStatus={player.status} />
-                </div>
                 {player.invitedByName && (
                   <div className="text-xs text-purple-300 mt-0.5">
                     🔗 {t.lobby.invitedBy} <span className="font-medium">{player.invitedByName}</span>
@@ -525,6 +522,18 @@ export function SkemaLobby({
               <p className="text-[11px] tracking-[0.18em] text-white/80 font-light mt-1 italic" style={{ textShadow: '0 0 12px rgba(255,255,255,0.15), 0 1px 4px rgba(0,0,0,0.9)' }}>
                 Antes da luz.
               </p>
+            </div>
+          </motion.div>
+
+          {/* Oportunidade Skema — chamativo logo abaixo do banner */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="mx-4 mt-3 flex justify-center"
+          >
+            <div className="w-full bg-gradient-to-r from-yellow-500/15 via-orange-500/10 to-yellow-500/15 border border-yellow-500/40 rounded-xl p-3 flex items-center justify-center shadow-[0_0_20px_rgba(234,179,8,0.15)]">
+              <InvestorBanner playerId={player.id} playerName={player.name} playerStatus={player.status} />
             </div>
           </motion.div>
 
