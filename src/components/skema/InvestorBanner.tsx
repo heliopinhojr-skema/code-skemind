@@ -313,23 +313,45 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
             </div>
 
             {/* Registro de interesse */}
-            <Button
-              onClick={handleToggle}
-              disabled={loading || isPenalized}
-              className={isPenalized
-                ? "w-full bg-red-900/30 border border-red-500/30 text-red-400/60 cursor-not-allowed"
-                : registered 
-                  ? "w-full bg-green-600/30 border border-green-500/50 text-green-300 hover:bg-red-600/30 hover:border-red-500/50 hover:text-red-300"
+            {!registered ? (
+              <Button
+                onClick={handleToggle}
+                disabled={loading || isPenalized}
+                className={isPenalized
+                  ? "w-full bg-red-900/30 border border-red-500/30 text-red-400/60 cursor-not-allowed"
                   : "w-full bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white font-bold"
-              }
-              size="lg"
-            >
-              {isPenalized ? '🚫 Acesso negado' : loading ? 'Processando...' : registered ? (
-                <span>✓ Interesse registrado — clique para cancelar</span>
-              ) : (
-                <span>Tenho interesse em investir</span>
-              )}
-            </Button>
+                }
+                size="lg"
+              >
+                {isPenalized ? '🚫 Acesso negado' : loading ? 'Processando...' : 'Tenho interesse em investir'}
+              </Button>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center justify-center gap-2 text-emerald-400 text-xs font-semibold py-1">
+                  <CheckCircle2 className="w-4 h-4" />
+                  Interesse registrado
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleToggle}
+                    disabled={loading}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 border-red-500/30 text-red-300 hover:bg-red-500/10 text-xs"
+                  >
+                    {loading ? '...' : 'Cancelar interesse'}
+                  </Button>
+                  <Button
+                    onClick={() => { setShowContract(true); }}
+                    size="sm"
+                    className="flex-1 bg-gradient-to-r from-orange-600 to-yellow-600 hover:from-orange-500 hover:to-yellow-500 text-white font-bold text-xs"
+                  >
+                    <ShoppingCart className="w-3.5 h-3.5 mr-1" />
+                    Reservar bloco
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Termos e Contrato SCP — toggle inline */}
             <Button
