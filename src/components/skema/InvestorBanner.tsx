@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Sparkles, Calendar, Clock, Users, CheckCircle } from 'lucide-react';
+import { Calendar, Clock, Users, TrendingUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import investorImg from '@/assets/skema-negociacoes.jpeg';
@@ -14,12 +14,21 @@ interface InvestorBannerProps {
   playerStatus?: string;
 }
 
+const FAIXAS = [
+  { label: '10%', players: 781, valuation: 899712 },
+  { label: '20%', players: 1562, valuation: 1799424 },
+  { label: '35%', players: 2734, valuation: 3149568 },
+  { label: '50%', players: 3905, valuation: 4499760 },
+  { label: '75%', players: 5858, valuation: 6748416 },
+  { label: '100%', players: 7810, valuation: 8997120 },
+];
+
 export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorBannerProps) {
   const [count, setCount] = useState(0);
   const [registered, setRegistered] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
 
-  // Fetch initial data
   useEffect(() => {
     const fetchData = async () => {
       const [{ count: total }, { data: mine }] = await Promise.all([
@@ -32,7 +41,6 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
     fetchData();
   }, [playerId]);
 
-  // Realtime subscription
   useEffect(() => {
     const channel = supabase
       .channel('investor-interest-realtime')
@@ -86,7 +94,7 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
             <img src={skemaEmojis} alt="" className="w-full h-full object-cover" />
           </motion.div>
           <span className="text-[10px] font-bold text-yellow-200/80 whitespace-nowrap">
-            Oportunidades s<span className="text-orange-400">k</span>ema
+            Conheça oportunidades
           </span>
           <motion.span
             key={count}
@@ -98,11 +106,11 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
           </motion.span>
         </motion.div>
       </DialogTrigger>
-      <DialogContent className="bg-transparent border-none shadow-none p-0 max-w-md">
+      <DialogContent className="bg-transparent border-none shadow-none p-0 max-w-md max-h-[90vh] overflow-y-auto">
         <div className="relative rounded-2xl overflow-hidden border border-yellow-500/40">
           <img src={investorImg} alt="" className="absolute inset-0 w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-black/75" />
-          <div className="relative z-10 p-6 text-center space-y-4">
+          <div className="absolute inset-0 bg-black/80" />
+          <div className="relative z-10 p-5 text-center space-y-3">
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -112,20 +120,98 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
               Universo Skema
             </motion.div>
             <h2 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-orange-400 to-yellow-300">
-              1ª Rodada de Negociações
+              1️⃣ RODADA — Negociações
             </h2>
-            <p className="text-xs text-white/60">Universo s<span className="text-orange-400 font-bold">k</span>ema — Oportunidades para investidores</p>
-            
-            <div className="bg-white/5 border border-yellow-500/30 rounded-xl p-4 space-y-1">
-              <div className="flex items-center justify-center gap-2">
-                <Calendar className="w-4 h-4 text-yellow-400" />
-                <span className="text-xl font-black text-yellow-300">03 / 03 / 2026</span>
+
+            {/* Dados financeiros da 1ª Rodada */}
+            <div className="bg-white/5 border border-yellow-500/30 rounded-xl p-3 space-y-2 text-left">
+              <div className="text-center">
+                <span className="text-xs text-yellow-400/70 uppercase tracking-wider">Valuation atual</span>
+                <div className="text-2xl font-black text-yellow-300">R$ 620.000</div>
               </div>
-              <div className="flex items-center justify-center gap-2">
-                <Clock className="w-4 h-4 text-yellow-400" />
-                <span className="text-lg font-bold text-yellow-300">13:00h</span>
+              <div className="grid grid-cols-2 gap-2 text-center">
+                <div className="bg-black/30 rounded-lg p-2">
+                  <span className="text-[10px] text-white/50">Cota 2,5%</span>
+                  <div className="text-sm font-bold text-yellow-300">R$ 15.500</div>
+                </div>
+                <div className="bg-black/30 rounded-lg p-2">
+                  <span className="text-[10px] text-white/50">Parcelamento</span>
+                  <div className="text-sm font-bold text-yellow-300">6x R$ 2.583,33</div>
+                </div>
+              </div>
+              <div className="flex items-center justify-center gap-2 text-xs text-white/50">
+                <Calendar className="w-3.5 h-3.5 text-yellow-400/70" />
+                <span>Mar · Abr · Mai · Jun · Jul · Ago 2026</span>
               </div>
             </div>
+
+            {/* Premissa */}
+            <div className="bg-white/5 border border-yellow-500/20 rounded-xl p-3 space-y-1 text-left text-[11px]">
+              <div className="text-xs font-semibold text-yellow-300 mb-1">📊 Premissa Financeira</div>
+              <div className="flex justify-between text-white/60">
+                <span>Receita/player/mês</span>
+                <span className="text-white/80 font-medium">R$ 24</span>
+              </div>
+              <div className="flex justify-between text-white/60">
+                <span>Receita anual/player</span>
+                <span className="text-white/80 font-medium">R$ 288</span>
+              </div>
+              <div className="flex justify-between text-white/60">
+                <span>Múltiplo (4x)</span>
+                <span className="text-white/80 font-medium">R$ 1.152/player</span>
+              </div>
+            </div>
+
+            {/* Meta 600 players */}
+            <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 rounded-xl p-3 text-[11px] text-left">
+              <div className="text-xs font-semibold text-emerald-300 mb-1">🎯 Meta 600 Players</div>
+              <div className="flex justify-between text-white/60">
+                <span>Valuation projetado</span>
+                <span className="text-emerald-300 font-medium">R$ 691.200</span>
+              </div>
+              <div className="flex justify-between text-white/60">
+                <span>2,5% valeria</span>
+                <span className="text-emerald-300 font-medium">R$ 17.280</span>
+              </div>
+              <div className="flex justify-between text-white/60">
+                <span>Retorno sobre investimento</span>
+                <span className="text-emerald-300 font-bold">+11,5%</span>
+              </div>
+            </div>
+
+            {/* Botão Conhecer o Skema */}
+            <Button
+              variant="outline"
+              onClick={() => setShowDetails(!showDetails)}
+              className="w-full border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/10 text-xs"
+              size="sm"
+            >
+              <TrendingUp className="w-3.5 h-3.5 mr-1.5" />
+              {showDetails ? 'Ocultar faixas de ativação' : 'Conhecer o Skema — Faixas de Ativação'}
+            </Button>
+
+            {/* Faixas de ativação expandíveis */}
+            <AnimatePresence>
+              {showDetails && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="bg-white/5 border border-yellow-500/20 rounded-xl p-3 space-y-1 text-[10px]">
+                    <div className="text-xs font-semibold text-yellow-300 mb-2">📈 Faixas de Ativação (cap. 7.810)</div>
+                    {FAIXAS.map(f => (
+                      <div key={f.label} className="flex items-center justify-between text-white/60 py-0.5 border-b border-white/5 last:border-0">
+                        <span className="font-medium text-white/80">{f.label} ({f.players.toLocaleString('pt-BR')} players)</span>
+                        <span>Val. R$ {f.valuation.toLocaleString('pt-BR')}</span>
+                        <span className="text-yellow-300 font-medium">2,5% = R$ {Math.round(f.valuation * 0.025).toLocaleString('pt-BR')}</span>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Contador em tempo real */}
             <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-3">
