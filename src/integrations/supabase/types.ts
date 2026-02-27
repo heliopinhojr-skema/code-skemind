@@ -220,6 +220,42 @@ export type Database = {
           },
         ]
       }
+      investment_blocks: {
+        Row: {
+          buyer_name: string
+          created_at: string
+          id: string
+          installments: number
+          notes: string | null
+          percentage: number
+          round: number
+          sold_at: string
+          total_value: number
+        }
+        Insert: {
+          buyer_name: string
+          created_at?: string
+          id?: string
+          installments?: number
+          notes?: string | null
+          percentage?: number
+          round?: number
+          sold_at?: string
+          total_value?: number
+        }
+        Update: {
+          buyer_name?: string
+          created_at?: string
+          id?: string
+          installments?: number
+          notes?: string | null
+          percentage?: number
+          round?: number
+          sold_at?: string
+          total_value?: number
+        }
+        Relationships: []
+      }
       investor_interest: {
         Row: {
           created_at: string

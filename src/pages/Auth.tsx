@@ -342,7 +342,7 @@ export default function Auth() {
                 transition={{ delay: 0.5, duration: 1 }}
                 className="text-purple-300/60 text-xs mt-2 tracking-[0.15em] uppercase font-light"
               >
-                {t.auth.tagline}
+                Antes da luz.
               </motion.p>
             </div>
 
