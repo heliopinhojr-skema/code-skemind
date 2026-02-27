@@ -127,6 +127,47 @@ export type Database = {
           },
         ]
       }
+      block_reservations: {
+        Row: {
+          blocks_wanted: number
+          created_at: string
+          id: string
+          message: string | null
+          player_id: string
+          player_name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          blocks_wanted?: number
+          created_at?: string
+          id?: string
+          message?: string | null
+          player_id: string
+          player_name: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          blocks_wanted?: number
+          created_at?: string
+          id?: string
+          message?: string | null
+          player_id?: string
+          player_name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "block_reservations_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bot_treasury: {
         Row: {
           balance: number
