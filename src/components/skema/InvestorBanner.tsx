@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Calendar, Users, TrendingUp, ShoppingCart } from 'lucide-react';
+import { Calendar, Users, TrendingUp, ShoppingCart, FileText } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import investorImg from '@/assets/skema-negociacoes.jpeg';
@@ -27,6 +28,7 @@ const FAIXAS = [
 ];
 
 export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorBannerProps) {
+  const navigate = useNavigate();
   const [count, setCount] = useState(0);
   const [registered, setRegistered] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -346,8 +348,15 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
               </div>
             )}
 
-            <p className="text-[11px] text-white/40 leading-relaxed">
-              Sociedade em Conta de Participação (SCP).<br/>Mais detalhes serão divulgados em breve.
+            <button
+              onClick={() => navigate('/contrato-scp')}
+              className="flex items-center justify-center gap-1.5 text-[11px] text-yellow-400/70 hover:text-yellow-300 underline underline-offset-2 transition-colors mx-auto"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              Termos e Contrato SCP
+            </button>
+            <p className="text-[10px] text-white/30 leading-relaxed">
+              Sociedade em Conta de Participação (SCP) — DASET.
             </p>
           </div>
         </div>
