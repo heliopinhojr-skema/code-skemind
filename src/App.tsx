@@ -14,7 +14,6 @@ import Guardian from "./pages/Guardian";
 import GuardianPublicView from "./pages/GuardianPublicView";
 import NotFound from "./pages/NotFound";
 import Terms from "./pages/Terms";
-import ContratoSCP from "./pages/ContratoSCP";
 import DemoFaces from "./pages/DemoFaces";
 
 const queryClient = new QueryClient();
@@ -64,7 +63,6 @@ const App = () => (
             
             {/* Termos - requires login */}
             <Route path="/termos" element={<ProtectedRoute playerOnly><Terms /></ProtectedRoute>} />
-            <Route path="/contrato-scp" element={<ProtectedRoute playerOnly><ContratoSCP /></ProtectedRoute>} />
             <Route path="/painel/:token" element={<GuardianPublicView />} />
             <Route path="/demo-faces" element={<DemoFaces />} />
             
