@@ -92,6 +92,7 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
 
   const isPenalized = playerStatus === 'penalized';
   const availableBlocks = TOTAL_BLOCKS - soldBlocks.length;
+  const negotiatedCount = soldBlocks.length;
 
   const handleToggle = async () => {
     if (isPenalized) { toast.error('Acesso negado à Oportunidade Skema'); return; }
@@ -163,8 +164,11 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
             <img src={skemaEmojis} alt="" className="w-full h-full object-cover" />
           </motion.div>
           <span className="text-[10px] font-bold text-yellow-200/80 whitespace-nowrap">
-            Conheça oportunidades
+            {negotiatedCount > 0 ? `${negotiatedCount} cota${negotiatedCount > 1 ? 's' : ''} negociada${negotiatedCount > 1 ? 's' : ''}` : 'Conheça oportunidades'}
           </span>
+          {negotiatedCount > 0 && (
+            <span className="text-[9px] text-emerald-400 font-semibold">✅</span>
+          )}
           <motion.span
             key={count}
             initial={{ scale: 1.3, opacity: 0 }}
