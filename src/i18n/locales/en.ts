@@ -158,6 +158,8 @@ export const en: TranslationKeys = {
     unknownDate: 'Unknown date',
     invitesNotAvailable: 'Invites not available for your tier',
     copyCode: 'Copy code',
+    shareWhatsApp: 'Share via WhatsApp',
+    whatsAppMessage: '🎮 You have been invited to SKEMA Universe! Use this link to join:',
   },
 
   creators: {
