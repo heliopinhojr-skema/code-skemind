@@ -360,7 +360,9 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
   const [copied, setCopied] = useState<string | null>(null);
   const [shareTarget, setShareTarget] = useState<{ codeId: string; code: string; type: 'code' | 'link' | 'whatsapp' } | null>(null);
   const [inviteeName, setInviteeName] = useState('');
+  const [visibleLink, setVisibleLink] = useState<string | null>(null);
   const inviteeInputRef = useRef<HTMLInputElement>(null);
+  const linkDisplayRef = useRef<HTMLInputElement>(null);
   const [showDonate, setShowDonate] = useState(false);
   const [donateAmount, setDonateAmount] = useState('');
   const [isDonating, setIsDonating] = useState(false);
@@ -640,10 +642,13 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
         setCopied(shareTarget.type === 'link' ? `link-${shareTarget.code}` : shareTarget.code);
         toast.success(`${shareTarget.type === 'link' ? 'Link' : 'Código'} copiado! Convite para "${name}"`);
         setTimeout(() => setCopied(null), 3000);
-      } else {
-        // Clipboard blocked — show the text in a toast so user can copy manually
-        toast.info(`${shareTarget.type === 'link' ? '🔗 Link' : '📋 Código'}: ${textToCopy}`, { duration: 15000 });
       }
+      // Always show the link for manual copy
+      setVisibleLink(textToCopy);
+      setTimeout(() => {
+        linkDisplayRef.current?.focus();
+        linkDisplayRef.current?.select();
+      }, 100);
     }
     setShareTarget(null);
     setInviteeName('');
@@ -1601,6 +1606,23 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
                           <Check className="w-3 h-3 mr-1" /> OK
                         </Button>
                         <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={handleCancelShare}>
+                          ✕
+                        </Button>
+                      </div>
+                    )}
+                    {/* Link visível para copiar manualmente */}
+                    {visibleLink && !isShareOpen && (
+                      <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-emerald-500/20">
+                        <input
+                          ref={linkDisplayRef}
+                          type="text"
+                          readOnly
+                          value={visibleLink}
+                          onFocus={(e) => e.target.select()}
+                          onClick={(e) => (e.target as HTMLInputElement).select()}
+                          className="flex-1 bg-emerald-500/10 border border-emerald-500/30 rounded-md px-2 py-1.5 text-[11px] text-emerald-200 font-mono select-all focus:outline-none focus:border-emerald-400/60 min-w-0 cursor-text"
+                        />
+                        <Button size="sm" variant="ghost" className="h-6 px-1" onClick={() => setVisibleLink(null)}>
                           ✕
                         </Button>
                       </div>

@@ -372,7 +372,9 @@ function InviteCodeItem({
   const [showNameInput, setShowNameInput] = useState(false);
   const [inviteeName, setInviteeName] = useState('');
   const [pendingAction, setPendingAction] = useState<'code' | 'link' | 'whatsapp' | null>(null);
+  const [visibleLink, setVisibleLink] = useState<string | null>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const linkInputRef = useRef<HTMLInputElement>(null);
   const isUsed = !!code.usedById;
   const isCopied = copiedCode === code.code;
   const isLinkCopied = copiedCode === `link-${code.code}`;
@@ -387,6 +389,7 @@ function InviteCodeItem({
   const handleStartShare = (type: 'code' | 'link' | 'whatsapp') => {
     setPendingAction(type);
     setShowNameInput(true);
+    setVisibleLink(null);
     setTimeout(() => nameInputRef.current?.focus(), 100);
   };
 
@@ -402,10 +405,24 @@ function InviteCodeItem({
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
-    await onShareAndCopy(code.id, code.code, pendingAction, name);
+    
+    const action = pendingAction;
     setShowNameInput(false);
     setInviteeName('');
     setPendingAction(null);
+
+    // For link/code actions, show the link text field immediately
+    if (action !== 'whatsapp') {
+      const linkText = action === 'link' ? buildInviteUrl(code.code) : code.code;
+      setVisibleLink(linkText);
+      // Select it after render
+      setTimeout(() => {
+        linkInputRef.current?.focus();
+        linkInputRef.current?.select();
+      }, 100);
+    }
+
+    await onShareAndCopy(code.id, code.code, action, name);
   };
 
   const handleCancelInput = () => {
@@ -568,6 +585,42 @@ function InviteCodeItem({
                 <X className="w-3.5 h-3.5" />
               </Button>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Link visível para copiar manualmente */}
+      <AnimatePresence>
+        {visibleLink && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="overflow-hidden"
+          >
+            <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-emerald-500/20">
+              <input
+                ref={linkInputRef}
+                type="text"
+                readOnly
+                value={visibleLink}
+                onFocus={(e) => e.target.select()}
+                onClick={(e) => (e.target as HTMLInputElement).select()}
+                className="flex-1 bg-emerald-500/10 border border-emerald-500/30 rounded-md px-2 py-1.5 text-[11px] text-emerald-200 font-mono select-all focus:outline-none focus:border-emerald-400/60 min-w-0 cursor-text"
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setVisibleLink(null)}
+                className="h-6 w-6 text-white/40 hover:text-white shrink-0"
+              >
+                <X className="w-3 h-3" />
+              </Button>
+            </div>
+            <p className="text-[10px] text-emerald-300/60 mt-1 px-1">
+              ☝️ Toque no link acima → selecione tudo → copie (Ctrl+C)
+            </p>
           </motion.div>
         )}
       </AnimatePresence>
