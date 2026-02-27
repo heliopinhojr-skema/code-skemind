@@ -973,21 +973,21 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
           </p>
         </CardHeader>
         <CardContent className="space-y-3">
-          {/* Resumo */}
-          <div className="grid grid-cols-3 gap-2">
-            <div className="bg-background/60 rounded-lg p-2 border border-border/40 text-center">
-              <p className="text-[10px] text-muted-foreground">Valuation</p>
-              <p className="text-sm font-bold text-foreground">R$ 620.000</p>
-            </div>
-            <div className="bg-background/60 rounded-lg p-2 border border-border/40 text-center">
-              <p className="text-[10px] text-muted-foreground">Cota 2,5%</p>
-              <p className="text-sm font-bold text-yellow-500">R$ 15.500</p>
-            </div>
-            <div className="bg-background/60 rounded-lg p-2 border border-border/40 text-center">
-              <p className="text-[10px] text-muted-foreground">6x parcelas</p>
-              <p className="text-sm font-bold text-foreground">R$ 2.583,33</p>
+          {/* 1. Parcelas */}
+          <div className="bg-background/60 rounded-lg p-3 border border-border/40">
+            <p className="text-[10px] text-muted-foreground mb-2 font-medium">📅 Parcelas — 6x R$ 2.583,33</p>
+            <div className="grid grid-cols-6 gap-1">
+              {['Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago'].map((mes) => (
+                <div key={mes} className="text-center p-1.5 rounded bg-muted/30 border border-border/30">
+                  <p className="text-[9px] text-muted-foreground">{mes}/26</p>
+                  <p className="text-[10px] font-bold text-foreground">R$ 2.583</p>
+                </div>
+              ))}
             </div>
           </div>
+
+          {/* 2. Blocos Vendidos + Interessados */}
+          <InvestmentBlocksLedger />
 
           {/* Interessados em tempo real */}
           <div className="bg-background/60 rounded-lg p-3 border border-primary/20">
@@ -1011,19 +1011,19 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
             )}
           </div>
 
-          {/* Blocos Vendidos */}
-          <InvestmentBlocksLedger />
-
-          {/* Cronograma */}
-          <div className="bg-background/60 rounded-lg p-3 border border-border/40">
-            <p className="text-[10px] text-muted-foreground mb-2 font-medium">📅 Parcelas</p>
-            <div className="grid grid-cols-6 gap-1">
-              {['Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago'].map((mes) => (
-                <div key={mes} className="text-center p-1.5 rounded bg-muted/30 border border-border/30">
-                  <p className="text-[9px] text-muted-foreground">{mes}/26</p>
-                  <p className="text-[10px] font-bold text-foreground">R$ 2.583</p>
-                </div>
-              ))}
+          {/* 3. Valuation + Cota */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-background/60 rounded-lg p-2 border border-border/40 text-center">
+              <p className="text-[10px] text-muted-foreground">6x parcelas</p>
+              <p className="text-sm font-bold text-foreground">R$ 2.583,33</p>
+            </div>
+            <div className="bg-background/60 rounded-lg p-2 border border-border/40 text-center">
+              <p className="text-[10px] text-muted-foreground">Cota 2,5%</p>
+              <p className="text-sm font-bold text-yellow-500">R$ 15.500</p>
+            </div>
+            <div className="bg-background/60 rounded-lg p-2 border border-border/40 text-center">
+              <p className="text-[10px] text-muted-foreground">Valuation</p>
+              <p className="text-sm font-bold text-foreground">R$ 620.000</p>
             </div>
           </div>
 

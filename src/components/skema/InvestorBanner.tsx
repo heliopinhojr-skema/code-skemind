@@ -28,15 +28,18 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
   const [registered, setRegistered] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [soldBlocks, setSoldBlocks] = useState<{ buyer_name: string; sold_at: string }[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
-      const [{ count: total }, { data: mine }] = await Promise.all([
+      const [{ count: total }, { data: mine }, { data: blocks }] = await Promise.all([
         supabase.from('investor_interest').select('*', { count: 'exact', head: true }),
         supabase.from('investor_interest').select('id').eq('player_id', playerId).maybeSingle(),
+        supabase.from('investment_blocks').select('buyer_name, sold_at').order('sold_at', { ascending: false }),
       ]);
       setCount(total || 0);
       setRegistered(!!mine);
+      setSoldBlocks(blocks || []);
     };
     fetchData();
   }, [playerId]);
@@ -212,6 +215,26 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Blocos já negociados */}
+            {soldBlocks.length > 0 && (
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-3">
+                <div className="text-[10px] uppercase tracking-wider text-yellow-400/60 mb-2 font-semibold">
+                  Blocos negociados ({soldBlocks.length})
+                </div>
+                <div className="space-y-1">
+                  {soldBlocks.map((b, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs">
+                      <span className="text-yellow-300 font-medium">2,5% — {b.buyer_name}</span>
+                      <span className="text-white/40 text-[10px]">{new Date(b.sold_at + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 text-[10px] text-yellow-400/50 text-center">
+                  {soldBlocks.length * 2.5}% já captado de 25% disponíveis
+                </div>
+              </div>
+            )}
 
             {/* Contador em tempo real */}
             <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-3">
