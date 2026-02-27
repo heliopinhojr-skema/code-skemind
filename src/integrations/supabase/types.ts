@@ -225,8 +225,10 @@ export type Database = {
           buyer_name: string
           created_at: string
           id: string
+          installment_details: Json | null
           installments: number
           notes: string | null
+          overbook: boolean
           percentage: number
           round: number
           sold_at: string
@@ -236,8 +238,10 @@ export type Database = {
           buyer_name: string
           created_at?: string
           id?: string
+          installment_details?: Json | null
           installments?: number
           notes?: string | null
+          overbook?: boolean
           percentage?: number
           round?: number
           sold_at?: string
@@ -247,8 +251,10 @@ export type Database = {
           buyer_name?: string
           created_at?: string
           id?: string
+          installment_details?: Json | null
           installments?: number
           notes?: string | null
+          overbook?: boolean
           percentage?: number
           round?: number
           sold_at?: string

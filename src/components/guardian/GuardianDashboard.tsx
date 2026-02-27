@@ -24,14 +24,20 @@ import { GENERATION_COLORS, PlanetFace } from '@/components/skema/GenerationColo
 import { buildInviteUrl } from '@/lib/inviteUrl';
 
 
-// Sub-component: Investment Blocks Ledger (sold 2.5% blocks)
+// Sub-component: Investment Blocks Ledger (spreadsheet with month columns)
+const INV_MONTHS = ['Mar/26', 'Abr/26', 'Mai/26', 'Jun/26', 'Jul/26', 'Ago/26'];
+const TARGET_PCT = 25;
+
 function InvestmentBlocksLedger() {
   const [showForm, setShowForm] = useState(false);
   const [buyerName, setBuyerName] = useState('');
   const [totalValue, setTotalValue] = useState('15500');
   const [soldAt, setSoldAt] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
+  const [isOverbook, setIsOverbook] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [editingDue, setEditingDue] = useState<{ blockId: string; monthIdx: number } | null>(null);
+  const [dueValue, setDueValue] = useState('');
 
   const { data: blocks, refetch } = useQuery({
     queryKey: ['investment-blocks'],
@@ -39,7 +45,7 @@ function InvestmentBlocksLedger() {
       const { data, error } = await supabase
         .from('investment_blocks')
         .select('*')
-        .order('sold_at', { ascending: false });
+        .order('sold_at', { ascending: true });
       if (error) throw error;
       return data || [];
     },
@@ -55,13 +61,11 @@ function InvestmentBlocksLedger() {
         total_value: parseFloat(totalValue) || 15500,
         sold_at: soldAt,
         notes: notes.trim() || null,
+        overbook: isOverbook,
       } as any);
       if (error) throw error;
       toast.success(`Bloco 2,5% registrado para ${buyerName}`);
-      setBuyerName('');
-      setTotalValue('15500');
-      setNotes('');
-      setShowForm(false);
+      setBuyerName(''); setTotalValue('15500'); setNotes(''); setIsOverbook(false); setShowForm(false);
       refetch();
     } catch (e: any) {
       toast.error('Erro: ' + (e.message || 'desconhecido'));
@@ -71,114 +75,166 @@ function InvestmentBlocksLedger() {
 
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from('investment_blocks').delete().eq('id', id);
-    if (error) {
-      toast.error('Erro ao remover');
-    } else {
-      toast.success('Bloco removido');
-      refetch();
-    }
+    if (error) toast.error('Erro ao remover');
+    else { toast.success('Bloco removido'); refetch(); }
   };
 
-  const totalSold = blocks?.length || 0;
+  const handleSaveDueDate = async (blockId: string, monthIdx: number, dateStr: string) => {
+    const block = blocks?.find((b: any) => b.id === blockId);
+    if (!block) return;
+    const details: any[] = Array.isArray((block as any).installment_details)
+      ? [...(block as any).installment_details]
+      : INV_MONTHS.map(m => ({ month: m, due_date: null, paid: false }));
+    details[monthIdx] = { ...details[monthIdx], due_date: dateStr || null };
+    await supabase.from('investment_blocks').update({ installment_details: details } as any).eq('id', blockId);
+    setEditingDue(null); setDueValue(''); refetch();
+  };
+
+  const handleTogglePaid = async (blockId: string, monthIdx: number) => {
+    const block = blocks?.find((b: any) => b.id === blockId);
+    if (!block) return;
+    const details: any[] = Array.isArray((block as any).installment_details)
+      ? [...(block as any).installment_details]
+      : INV_MONTHS.map(m => ({ month: m, due_date: null, paid: false }));
+    details[monthIdx] = { ...details[monthIdx], paid: !details[monthIdx].paid };
+    await supabase.from('investment_blocks').update({ installment_details: details } as any).eq('id', blockId);
+    refetch();
+  };
+
+  const totalSold = blocks?.filter((b: any) => !(b as any).overbook).length || 0;
+  const totalOverbook = blocks?.filter((b: any) => (b as any).overbook).length || 0;
   const totalPctSold = totalSold * 2.5;
-  const totalValueSold = blocks?.reduce((s, b) => s + Number(b.total_value), 0) || 0;
+  const totalPctRemaining = TARGET_PCT - totalPctSold;
+  const totalValueSold = blocks?.filter((b: any) => !(b as any).overbook).reduce((s: number, b: any) => s + Number(b.total_value), 0) || 0;
 
   return (
-    <div className="bg-background/60 rounded-lg p-3 border border-yellow-500/20">
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
-          📋 Blocos Vendidos ({totalSold}) — {totalPctSold}% captado
-        </p>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-6 text-[10px] gap-1 px-2"
-          onClick={() => setShowForm(!showForm)}
-        >
-          <Plus className="h-3 w-3" />
-          Registrar venda
+    <div className="bg-background/60 rounded-lg p-3 border border-yellow-500/20 space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
+            📋 Blocos ({totalSold}) {totalOverbook > 0 && <span className="text-yellow-500">+ {totalOverbook} overbook</span>}
+          </p>
+          <p className="text-[9px] text-muted-foreground">
+            Meta {TARGET_PCT}% · Vendido {totalPctSold}% · Falta {totalPctRemaining > 0 ? totalPctRemaining : 0}%
+            {totalPctRemaining <= 0 && ' ✅'}
+          </p>
+        </div>
+        <Button variant="outline" size="sm" className="h-6 text-[10px] gap-1 px-2" onClick={() => setShowForm(!showForm)}>
+          <Plus className="h-3 w-3" /> Registrar venda
         </Button>
       </div>
 
-      {/* Formulário de adição */}
+      {/* Progress bar */}
+      <div className="h-2 rounded-full bg-muted/40 overflow-hidden">
+        <div className="h-full rounded-full bg-gradient-to-r from-yellow-500 to-orange-500 transition-all" style={{ width: `${Math.min(100, (totalPctSold / TARGET_PCT) * 100)}%` }} />
+      </div>
+
       {showForm && (
-        <div className="bg-muted/20 rounded-lg p-2 mb-2 space-y-2 border border-border/40">
+        <div className="bg-muted/20 rounded-lg p-2 space-y-2 border border-border/40">
           <div className="grid grid-cols-3 gap-2">
-            <Input
-              placeholder="Nome do comprador"
-              value={buyerName}
-              onChange={e => setBuyerName(e.target.value)}
-              className="h-7 text-xs"
-            />
-            <Input
-              type="number"
-              placeholder="Valor R$"
-              value={totalValue}
-              onChange={e => setTotalValue(e.target.value)}
-              className="h-7 text-xs"
-            />
-            <Input
-              type="date"
-              value={soldAt}
-              onChange={e => setSoldAt(e.target.value)}
-              className="h-7 text-xs"
-            />
+            <Input placeholder="Comprador" value={buyerName} onChange={e => setBuyerName(e.target.value)} className="h-7 text-xs" />
+            <Input type="number" placeholder="Valor R$" value={totalValue} onChange={e => setTotalValue(e.target.value)} className="h-7 text-xs" />
+            <Input type="date" value={soldAt} onChange={e => setSoldAt(e.target.value)} className="h-7 text-xs" />
           </div>
-          <div className="flex gap-2">
-            <Input
-              placeholder="Observações (opcional)"
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              className="h-7 text-xs flex-1"
-            />
+          <div className="flex gap-2 items-center">
+            <Input placeholder="Obs" value={notes} onChange={e => setNotes(e.target.value)} className="h-7 text-xs flex-1" />
+            <label className="flex items-center gap-1 text-[10px] text-muted-foreground cursor-pointer whitespace-nowrap">
+              <input type="checkbox" checked={isOverbook} onChange={e => setIsOverbook(e.target.checked)} className="w-3 h-3" />
+              Overbook
+            </label>
             <Button size="sm" className="h-7 text-xs gap-1" onClick={handleAdd} disabled={isSaving || !buyerName.trim()}>
-              {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-              Salvar
+              {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />} Salvar
             </Button>
           </div>
         </div>
       )}
 
-      {/* Lista de blocos */}
+      {/* Spreadsheet table */}
       {blocks && blocks.length > 0 ? (
-        <div className="space-y-1 max-h-[200px] overflow-y-auto pr-1">
-          {blocks.map((b: any) => (
-            <div key={b.id} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded bg-muted/30">
-              <span className="text-yellow-500 font-bold shrink-0">2,5%</span>
-              <span className="font-medium text-foreground truncate flex-1">{b.buyer_name}</span>
-              <span className="text-muted-foreground font-mono shrink-0">
-                R$ {Number(b.total_value).toLocaleString('pt-BR')}
-              </span>
-              <span className="text-muted-foreground text-[10px] shrink-0">
-                {format(new Date(b.sold_at + 'T12:00:00'), "dd/MM/yyyy", { locale: ptBR })}
-              </span>
-              {b.notes && (
-                <span className="text-[9px] text-muted-foreground truncate max-w-[80px]" title={b.notes}>
-                  {b.notes}
-                </span>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5 shrink-0 text-destructive/60 hover:text-destructive"
-                onClick={() => handleDelete(b.id)}
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            </div>
-          ))}
+        <div className="overflow-x-auto -mx-1">
+          <table className="w-full text-[10px] min-w-[600px]">
+            <thead>
+              <tr className="border-b border-border/40">
+                <th className="text-left py-1 px-1 text-muted-foreground font-medium">Comprador</th>
+                <th className="text-center py-1 px-1 text-muted-foreground font-medium">R$/mês</th>
+                {INV_MONTHS.map(m => (
+                  <th key={m} className="text-center py-1 px-1 text-muted-foreground font-medium whitespace-nowrap">{m}</th>
+                ))}
+                <th className="w-5"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {blocks.map((b: any) => {
+                const details: any[] = Array.isArray(b.installment_details)
+                  ? b.installment_details
+                  : INV_MONTHS.map(m => ({ month: m, due_date: null, paid: false }));
+                const parcelaVal = Number(b.total_value) / (b.installments || 6);
+                return (
+                  <tr key={b.id} className={cn("border-b border-border/20", b.overbook && "opacity-60 bg-yellow-500/5")}>
+                    <td className="py-1.5 px-1">
+                      <div className="flex items-center gap-1">
+                        {b.overbook && <span className="text-[8px] text-yellow-500 font-bold">OB</span>}
+                        <span className="font-medium text-foreground truncate max-w-[90px]">{b.buyer_name}</span>
+                      </div>
+                      {b.notes && <span className="text-[8px] text-muted-foreground block truncate max-w-[90px]">{b.notes}</span>}
+                    </td>
+                    <td className="text-center py-1.5 px-1 text-yellow-500 font-bold whitespace-nowrap">
+                      {parcelaVal.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+                    </td>
+                    {details.map((inst: any, idx: number) => {
+                      const isEditing = editingDue?.blockId === b.id && editingDue?.monthIdx === idx;
+                      return (
+                        <td key={idx} className="text-center py-1 px-0.5">
+                          <div
+                            className={cn(
+                              "rounded px-1 py-0.5 cursor-pointer text-[9px]",
+                              inst.paid ? "bg-emerald-500/20 text-emerald-400" : inst.due_date ? "bg-muted/40 text-foreground" : "bg-muted/20 text-muted-foreground"
+                            )}
+                            onClick={() => handleTogglePaid(b.id, idx)}
+                            title={inst.paid ? 'Pago ✅' : 'Marcar pago'}
+                          >
+                            {inst.paid ? '✅' : inst.due_date ? inst.due_date.slice(8, 10) + '/' + inst.due_date.slice(5, 7) : '—'}
+                          </div>
+                          {isEditing ? (
+                            <Input
+                              type="date" value={dueValue} onChange={e => setDueValue(e.target.value)}
+                              onBlur={() => handleSaveDueDate(b.id, idx, dueValue)}
+                              onKeyDown={e => e.key === 'Enter' && handleSaveDueDate(b.id, idx, dueValue)}
+                              className="h-5 text-[9px] mt-0.5 w-full px-0.5" autoFocus
+                            />
+                          ) : (
+                            <button className="text-[8px] text-primary/60 hover:text-primary mt-0.5 w-full" onClick={() => { setEditingDue({ blockId: b.id, monthIdx: idx }); setDueValue(inst.due_date || ''); }}>
+                              {inst.due_date ? 'editar' : 'vcto'}
+                            </button>
+                          )}
+                        </td>
+                      );
+                    })}
+                    <td className="py-1 px-0.5">
+                      <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive/60 hover:text-destructive" onClick={() => handleDelete(b.id)}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       ) : (
         <p className="text-[10px] text-muted-foreground">Nenhum bloco vendido ainda</p>
       )}
 
-      {/* Total */}
       {totalSold > 0 && (
-        <div className="mt-2 flex items-center justify-between text-xs px-2 py-1 rounded bg-yellow-500/10 border border-yellow-500/20">
-          <span className="text-muted-foreground font-medium">Total captado</span>
-          <span className="text-yellow-500 font-bold">
-            {totalPctSold}% · R$ {totalValueSold.toLocaleString('pt-BR')}
-          </span>
+        <div className="flex items-center justify-between text-xs px-2 py-1.5 rounded bg-yellow-500/10 border border-yellow-500/20">
+          <span className="text-muted-foreground font-medium">Captado</span>
+          <span className="text-yellow-500 font-bold">{totalPctSold}% de {TARGET_PCT}% · R$ {totalValueSold.toLocaleString('pt-BR')}</span>
+        </div>
+      )}
+      {totalOverbook > 0 && (
+        <div className="flex items-center justify-between text-[10px] px-2 py-1 rounded bg-yellow-500/5 border border-yellow-500/10">
+          <span className="text-muted-foreground">Overbook (análise posterior)</span>
+          <span className="text-yellow-500">{totalOverbook} bloco(s) · {totalOverbook * 2.5}%</span>
         </div>
       )}
     </div>

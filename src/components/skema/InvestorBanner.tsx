@@ -28,14 +28,14 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
   const [registered, setRegistered] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
-  const [soldBlocks, setSoldBlocks] = useState<{ buyer_name: string; sold_at: string }[]>([]);
+  const [soldBlocks, setSoldBlocks] = useState<{ sold_at: string }[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
       const [{ count: total }, { data: mine }, { data: blocks }] = await Promise.all([
         supabase.from('investor_interest').select('*', { count: 'exact', head: true }),
         supabase.from('investor_interest').select('id').eq('player_id', playerId).maybeSingle(),
-        supabase.from('investment_blocks').select('buyer_name, sold_at').order('sold_at', { ascending: false }),
+        supabase.from('investment_blocks').select('sold_at, overbook').eq('overbook', false).order('sold_at', { ascending: false }),
       ]);
       setCount(total || 0);
       setRegistered(!!mine);
@@ -225,7 +225,7 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
                 <div className="space-y-1">
                   {soldBlocks.map((b, i) => (
                     <div key={i} className="flex items-center justify-between text-xs">
-                      <span className="text-yellow-300 font-medium">2,5% — {b.buyer_name}</span>
+                      <span className="text-yellow-300 font-medium">🔒 Bloco {i + 1} — 2,5%</span>
                       <span className="text-white/40 text-[10px]">{new Date(b.sold_at + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
                     </div>
                   ))}
