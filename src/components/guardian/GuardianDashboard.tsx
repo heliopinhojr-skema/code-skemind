@@ -61,6 +61,7 @@ function InvestmentBlocksLedger() {
   const [buyerName, setBuyerName] = useState('');
   const [totalValue, setTotalValue] = useState('15500');
   const [soldAt, setSoldAt] = useState(new Date().toISOString().slice(0, 10));
+  const [firstPayDate, setFirstPayDate] = useState('');
   const [notes, setNotes] = useState('');
   const [isOverbook, setIsOverbook] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -81,11 +82,14 @@ function InvestmentBlocksLedger() {
   });
 
   const handleAdd = async () => {
-    if (!buyerName.trim()) return;
+    if (!buyerName.trim() || !firstPayDate) {
+      toast.error('Preencha o comprador e a data do 1º pagamento');
+      return;
+    }
     setIsSaving(true);
     try {
-      const startDate = new Date(soldAt + 'T12:00:00');
-      const autoDetails = generateInstallments(startDate);
+      const payStart = new Date(firstPayDate + 'T12:00:00');
+      const autoDetails = generateInstallments(payStart);
 
       const { error } = await supabase.from('investment_blocks').insert({
         buyer_name: buyerName.trim(),
@@ -96,8 +100,8 @@ function InvestmentBlocksLedger() {
         installment_details: autoDetails,
       } as any);
       if (error) throw error;
-      toast.success(`Bloco 2,5% registrado para ${buyerName} — parcelas preenchidas a cada 30 dias`);
-      setBuyerName(''); setTotalValue('15500'); setNotes(''); setIsOverbook(false); setShowForm(false);
+      toast.success(`Bloco 2,5% registrado para ${buyerName} — parcelas a partir de ${firstPayDate}`);
+      setBuyerName(''); setTotalValue('15500'); setFirstPayDate(''); setNotes(''); setIsOverbook(false); setShowForm(false);
       refetch();
     } catch (e: any) {
       toast.error('Erro: ' + (e.message || 'desconhecido'));
@@ -166,10 +170,14 @@ function InvestmentBlocksLedger() {
           <div className="grid grid-cols-3 gap-2">
             <Input placeholder="Comprador" value={buyerName} onChange={e => setBuyerName(e.target.value)} className="h-7 text-xs" />
             <Input type="number" placeholder="Valor R$" value={totalValue} onChange={e => setTotalValue(e.target.value)} className="h-7 text-xs" />
-            <Input type="date" value={soldAt} onChange={e => setSoldAt(e.target.value)} className="h-7 text-xs" />
+            <Input type="date" value={soldAt} onChange={e => setSoldAt(e.target.value)} className="h-7 text-xs" title="Data de fechamento" />
           </div>
-          <div className="flex gap-2 items-center">
-            <Input placeholder="Obs" value={notes} onChange={e => setNotes(e.target.value)} className="h-7 text-xs flex-1" />
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[10px] text-muted-foreground">1º Pagamento (gera 30 em 30)</span>
+              <Input type="date" value={firstPayDate} onChange={e => setFirstPayDate(e.target.value)} className="h-7 text-xs" />
+            </div>
+            <Input placeholder="Obs" value={notes} onChange={e => setNotes(e.target.value)} className="h-7 text-xs" />
             <label className="flex items-center gap-1 text-[10px] text-muted-foreground cursor-pointer whitespace-nowrap">
               <input type="checkbox" checked={isOverbook} onChange={e => setIsOverbook(e.target.checked)} className="w-3 h-3" />
               Overbook
