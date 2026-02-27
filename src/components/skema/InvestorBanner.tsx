@@ -203,15 +203,15 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
                   return (
                     <div
                       key={i}
-                      className={`h-6 rounded ${isSold ? 'bg-yellow-500/60 border border-yellow-400/40' : 'bg-white/10 border border-white/20'}`}
-                      title={isSold ? `Bloco ${i + 1} — vendido` : `Bloco ${i + 1} — disponível`}
+                      className={`h-6 rounded ${isSold ? 'bg-emerald-500/70 border border-emerald-400/50' : 'bg-white/10 border border-white/20'}`}
+                      title={isSold ? `Bloco ${i + 1} — negociado` : `Bloco ${i + 1} — disponível`}
                     />
                   );
                 })}
               </div>
               <div className="flex justify-between text-[10px] text-white/40">
-                <span>🔒 {soldBlocks.length} vendido(s)</span>
-                <span>🟢 {availableBlocks} disponível(eis)</span>
+                <span className="text-emerald-400/80">✅ {soldBlocks.length} negociado(s)</span>
+                <span>🟡 {availableBlocks} disponível(eis)</span>
               </div>
             </div>
 
