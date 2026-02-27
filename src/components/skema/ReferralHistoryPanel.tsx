@@ -497,20 +497,6 @@ function InviteCodeItem({
             ) : (
               <>
                 <motion.div
-                  animate={isCopied ? { scale: [1, 1.3, 1] } : {}}
-                  transition={{ duration: 0.3 }}
-                >
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleStartShare('code')}
-                    className="h-7 w-7 text-white/40 hover:text-white"
-                    title={t.referral.copyCode}
-                  >
-                    {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  </Button>
-                </motion.div>
-                <motion.div
                   animate={isLinkCopied ? { scale: [1, 1.3, 1] } : {}}
                   transition={{ duration: 0.3 }}
                 >
