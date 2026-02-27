@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import type { GameState, GameSymbol, AttemptResult } from '@/hooks/useGame';
 import { MAX_ATTEMPTS } from '@/hooks/useGame';
 import { evaluateGuess } from '@/lib/mastermindEngine';
+import { copyToClipboard } from '@/lib/clipboardFallback';
 interface GameBoardProps {
   state: GameState;
   secretCode: GameSymbol[];
@@ -63,12 +64,10 @@ export function GameBoard({
 
   const handleCopyHistory = async () => {
     if (safeHistory.length === 0) return;
-    try {
-      await navigator.clipboard.writeText(formatHistoryForClipboard(safeHistory));
+    const ok = await copyToClipboard(formatHistoryForClipboard(safeHistory));
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Falha ao copiar:', err);
     }
   };
 

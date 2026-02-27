@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import universeBg from '@/assets/universe-bg.jpg';
+import { copyToClipboard } from '@/lib/clipboardFallback';
 
 interface RegistrationScreenProps {
   onRegister: (name: string, inviteCode: string, emoji: string, password?: string) => { success: boolean; error?: string; playerCode?: string };
@@ -123,12 +124,10 @@ export function RegistrationScreen({ onRegister, onLogin, validateCode, initialI
 
   const handleCopyCode = useCallback(async () => {
     if (!newPlayerCode) return;
-    try {
-      await navigator.clipboard.writeText(newPlayerCode);
+    const ok = await copyToClipboard(newPlayerCode);
+    if (ok) {
       setCopiedCode(true);
       setTimeout(() => setCopiedCode(false), 2000);
-    } catch (e) {
-      console.error('Erro ao copiar:', e);
     }
   }, [newPlayerCode]);
 

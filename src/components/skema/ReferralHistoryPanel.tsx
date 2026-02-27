@@ -17,6 +17,7 @@ import { useI18n } from '@/i18n/I18nContext';
 import { getTierEconomy, formatEnergy } from '@/lib/tierEconomy';
 import { toast } from '@/components/ui/use-toast';
 import { buildInviteUrl } from '@/lib/inviteUrl';
+import { copyToClipboard } from '@/lib/clipboardFallback';
 
 interface ReferralHistoryPanelProps {
   playerId: string;
@@ -85,8 +86,8 @@ export function ReferralHistoryPanel({
     // Copy to clipboard
     const textToCopy = type === 'link' ? inviteUrl : code;
 
-    try {
-      await navigator.clipboard.writeText(textToCopy);
+    const ok = await copyToClipboard(textToCopy);
+    if (ok) {
       setCopiedCode(type === 'link' ? `link-${code}` : code);
       toast({
         title: '✅ ' + (type === 'link' ? t.referral.linkCopied : t.referral.codeCopied),
@@ -95,8 +96,8 @@ export function ReferralHistoryPanel({
           : (type === 'link' ? t.referral.sendToInvitee : `${code} — ${t.referral.sendToInvitee}`),
       });
       setTimeout(() => setCopiedCode(null), 2000);
-    } catch (e) {
-      console.error('Erro ao copiar:', e);
+    } else {
+      toast({ title: '⚠️ Não foi possível copiar', description: 'Selecione e copie manualmente: ' + textToCopy });
     }
   };
 

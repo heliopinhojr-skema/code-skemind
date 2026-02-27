@@ -22,6 +22,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { GENERATION_COLORS, PlanetFace } from '@/components/skema/GenerationColorPicker';
 import { buildInviteUrl } from '@/lib/inviteUrl';
+import { copyToClipboard } from '@/lib/clipboardFallback';
 
 
 // Sub-component: Investment Blocks Ledger (spreadsheet with dynamic month columns)
@@ -626,16 +627,16 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
       toast.success(`WhatsApp aberto! Convite para "${name}"`);
     } else {
       // Copy to clipboard
-      try {
-        const textToCopy = shareTarget.type === 'link' 
-          ? buildInviteUrl(shareTarget.code) 
-          : shareTarget.code;
-        await navigator.clipboard.writeText(textToCopy);
+      const textToCopy = shareTarget.type === 'link' 
+        ? buildInviteUrl(shareTarget.code) 
+        : shareTarget.code;
+      const ok = await copyToClipboard(textToCopy);
+      if (ok) {
         setCopied(shareTarget.type === 'link' ? `link-${shareTarget.code}` : shareTarget.code);
         toast.success(`${shareTarget.type === 'link' ? 'Link' : 'Código'} copiado! Convite para "${name}"`);
         setTimeout(() => setCopied(null), 2000);
-      } catch {
-        toast.error('Erro ao copiar');
+      } else {
+        toast.error('Erro ao copiar — copie manualmente: ' + textToCopy);
       }
     }
     setShareTarget(null);
