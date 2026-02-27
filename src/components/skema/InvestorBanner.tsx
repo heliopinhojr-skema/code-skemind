@@ -175,12 +175,12 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
           </motion.span>
         </motion.div>
       </DialogTrigger>
-      <DialogContent className="bg-transparent border-none shadow-none p-0 max-w-md max-h-[90vh] overflow-y-auto [&>button]:text-white [&>button]:bg-black/60 [&>button]:rounded-full [&>button]:p-1 [&>button]:hover:bg-black/80 [&>button]:z-20">
+      <DialogContent className="bg-transparent border-none shadow-none p-0 max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto [&>button]:text-white [&>button]:bg-black/60 [&>button]:rounded-full [&>button]:p-1 [&>button]:hover:bg-black/80 [&>button]:z-20">
         <DialogTitle className="sr-only">Oportunidade Skema</DialogTitle>
         <div className="relative rounded-2xl overflow-hidden border border-yellow-500/40">
           <img src={investorImg} alt="" className="absolute inset-0 w-full h-full object-cover" />
           <div className="absolute inset-0 bg-black/80" />
-          <div className="relative z-10 p-5 text-center space-y-3">
+          <div className="relative z-10 p-3 sm:p-5 text-center space-y-2.5 sm:space-y-3">
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
