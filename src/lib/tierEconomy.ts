@@ -18,8 +18,8 @@ export interface TierEconomyConfig {
 
 /** Configuração econômica por tier do convidador */
 const TIER_ECONOMY: Record<string, TierEconomyConfig> = {
-  'master_admin': { maxInvites: 7, costPerInvite: 200_000, invitedTierLabel: 'Criador', baseLocked: 0 },
-  'CD HX':        { maxInvites: 7, costPerInvite: 200_000, invitedTierLabel: 'Criador', baseLocked: 0 },
+  'master_admin': { maxInvites: 10, costPerInvite: 200_000, invitedTierLabel: 'Criador', baseLocked: 0 },
+  'CD HX':        { maxInvites: 10, costPerInvite: 200_000, invitedTierLabel: 'Criador', baseLocked: 0 },
   'Criador':      { maxInvites: 10, costPerInvite: 15_000, invitedTierLabel: 'Grão Mestre', baseLocked: 0 },
   'Grão Mestre':  { maxInvites: 10, costPerInvite: 1_300, invitedTierLabel: 'Mestre', baseLocked: 0 },
   'Mestre':       { maxInvites: 10, costPerInvite: 130, invitedTierLabel: 'Boom', baseLocked: 0 },

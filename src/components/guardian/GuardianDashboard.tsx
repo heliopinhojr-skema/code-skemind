@@ -14,7 +14,7 @@ import { useSupabasePlayer } from '@/hooks/useSupabasePlayer';
 import { useInviteCodes } from '@/hooks/useInviteCodes';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, Zap, Box, Gift, Trophy, TrendingUp, Copy, Check, Share2, Link, ArrowDownRight, Dna, TreePine, Heart, Loader2, Calendar, Receipt, Radio, UserPlus, Activity, AlertTriangle, Briefcase, Trash2, Plus } from 'lucide-react';
+import { Users, Zap, Box, Gift, Trophy, TrendingUp, Copy, Check, Share2, Link, ArrowDownRight, Dna, TreePine, Heart, Loader2, Calendar, Receipt, Radio, UserPlus, Activity, AlertTriangle, Briefcase, Trash2, Plus, X, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { calculateBalanceBreakdown, formatEnergy as formatEnergyUtil, getTierEconomy } from '@/lib/tierEconomy';
@@ -351,18 +351,19 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
   const { data: referralNodes } = useReferralTree();
   const { data: sboxTransactions } = useSkemaBoxTransactions();
   const { player } = useSupabasePlayer();
-  const { codes, isLoading: isLoadingCodes, isAutoGenerating, unusedCount, usedCount, sharedCount, shareCode } = useInviteCodes(player?.id || null, player?.playerTier || null);
+  const { codes, isLoading: isLoadingCodes, isAutoGenerating, unusedCount, usedCount, sharedCount, shareCode, refetch: refetchCodes } = useInviteCodes(player?.id || null, player?.playerTier || null);
   const tierConfig = getTierEconomy(player?.playerTier || null);
   const costPerInvite = tierConfig.costPerInvite;
   const pendingEnergy = sharedCount * costPerInvite;
   const unusedEnergy = unusedCount * costPerInvite;
   const [copied, setCopied] = useState<string | null>(null);
-  const [shareTarget, setShareTarget] = useState<{ codeId: string; code: string; type: 'code' | 'link' } | null>(null);
+  const [shareTarget, setShareTarget] = useState<{ codeId: string; code: string; type: 'code' | 'link' | 'whatsapp' } | null>(null);
   const [inviteeName, setInviteeName] = useState('');
   const inviteeInputRef = useRef<HTMLInputElement>(null);
   const [showDonate, setShowDonate] = useState(false);
   const [donateAmount, setDonateAmount] = useState('');
   const [isDonating, setIsDonating] = useState(false);
+  const [cancellingCodeId, setCancellingCodeId] = useState<string | null>(null);
 
   // Fetch detailed referral data with inviter/invited info
   const { data: detailedReferrals } = useQuery({
@@ -594,7 +595,7 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
     return { totalLocked: locked, totalAvailable: available };
   })();
 
-  const handleStartShare = (codeId: string, code: string, type: 'code' | 'link') => {
+  const handleStartShare = (codeId: string, code: string, type: 'code' | 'link' | 'whatsapp') => {
     setShareTarget({ codeId, code, type });
     setInviteeName('');
     setTimeout(() => inviteeInputRef.current?.focus(), 100);
@@ -616,17 +617,26 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
         return;
       }
     }
-    // Copy to clipboard
-    try {
-      const textToCopy = shareTarget.type === 'link' 
-        ? buildInviteUrl(shareTarget.code) 
-        : shareTarget.code;
-      await navigator.clipboard.writeText(textToCopy);
-      setCopied(shareTarget.type === 'link' ? `link-${shareTarget.code}` : shareTarget.code);
-      toast.success(`${shareTarget.type === 'link' ? 'Link' : 'Código'} copiado! Convite para "${name}"`);
-      setTimeout(() => setCopied(null), 2000);
-    } catch {
-      toast.error('Erro ao copiar');
+
+    if (shareTarget.type === 'whatsapp') {
+      const inviteUrl = buildInviteUrl(shareTarget.code);
+      const message = `🎮 Você foi convidado para o SKEMA Universe! Use este link para entrar:\n\n${inviteUrl}\n\nCódigo: ${shareTarget.code}`;
+      const waUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+      window.open(waUrl, '_blank');
+      toast.success(`WhatsApp aberto! Convite para "${name}"`);
+    } else {
+      // Copy to clipboard
+      try {
+        const textToCopy = shareTarget.type === 'link' 
+          ? buildInviteUrl(shareTarget.code) 
+          : shareTarget.code;
+        await navigator.clipboard.writeText(textToCopy);
+        setCopied(shareTarget.type === 'link' ? `link-${shareTarget.code}` : shareTarget.code);
+        toast.success(`${shareTarget.type === 'link' ? 'Link' : 'Código'} copiado! Convite para "${name}"`);
+        setTimeout(() => setCopied(null), 2000);
+      } catch {
+        toast.error('Erro ao copiar');
+      }
     }
     setShareTarget(null);
     setInviteeName('');
@@ -635,6 +645,21 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
   const handleCancelShare = () => {
     setShareTarget(null);
     setInviteeName('');
+  };
+
+  const handleAdminCancelCode = async (codeId: string) => {
+    if (!confirm('Tem certeza que deseja anular este convite? Se já foi aceito, o vínculo de indicação será removido.')) return;
+    setCancellingCodeId(codeId);
+    try {
+      const { error } = await supabase.rpc('admin_cancel_invite_code', { p_code_id: codeId });
+      if (error) throw error;
+      toast.success('Convite anulado com sucesso');
+      await refetchCodes();
+    } catch (e: any) {
+      toast.error('Erro ao anular: ' + (e.message || 'desconhecido'));
+    } finally {
+      setCancellingCodeId(null);
+    }
   };
 
   if (error) {
@@ -1479,10 +1504,35 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
                         )}
                       </div>
                       {isUsed ? (
-                        <Badge variant="outline" className="text-xs border-muted text-muted-foreground">
-                          ✓ {code.usedByName || 'usado'}
-                        </Badge>
-                      ) : !isPending ? (
+                        <div className="flex items-center gap-1">
+                          <Badge variant="outline" className="text-xs border-muted text-muted-foreground">
+                            ✓ {code.usedByName || 'usado'}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive/60 hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleAdminCancelCode(code.id)}
+                            disabled={cancellingCodeId === code.id}
+                            title="Anular convite (admin)"
+                          >
+                            {cancellingCodeId === code.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                          </Button>
+                        </div>
+                      ) : isPending ? (
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive/60 hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleAdminCancelCode(code.id)}
+                            disabled={cancellingCodeId === code.id}
+                            title="Anular convite (admin)"
+                          >
+                            {cancellingCodeId === code.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+                          </Button>
+                        </div>
+                      ) : (
                         <div className="flex items-center gap-1">
                           <Button
                             variant="ghost"
@@ -1510,8 +1560,17 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
                               <Link className="h-3.5 w-3.5" />
                             )}
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-emerald-500/60 hover:text-emerald-500 hover:bg-emerald-500/10"
+                            onClick={() => handleStartShare(code.id, code.code, 'whatsapp')}
+                            title="Enviar pelo WhatsApp"
+                          >
+                            <MessageCircle className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
-                      ) : null}
+                      )}
                     </div>
                     {/* Input para nome do convidado */}
                     {isShareOpen && (
