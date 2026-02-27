@@ -633,18 +633,16 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
       window.open(waUrl, '_blank');
       toast.success(`WhatsApp aberto! Convite para "${name}"`);
     } else {
-      // Copy to clipboard
-      const textToCopy = shareTarget.type === 'link' 
-        ? buildInviteUrl(shareTarget.code) 
-        : shareTarget.code;
-      const ok = await copyToClipboard(textToCopy);
+      // Sempre copiar o endereço completo do convite
+      const inviteUrl = buildInviteUrl(shareTarget.code);
+      const ok = await copyToClipboard(inviteUrl);
       if (ok) {
-        setCopied(shareTarget.type === 'link' ? `link-${shareTarget.code}` : shareTarget.code);
-        toast.success(`${shareTarget.type === 'link' ? 'Link' : 'Código'} copiado! Convite para "${name}"`);
+        setCopied(`link-${shareTarget.code}`);
+        toast.success(`Endereço completo copiado! Convite para "${name}"`);
         setTimeout(() => setCopied(null), 3000);
       }
-      // Always show the link for manual copy
-      setVisibleLink(textToCopy);
+      // Sempre mostrar o endereço completo para cópia manual
+      setVisibleLink(inviteUrl);
       setTimeout(() => {
         linkDisplayRef.current?.focus();
         linkDisplayRef.current?.select();
@@ -1550,9 +1548,9 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
                             size="icon"
                             className="h-8 w-8"
                             onClick={() => handleStartShare(code.id, code.code, 'code')}
-                            title="Copiar código"
+                            title="Copiar endereço completo"
                           >
-                            {copied === code.code ? (
+                            {copied === `link-${code.code}` ? (
                               <Check className="h-3.5 w-3.5 text-primary" />
                             ) : (
                               <Copy className="h-3.5 w-3.5" />
