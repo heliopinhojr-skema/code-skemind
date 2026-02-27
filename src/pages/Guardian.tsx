@@ -16,6 +16,7 @@ import { GuardianReferralTree } from '@/components/guardian/GuardianReferralTree
 import { GuardianSkemaBox } from '@/components/guardian/GuardianSkemaBox';
 import { GuardianRacesPanel } from '@/components/guardian/GuardianRacesPanel';
 import { GuardianArenasPanel } from '@/components/guardian/GuardianArenasPanel';
+import { GuardianInvitePanel } from '@/components/guardian/GuardianInvitePanel';
 import { supabase } from '@/integrations/supabase/client';
 import { Crown, LogOut, LayoutDashboard, Users, GitBranch, Box, Trophy, Eye, Swords } from 'lucide-react';
 import { CosmicBackground } from '@/components/CosmicBackground';
@@ -142,6 +143,7 @@ export default function Guardian() {
             </TabsContent>
 
             <TabsContent value="referrals" className="space-y-6">
+              <GuardianInvitePanel />
               <GuardianReferralTree />
             </TabsContent>
 

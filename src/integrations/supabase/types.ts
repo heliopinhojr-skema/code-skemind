@@ -340,6 +340,7 @@ export type Database = {
           id: string
           shared_at: string | null
           shared_to_name: string | null
+          target_tier: string | null
           used_at: string | null
           used_by_id: string | null
         }
@@ -350,6 +351,7 @@ export type Database = {
           id?: string
           shared_at?: string | null
           shared_to_name?: string | null
+          target_tier?: string | null
           used_at?: string | null
           used_by_id?: string | null
         }
@@ -360,6 +362,7 @@ export type Database = {
           id?: string
           shared_at?: string | null
           shared_to_name?: string | null
+          target_tier?: string | null
           used_at?: string | null
           used_by_id?: string | null
         }
@@ -711,6 +714,10 @@ export type Database = {
       }
       generate_invite_code: {
         Args: { p_creator_profile_id: string }
+        Returns: string
+      }
+      guardian_generate_invite_code: {
+        Args: { p_creator_profile_id: string; p_target_tier: string }
         Returns: string
       }
       has_role: {
