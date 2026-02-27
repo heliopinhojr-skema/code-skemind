@@ -27,6 +27,7 @@ import { buildInviteUrl } from '@/lib/inviteUrl';
 // Sub-component: Investment Blocks Ledger (spreadsheet with dynamic month columns)
 const TARGET_PCT = 25;
 const NUM_INSTALLMENTS = 6;
+const TOTAL_SLOTS = 16; // 16 cotas de 2,5% = 40%
 
 /** Generate 6 month labels starting from a date, using Brazilian format */
 function generateMonthLabels(startDate: Date): string[] {
@@ -190,11 +191,15 @@ function InvestmentBlocksLedger() {
       )}
 
       {/* Spreadsheet table */}
-      {blocks && blocks.length > 0 ? (() => {
-        // Derive column headers from the first block's installment_details
-        const firstDetails: any[] = Array.isArray(blocks[0]?.installment_details)
-          ? blocks[0].installment_details
-          : generateInstallments(new Date(blocks[0]?.sold_at + 'T12:00:00'));
+      {(() => {
+        // Build all 16 slots: sold blocks first, then empty placeholders
+        const soldBlocks = blocks || [];
+        const emptySlots = TOTAL_SLOTS - soldBlocks.length;
+
+        // Derive column headers from the first sold block, or default 6 months from today
+        const firstDetails: any[] = soldBlocks.length > 0 && Array.isArray(soldBlocks[0]?.installment_details)
+          ? soldBlocks[0].installment_details
+          : generateInstallments(new Date());
         const colLabels = firstDetails.map((d: any) => d.month || '—');
         const numCols = firstDetails.length;
 
@@ -203,6 +208,7 @@ function InvestmentBlocksLedger() {
           <table className="w-full text-[10px] min-w-[600px]">
             <thead>
               <tr className="border-b border-border/40">
+                <th className="text-left py-1 px-1 text-muted-foreground font-medium w-5">#</th>
                 <th className="text-left py-1 px-1 text-muted-foreground font-medium">Comprador</th>
                 <th className="text-center py-1 px-1 text-muted-foreground font-medium">R$/mês</th>
                 {colLabels.map((m: string) => (
@@ -212,13 +218,15 @@ function InvestmentBlocksLedger() {
               </tr>
             </thead>
             <tbody>
-              {blocks.map((b: any) => {
+              {/* Sold blocks */}
+              {soldBlocks.map((b: any, slotIdx: number) => {
                 const details: any[] = Array.isArray(b.installment_details)
                   ? b.installment_details
                   : generateInstallments(new Date(b.sold_at + 'T12:00:00'));
                 const parcelaVal = Number(b.total_value) / (b.installments || 6);
                 return (
                   <tr key={b.id} className={cn("border-b border-border/20", b.overbook && "opacity-60 bg-yellow-500/5")}>
+                    <td className="py-1.5 px-1 text-muted-foreground font-mono">{slotIdx + 1}</td>
                     <td className="py-1.5 px-1">
                       <div className="flex items-center gap-1">
                         {b.overbook && <span className="text-[8px] text-yellow-500 font-bold">OB</span>}
@@ -266,20 +274,33 @@ function InvestmentBlocksLedger() {
                   </tr>
                 );
               })}
+              {/* Empty unsold slots */}
+              {Array.from({ length: Math.max(0, emptySlots) }).map((_, i) => (
+                <tr key={`empty-${i}`} className="border-b border-border/10">
+                  <td className="py-1.5 px-1 text-muted-foreground/40 font-mono">{soldBlocks.length + i + 1}</td>
+                  <td className="py-1.5 px-1 text-muted-foreground/30 italic">disponível</td>
+                  <td className="text-center py-1.5 px-1 text-muted-foreground/20">—</td>
+                  {Array.from({ length: numCols }).map((_, ci) => (
+                    <td key={ci} className="text-center py-1 px-0.5 text-muted-foreground/20">—</td>
+                  ))}
+                  <td></td>
+                </tr>
+              ))}
             </tbody>
             <tfoot>
               <tr className="border-t border-border/60">
+                <td></td>
                 <td className="py-1.5 px-1 text-[10px] font-bold text-foreground">TOTAL</td>
                 <td className="text-center py-1.5 px-1 text-[10px] font-bold text-yellow-500">
-                  {blocks.reduce((s: number, b: any) => s + Number(b.total_value) / (b.installments || 6), 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+                  {soldBlocks.reduce((s: number, b: any) => s + Number(b.total_value) / (b.installments || 6), 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
                 </td>
                 {Array.from({ length: numCols }).map((_, colIdx) => {
-                  const colTotal = blocks.reduce((sum: number, b: any) => {
+                  const colTotal = soldBlocks.reduce((sum: number, b: any) => {
                     const det: any[] = Array.isArray(b.installment_details) ? b.installment_details : [];
                     if (colIdx >= det.length) return sum;
                     return sum + Number(b.total_value) / (b.installments || 6);
                   }, 0);
-                  const paidTotal = blocks.reduce((sum: number, b: any) => {
+                  const paidTotal = soldBlocks.reduce((sum: number, b: any) => {
                     const det: any[] = Array.isArray(b.installment_details) ? b.installment_details : [];
                     if (colIdx >= det.length || !det[colIdx]?.paid) return sum;
                     return sum + Number(b.total_value) / (b.installments || 6);
@@ -303,9 +324,7 @@ function InvestmentBlocksLedger() {
           </table>
         </div>
         );
-      })() : (
-        <p className="text-[10px] text-muted-foreground">Nenhum bloco vendido ainda</p>
-      )}
+      })()}
 
       {totalSold > 0 && (
         <div className="flex items-center justify-between text-xs px-2 py-1.5 rounded bg-yellow-500/10 border border-yellow-500/20">
