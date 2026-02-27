@@ -1,6 +1,7 @@
 /**
  * Copy text to clipboard with robust fallbacks.
- * Returns true if copy succeeded or user was given a way to copy.
+ * Returns true ONLY if text was actually copied to clipboard.
+ * Returns false if all programmatic methods failed (caller should show text to user).
  */
 export async function copyToClipboard(text: string): Promise<boolean> {
   // Method 1: Modern Clipboard API
@@ -23,7 +24,7 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     document.body.appendChild(ta);
 
     // iOS needs special handling
-    if (navigator.userAgent.match(/ipad|iphone/i)) {
+    if (/ipad|iphone/i.test(navigator.userAgent)) {
       const range = document.createRange();
       range.selectNodeContents(ta);
       const sel = window.getSelection();
@@ -45,11 +46,5 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     // fall through
   }
 
-  // Method 3: Prompt-based manual copy
-  try {
-    window.prompt('Copie o texto (Ctrl+C / Cmd+C):', text);
-  } catch {
-    // ignore
-  }
-  return true;
+  return false;
 }

@@ -634,7 +634,10 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
       if (ok) {
         setCopied(shareTarget.type === 'link' ? `link-${shareTarget.code}` : shareTarget.code);
         toast.success(`${shareTarget.type === 'link' ? 'Link' : 'Código'} copiado! Convite para "${name}"`);
-        setTimeout(() => setCopied(null), 2000);
+        setTimeout(() => setCopied(null), 3000);
+      } else {
+        // Clipboard blocked — show the text in a toast so user can copy manually
+        toast.info(`${shareTarget.type === 'link' ? '🔗 Link' : '📋 Código'}: ${textToCopy}`, { duration: 15000 });
       }
     }
     setShareTarget(null);
