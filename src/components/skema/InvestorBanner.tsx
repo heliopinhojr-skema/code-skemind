@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Calendar, Clock, Users, TrendingUp } from 'lucide-react';
+import { Calendar, Users, TrendingUp, ShoppingCart } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import investorImg from '@/assets/skema-negociacoes.jpeg';
@@ -13,6 +13,9 @@ interface InvestorBannerProps {
   playerName: string;
   playerStatus?: string;
 }
+
+const TOTAL_BLOCKS = 10;
+const BLOCK_PCT = 2.5;
 
 const FAIXAS = [
   { label: '10%', players: 781, valuation: 899712 },
@@ -29,20 +32,24 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
   const [loading, setLoading] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [soldBlocks, setSoldBlocks] = useState<{ sold_at: string }[]>([]);
+  const [myReservation, setMyReservation] = useState<{ id: string; blocks_wanted: number; status: string } | null>(null);
+  const [reserving, setReserving] = useState(false);
+  const [blocksWanted, setBlocksWanted] = useState(1);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const [{ count: total }, { data: mine }, { data: blocks }] = await Promise.all([
-        supabase.from('investor_interest').select('*', { count: 'exact', head: true }),
-        supabase.from('investor_interest').select('id').eq('player_id', playerId).maybeSingle(),
-        supabase.from('investment_blocks').select('sold_at, overbook').eq('overbook', false).order('sold_at', { ascending: false }),
-      ]);
-      setCount(total || 0);
-      setRegistered(!!mine);
-      setSoldBlocks(blocks || []);
-    };
-    fetchData();
-  }, [playerId]);
+  const fetchData = async () => {
+    const [{ count: total }, { data: mine }, { data: blocks }, { data: reservation }] = await Promise.all([
+      supabase.from('investor_interest').select('*', { count: 'exact', head: true }),
+      supabase.from('investor_interest').select('id').eq('player_id', playerId).maybeSingle(),
+      supabase.from('investment_blocks').select('sold_at, overbook').eq('overbook', false).order('sold_at', { ascending: false }),
+      supabase.from('block_reservations').select('id, blocks_wanted, status').eq('player_id', playerId).eq('status', 'pending').maybeSingle(),
+    ]);
+    setCount(total || 0);
+    setRegistered(!!mine);
+    setSoldBlocks(blocks || []);
+    setMyReservation(reservation || null);
+  };
+
+  useEffect(() => { fetchData(); }, [playerId]);
 
   useEffect(() => {
     const channel = supabase
@@ -57,12 +64,10 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
   }, []);
 
   const isPenalized = playerStatus === 'penalized';
+  const availableBlocks = TOTAL_BLOCKS - soldBlocks.length;
 
   const handleToggle = async () => {
-    if (isPenalized) {
-      toast.error('Acesso negado à Oportunidade Skema');
-      return;
-    }
+    if (isPenalized) { toast.error('Acesso negado à Oportunidade Skema'); return; }
     setLoading(true);
     try {
       if (registered) {
@@ -74,10 +79,38 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
         setRegistered(true);
         toast.success('Interesse registrado!');
       }
-    } catch {
-      toast.error('Erro ao processar');
-    }
+    } catch { toast.error('Erro ao processar'); }
     setLoading(false);
+  };
+
+  const handleReserve = async () => {
+    if (isPenalized) { toast.error('Acesso negado'); return; }
+    setReserving(true);
+    try {
+      const { error } = await supabase.from('block_reservations').insert({
+        player_id: playerId,
+        player_name: playerName,
+        blocks_wanted: blocksWanted,
+      } as any);
+      if (error) throw error;
+      toast.success(`Reserva de ${blocksWanted} bloco(s) enviada! Aguarde aprovação.`);
+      await fetchData();
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao reservar');
+    }
+    setReserving(false);
+  };
+
+  const handleCancelReservation = async () => {
+    if (!myReservation) return;
+    setReserving(true);
+    try {
+      await supabase.from('block_reservations').update({ status: 'cancelled' } as any).eq('id', myReservation.id);
+      toast.success('Reserva cancelada');
+      setMyReservation(null);
+      await fetchData();
+    } catch { toast.error('Erro ao cancelar'); }
+    setReserving(false);
   };
 
   return (
@@ -123,8 +156,31 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
               Universo Skema
             </motion.div>
             <h2 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-orange-400 to-yellow-300">
-              Oportunidade Skema
+              Oportunidade Skema — SCP
             </h2>
+
+            {/* Blocos disponíveis visual */}
+            <div className="bg-white/5 border border-yellow-500/30 rounded-xl p-3 space-y-2">
+              <div className="text-xs text-yellow-400/70 uppercase tracking-wider font-semibold">
+                Blocos de 2,5% — {availableBlocks} de {TOTAL_BLOCKS} disponíveis
+              </div>
+              <div className="grid grid-cols-10 gap-1">
+                {Array.from({ length: TOTAL_BLOCKS }).map((_, i) => {
+                  const isSold = i < soldBlocks.length;
+                  return (
+                    <div
+                      key={i}
+                      className={`h-6 rounded ${isSold ? 'bg-yellow-500/60 border border-yellow-400/40' : 'bg-white/10 border border-white/20'}`}
+                      title={isSold ? `Bloco ${i + 1} — vendido` : `Bloco ${i + 1} — disponível`}
+                    />
+                  );
+                })}
+              </div>
+              <div className="flex justify-between text-[10px] text-white/40">
+                <span>🔒 {soldBlocks.length} vendido(s)</span>
+                <span>🟢 {availableBlocks} disponível(eis)</span>
+              </div>
+            </div>
 
             {/* Premissa */}
             <div className="bg-white/5 border border-yellow-500/20 rounded-xl p-3 space-y-1 text-left text-[11px]">
@@ -151,8 +207,8 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
                 <span className="text-emerald-300 font-medium">R$ 691.200</span>
               </div>
               <div className="flex justify-between text-white/60">
-                <span>1,5% valeria</span>
-                <span className="text-emerald-300 font-medium">R$ {Math.round(691200 * 0.015).toLocaleString('pt-BR')}</span>
+                <span>2,5% valeria</span>
+                <span className="text-emerald-300 font-medium">R$ {Math.round(691200 * 0.025).toLocaleString('pt-BR')}</span>
               </div>
               <div className="flex justify-between text-white/60">
                 <span>Retorno sobre investimento</span>
@@ -160,7 +216,7 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
               </div>
             </div>
 
-            {/* Botão Conhecer o Skema */}
+            {/* Botão Faixas */}
             <Button
               variant="outline"
               onClick={() => setShowDetails(!showDetails)}
@@ -171,7 +227,6 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
               {showDetails ? 'Ocultar faixas de ativação' : 'Conhecer o Skema — Faixas de Ativação'}
             </Button>
 
-            {/* Faixas de ativação expandíveis */}
             <AnimatePresence>
               {showDetails && (
                 <motion.div
@@ -186,33 +241,13 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
                       <div key={f.label} className="flex items-center justify-between text-white/60 py-0.5 border-b border-white/5 last:border-0">
                         <span className="font-medium text-white/80">{f.label} ({f.players.toLocaleString('pt-BR')} players)</span>
                         <span>Val. R$ {f.valuation.toLocaleString('pt-BR')}</span>
-                        <span className="text-yellow-300 font-medium">1,5% = R$ {Math.round(f.valuation * 0.015).toLocaleString('pt-BR')}</span>
+                        <span className="text-yellow-300 font-medium">2,5% = R$ {Math.round(f.valuation * 0.025).toLocaleString('pt-BR')}</span>
                       </div>
                     ))}
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
-
-            {/* Blocos já negociados */}
-            {soldBlocks.length > 0 && (
-              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-3">
-                <div className="text-[10px] uppercase tracking-wider text-yellow-400/60 mb-2 font-semibold">
-                  Blocos negociados ({soldBlocks.length})
-                </div>
-                <div className="space-y-1">
-                  {soldBlocks.map((b, i) => (
-                    <div key={i} className="flex items-center justify-between text-xs">
-                      <span className="text-yellow-300 font-medium">🔒 Bloco {i + 1} — 1,5%</span>
-                      <span className="text-white/40 text-[10px]">{new Date(b.sold_at + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-2 text-[10px] text-yellow-400/50 text-center">
-                  {soldBlocks.length * 1.5}% já captado de 15% disponíveis
-                </div>
-              </div>
-            )}
 
             {/* Contador em tempo real */}
             <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-3">
@@ -229,11 +264,11 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
                     {count}
                   </motion.span>
                 </AnimatePresence>
-                <span className="text-sm text-yellow-200/70">participantes interessados</span>
+                <span className="text-sm text-yellow-200/70">interessados</span>
               </div>
             </div>
 
-            {/* Botão de registro de interesse */}
+            {/* Registro de interesse */}
             <Button
               onClick={handleToggle}
               disabled={loading || isPenalized}
@@ -252,8 +287,66 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
               )}
             </Button>
 
+            {/* Reservar bloco — só aparece para quem já registrou interesse */}
+            {registered && availableBlocks > 0 && (
+              <div className="bg-gradient-to-r from-orange-500/10 to-yellow-500/10 border border-orange-500/30 rounded-xl p-3 space-y-2">
+                {myReservation ? (
+                  <div className="space-y-2">
+                    <div className="text-xs text-orange-300 font-semibold">
+                      📋 Reserva pendente: {myReservation.blocks_wanted} bloco(s) de 2,5%
+                    </div>
+                    <Button
+                      onClick={handleCancelReservation}
+                      disabled={reserving}
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-red-500/30 text-red-300 hover:bg-red-500/10 text-xs"
+                    >
+                      Cancelar reserva
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="text-xs font-semibold text-orange-300">
+                      🛒 Reservar Blocos — R$ 15.500 por bloco (6× de R$ 2.583,33)
+                    </div>
+                    <div className="flex items-center justify-center gap-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 w-7 p-0 border-white/20 text-white/60"
+                        onClick={() => setBlocksWanted(Math.max(1, blocksWanted - 1))}
+                      >−</Button>
+                      <span className="text-lg font-black text-orange-300 min-w-[2ch] text-center">{blocksWanted}</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 w-7 p-0 border-white/20 text-white/60"
+                        onClick={() => setBlocksWanted(Math.min(availableBlocks, blocksWanted + 1))}
+                      >+</Button>
+                    </div>
+                    <div className="text-[10px] text-white/50">
+                      {blocksWanted} × 2,5% = {(blocksWanted * BLOCK_PCT).toFixed(1)}% · Total: R$ {(blocksWanted * 15500).toLocaleString('pt-BR')}
+                    </div>
+                    <Button
+                      onClick={handleReserve}
+                      disabled={reserving || isPenalized}
+                      className="w-full bg-gradient-to-r from-orange-600 to-yellow-600 hover:from-orange-500 hover:to-yellow-500 text-white font-bold"
+                      size="sm"
+                    >
+                      <ShoppingCart className="w-3.5 h-3.5 mr-1.5" />
+                      {reserving ? 'Enviando...' : `Reservar ${blocksWanted} bloco(s)`}
+                    </Button>
+                    <p className="text-[10px] text-white/30">
+                      Sua reserva será analisada pelo Guardião. Sem compromisso até aprovação.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+
             <p className="text-[11px] text-white/40 leading-relaxed">
-              Mais detalhes serão divulgados em breve.<br/>Fique atento ao universo.
+              Sociedade em Conta de Participação (SCP).<br/>Mais detalhes serão divulgados em breve.
             </p>
           </div>
         </div>
