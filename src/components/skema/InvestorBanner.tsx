@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTrigger, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Calendar, Users, TrendingUp, ShoppingCart } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -142,7 +142,8 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
           </motion.span>
         </motion.div>
       </DialogTrigger>
-      <DialogContent className="bg-transparent border-none shadow-none p-0 max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="bg-transparent border-none shadow-none p-0 max-w-md max-h-[90vh] overflow-y-auto [&>button]:text-white [&>button]:bg-black/60 [&>button]:rounded-full [&>button]:p-1 [&>button]:hover:bg-black/80 [&>button]:z-20">
+        <DialogTitle className="sr-only">Oportunidade Skema</DialogTitle>
         <div className="relative rounded-2xl overflow-hidden border border-yellow-500/40">
           <img src={investorImg} alt="" className="absolute inset-0 w-full h-full object-cover" />
           <div className="absolute inset-0 bg-black/80" />
