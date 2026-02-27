@@ -7,7 +7,7 @@
 
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Gift, Copy, Check, Clock, Coins, ChevronDown, ChevronUp, Users, Loader2, Share2, Ticket, Dna, Lock, Sparkles, X, UserPlus, MessageCircle } from 'lucide-react';
+import { Copy, Check, Clock, Coins, ChevronDown, ChevronUp, Users, Loader2, Ticket, Dna, Lock, Sparkles, X, UserPlus, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR as ptBRLocale, enUS as enUSLocale } from 'date-fns/locale';
@@ -49,8 +49,7 @@ export function ReferralHistoryPanel({
   const invitedTierLabel = tierConfig.invitedTierLabel;
   const canInvite = maxInvites > 0;
 
-  const handleShareAndCopy = async (codeId: string, code: string, type: 'code' | 'link' | 'whatsapp', sharedToName?: string) => {
-    // Find the code object
+  const handleShareAndCopy = async (codeId: string, code: string, type: 'link' | 'whatsapp', sharedToName?: string) => {
     const codeObj = codes.find(c => c.id === codeId);
     const isAlreadyShared = codeObj?.sharedAt;
 
@@ -65,47 +64,31 @@ export function ReferralHistoryPanel({
         });
         return;
       }
-      onRefreshProfile(); // Refresh balance
+      onRefreshProfile();
     }
 
     const inviteUrl = buildInviteUrl(code);
 
     if (type === 'whatsapp') {
-      const message = `${t.referral.whatsAppMessage}\n\n${inviteUrl}\n\nCódigo: ${code}`;
-      const waUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
-      window.open(waUrl, '_blank');
-      toast({
-        title: '✅ WhatsApp',
-        description: sharedToName 
-          ? `${t.referral.inviteFor} "${sharedToName}"`
-          : t.referral.sendToInvitee,
-      });
+      const message = `${t.referral.whatsAppMessage}\n\n${inviteUrl}`;
+      window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+      toast({ title: '✅ WhatsApp', description: t.referral.sendToInvitee });
       return;
     }
 
-    // Copy to clipboard — try immediately, then retry with delay
-    const textToCopy = inviteUrl;
-
-    // First attempt
-    let ok = await copyToClipboard(textToCopy);
-    
-    // Retry after a short delay (helps in iframe environments)
+    let ok = await copyToClipboard(inviteUrl);
     if (!ok) {
       await new Promise(r => setTimeout(r, 300));
-      ok = await copyToClipboard(textToCopy);
+      ok = await copyToClipboard(inviteUrl);
     }
 
     if (ok) {
       setCopiedCode(`link-${code}`);
-      toast({
-        title: '✅ ' + t.referral.linkCopied,
-        description: sharedToName 
-          ? `${t.referral.inviteFor} "${sharedToName}" — ${t.referral.sendNow}`
-          : t.referral.sendToInvitee,
-      });
+      toast({ title: '✅ ' + t.referral.linkCopied, description: t.referral.sendToInvitee });
       setTimeout(() => setCopiedCode(null), 3000);
+    } else {
+      toast({ title: '📋 Selecione e copie o link manualmente', variant: 'default' });
     }
-    // Note: if clipboard fails, the visible link field is already shown by the child component
   };
 
   const handleCancelCode = async (codeId: string) => {
@@ -365,22 +348,21 @@ function InviteCodeItem({
   code: InviteCode; 
   index: number;
   copiedCode: string | null;
-  onShareAndCopy: (codeId: string, code: string, type: 'code' | 'link' | 'whatsapp', sharedToName?: string) => Promise<void>;
+  onShareAndCopy: (codeId: string, code: string, type: 'link' | 'whatsapp', sharedToName?: string) => Promise<void>;
   onCancel: (codeId: string) => Promise<void>;
   formatDate: (d: string) => string;
 }) {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const [isCancelling, setIsCancelling] = useState(false);
   const [showNameInput, setShowNameInput] = useState(false);
   const [inviteeName, setInviteeName] = useState('');
-  const [pendingAction, setPendingAction] = useState<'code' | 'link' | 'whatsapp' | null>(null);
-  const [visibleLink, setVisibleLink] = useState<string | null>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
-  const linkInputRef = useRef<HTMLInputElement>(null);
+  const linkRef = useRef<HTMLInputElement>(null);
+
   const isUsed = !!code.usedById;
-  const isCopied = copiedCode === code.code;
   const isLinkCopied = copiedCode === `link-${code.code}`;
   const isPending = !isUsed && !!code.sharedAt;
+  const inviteUrl = buildInviteUrl(code.code);
 
   const handleCancel = async () => {
     setIsCancelling(true);
@@ -388,52 +370,33 @@ function InviteCodeItem({
     setIsCancelling(false);
   };
 
-  const handleStartShare = (type: 'code' | 'link' | 'whatsapp') => {
-    setPendingAction(type);
-    setShowNameInput(true);
-    setVisibleLink(null);
-    setTimeout(() => nameInputRef.current?.focus(), 100);
-  };
-
-  const handleConfirmShare = async () => {
-    if (!pendingAction) return;
-    const name = inviteeName.trim();
-    if (!name) {
-      nameInputRef.current?.focus();
+  // Direct copy — no name needed if already shared
+  const handleDirectCopy = async () => {
+    if (!isPending && !code.sharedAt) {
+      // Need name first
+      setShowNameInput(true);
+      setTimeout(() => nameInputRef.current?.focus(), 100);
       return;
     }
-    // Blur the name input BEFORE copying so execCommand doesn't copy the input value
-    nameInputRef.current?.blur();
-    if (document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
-    
-    const action = pendingAction;
-    setShowNameInput(false);
-    setInviteeName('');
-    setPendingAction(null);
-
-    // For link actions, show the link text field immediately
-    if (action !== 'whatsapp') {
-      const linkText = buildInviteUrl(code.code);
-      setVisibleLink(linkText);
-    }
-
-    await onShareAndCopy(code.id, code.code, action, name);
-
-    // Always focus and select the visible field after everything settles
-    if (action !== 'whatsapp') {
-      setTimeout(() => {
-        linkInputRef.current?.focus();
-        linkInputRef.current?.select();
-      }, 400);
-    }
+    await onShareAndCopy(code.id, code.code, 'link');
   };
 
-  const handleCancelInput = () => {
+  const handleWhatsApp = async () => {
+    if (!isPending && !code.sharedAt) {
+      setShowNameInput(true);
+      setTimeout(() => nameInputRef.current?.focus(), 100);
+      return;
+    }
+    await onShareAndCopy(code.id, code.code, 'whatsapp');
+  };
+
+  const handleConfirmName = async (action: 'link' | 'whatsapp' = 'link') => {
+    const name = inviteeName.trim();
+    if (!name) { nameInputRef.current?.focus(); return; }
+    nameInputRef.current?.blur();
     setShowNameInput(false);
     setInviteeName('');
-    setPendingAction(null);
+    await onShareAndCopy(code.id, code.code, action, name);
   };
 
   return (
@@ -446,104 +409,71 @@ function InviteCodeItem({
           ? 'bg-white/3 border-white/5 opacity-50' 
           : isPending
             ? 'bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border-amber-500/20'
-            : 'bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/20 hover:border-purple-500/40'
+            : 'bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/20'
       }`}
     >
-      <div className="flex items-center gap-2">
-        {/* Número do slot */}
+      {/* Status line */}
+      <div className="flex items-center gap-2 mb-1">
         <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
-          isUsed 
-            ? 'bg-white/10 text-white/30' 
-            : isPending
-              ? 'bg-amber-500/20 text-amber-300'
-              : 'bg-purple-500/20 text-purple-300'
+          isUsed ? 'bg-white/10 text-white/30' : isPending ? 'bg-amber-500/20 text-amber-300' : 'bg-purple-500/20 text-purple-300'
         }`}>
           {index}
         </div>
-
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className={`font-mono text-xs tracking-wider ${isUsed ? 'text-white/30 line-through' : isPending ? 'text-amber-200' : 'text-purple-200'}`}>
-              {code.code}
+          {isUsed ? (
+            <span className="text-[10px] text-emerald-300/80">
+              ✅ {code.usedByName || '?'}
             </span>
-          </div>
-          <div className="text-[10px] text-white/30 mt-0.5">
-            {isUsed ? (
-              <span className="text-emerald-300/80">
-                ✅ {t.referral.inviteAcceptedBy} <span className="text-white/70 font-semibold">{code.usedByName || '?'}</span>
-                {code.usedAt && <span className="text-white/30 ml-1">• {new Date(code.usedAt).toLocaleDateString(locale === 'pt-BR' ? 'pt-BR' : 'en-US', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>}
-              </span>
-            ) : isPending ? (
-              <span className="text-amber-400/80 flex items-center gap-1">
-                <Clock className="w-2.5 h-2.5 animate-pulse" /> {t.referral.pending}
-                {code.sharedToName && (
-                  <span className="text-white/50 ml-0.5">• {t.referral.forPerson} <span className="font-semibold text-amber-200">{code.sharedToName}</span></span>
-                )}
-              </span>
-            ) : (
-              <span className="text-emerald-400/60">● {t.referral.available}</span>
-            )}
-          </div>
-          {/* Link sempre visível para convites disponíveis ou pendentes */}
-          {!isUsed && (
-            <div className="mt-1">
-              <input
-                type="text"
-                readOnly
-                value={buildInviteUrl(code.code)}
-                onFocus={(e) => e.target.select()}
-                onClick={(e) => (e.target as HTMLInputElement).select()}
-                className="w-full bg-white/5 border border-white/10 rounded px-1.5 py-0.5 text-[9px] text-emerald-300/70 font-mono select-all focus:outline-none focus:border-emerald-400/40 cursor-text"
-              />
-            </div>
+          ) : isPending ? (
+            <span className="text-[10px] text-amber-400/80 flex items-center gap-1">
+              <Clock className="w-2.5 h-2.5" /> ⏳ {code.sharedToName || t.referral.pending}
+            </span>
+          ) : (
+            <span className="text-[10px] text-emerald-400/60">● {t.referral.available}</span>
           )}
         </div>
-
-        {!isUsed && (
-          <div className="flex items-center gap-0.5 shrink-0">
-            {isPending ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleCancel}
-                disabled={isCancelling}
-                className="h-7 w-7 text-red-400/60 hover:text-red-400 hover:bg-red-500/10"
-                title={t.lobby.cancel}
-              >
-                {isCancelling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
-              </Button>
-            ) : (
-              <>
-                <motion.div
-                  animate={isLinkCopied ? { scale: [1, 1.3, 1] } : {}}
-                  transition={{ duration: 0.3 }}
-                >
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleStartShare('link')}
-                    className="h-7 w-7 text-white/40 hover:text-white"
-                    title={t.referral.copyLink}
-                  >
-                    {isLinkCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
-                  </Button>
-                </motion.div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleStartShare('whatsapp')}
-                  className="h-7 w-7 text-emerald-400/60 hover:text-emerald-400 hover:bg-emerald-500/10"
-                  title={t.referral.shareWhatsApp}
-                >
-                  <MessageCircle className="w-3.5 h-3.5" />
-                </Button>
-              </>
-            )}
-          </div>
+        {isPending && (
+          <Button variant="ghost" size="icon" onClick={handleCancel} disabled={isCancelling}
+            className="h-6 w-6 text-red-400/60 hover:text-red-400 hover:bg-red-500/10">
+            {isCancelling ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
+          </Button>
         )}
       </div>
 
-      {/* Input de nome do convidado */}
+      {/* Link visível + botões — SEMPRE para não-usados */}
+      {!isUsed && (
+        <div className="flex items-center gap-1">
+          <input
+            ref={linkRef}
+            type="text"
+            readOnly
+            value={inviteUrl}
+            onFocus={(e) => e.target.select()}
+            onClick={(e) => (e.target as HTMLInputElement).select()}
+            className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded px-1.5 py-1 text-[10px] text-emerald-300/80 font-mono select-all focus:outline-none focus:border-emerald-400/40 cursor-text"
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleDirectCopy}
+            className="h-7 w-7 shrink-0 text-white/60 hover:text-emerald-400 hover:bg-emerald-500/10"
+            title="Copiar link"
+          >
+            {isLinkCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleWhatsApp}
+            className="h-7 w-7 shrink-0 text-emerald-400/60 hover:text-emerald-400 hover:bg-emerald-500/10"
+            title="WhatsApp"
+          >
+            <MessageCircle className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      )}
+
+      {/* Input de nome (só aparece quando convite ainda não foi compartilhado) */}
       <AnimatePresence>
         {showNameInput && (
           <motion.div
@@ -558,98 +488,32 @@ function InviteCodeItem({
               <input
                 ref={nameInputRef}
                 type="text"
-                name={"invite_guest_" + code.id}
                 autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="off"
-                spellCheck={false}
                 data-lpignore="true"
-                data-1p-ignore="true"
-                data-form-type="other"
                 placeholder={t.referral.guestNameInputPlaceholder}
                 value={inviteeName}
                 onChange={(e) => setInviteeName(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleConfirmShare();
-                  if (e.key === 'Escape') handleCancelInput();
+                  if (e.key === 'Enter') handleConfirmName('link');
+                  if (e.key === 'Escape') setShowNameInput(false);
                 }}
                 className="flex-1 bg-white/10 border border-white/20 rounded-md px-2 py-1 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-purple-400/50 min-w-0"
                 maxLength={30}
               />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleConfirmShare}
-                className="h-6 w-6 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 shrink-0"
-                title="Confirmar"
-              >
-                <Check className="w-3.5 h-3.5" />
+              <Button variant="ghost" size="icon" onClick={() => handleConfirmName('link')}
+                className="h-6 w-6 text-emerald-400 hover:text-emerald-300 shrink-0" title="Copiar">
+                <Copy className="w-3 h-3" />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleCancelInput}
-                className="h-6 w-6 text-white/40 hover:text-white hover:bg-white/10 shrink-0"
-                title="Cancelar"
-              >
-                <X className="w-3.5 h-3.5" />
+              <Button variant="ghost" size="icon" onClick={() => handleConfirmName('whatsapp')}
+                className="h-6 w-6 text-emerald-400/60 hover:text-emerald-400 shrink-0" title="WhatsApp">
+                <MessageCircle className="w-3 h-3" />
               </Button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Link visível para copiar manualmente */}
-      <AnimatePresence>
-        {visibleLink && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="overflow-hidden"
-          >
-            <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-emerald-500/20">
-              <input
-                ref={linkInputRef}
-                type="text"
-                readOnly
-                value={visibleLink}
-                onFocus={(e) => e.target.select()}
-                onClick={(e) => (e.target as HTMLInputElement).select()}
-                className="flex-1 bg-emerald-500/10 border border-emerald-500/30 rounded-md px-2 py-1.5 text-[11px] text-emerald-200 font-mono select-all focus:outline-none focus:border-emerald-400/60 min-w-0 cursor-text"
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={async () => {
-                  const ok = await copyToClipboard(visibleLink!);
-                  if (ok) {
-                    toast({ title: '✅ Link copiado!' });
-                    setVisibleLink(null);
-                  } else {
-                    // Select the text so user can Ctrl+C
-                    linkInputRef.current?.focus();
-                    linkInputRef.current?.select();
-                  }
-                }}
-                className="h-7 w-7 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 shrink-0"
-                title="Copiar link"
-              >
-                <Copy className="w-3.5 h-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setVisibleLink(null)}
-                className="h-6 w-6 text-white/40 hover:text-white shrink-0"
-              >
+              <Button variant="ghost" size="icon" onClick={() => { setShowNameInput(false); setInviteeName(''); }}
+                className="h-6 w-6 text-white/40 hover:text-white shrink-0">
                 <X className="w-3 h-3" />
               </Button>
             </div>
-            <p className="text-[10px] text-emerald-300/60 mt-1 px-1">
-              📋 Toque em copiar ou selecione o link acima
-            </p>
+            <p className="text-[9px] text-white/30 mt-1 px-1">👤 Nome do convidado (obrigatório)</p>
           </motion.div>
         )}
       </AnimatePresence>
