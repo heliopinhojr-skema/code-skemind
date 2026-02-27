@@ -6,19 +6,27 @@ const corsHeaders = {
 }
 
 /**
- * process-arena-economy
+ * process-arena-economy v2
  * 
- * Handles all economic transactions for Arena x Bots atomically:
- * 
+ * ALL economy is now processed ATOMICALLY at finish time.
+ * The 'enter' action only VALIDATES that the player + bot treasury
+ * have enough balance, but does NOT debit anything.
+ * This prevents "lost pools" when a player disconnects mid-game.
+ *
  * action: 'enter'
+ *   - Validates player has enough energy for buy_in
+ *   - Validates bot treasury has enough for (bot_count × buy_in)
+ *   - Returns the pool amount (NO debits)
+ * 
+ * action: 'finish'
  *   - Debits player energy (buy_in)
  *   - Debits bot buy-ins from bot_treasury (bot_count × buy_in)
  *   - Credits rake to skema_box ((bot_count + 1) × rake_fee)
- * 
- * action: 'finish'
- *   - Credits player prize (if ITM) to player energy
- *   - Credits sum of all bot prizes back to bot_treasury
- *   - Records arena entry in arena_entries table
+ *   - Credits player prize (if ITM)
+ *   - Credits bot prizes to bot_treasury
+ *   - Net effect on player: -buy_in + prize
+ *   - Net effect on bot_treasury: -(bot_count × buy_in) + bot_prizes
+ *   - Net effect on skema_box: +total_rake
  */
 
 interface EnterPayload {
@@ -31,6 +39,9 @@ interface EnterPayload {
 
 interface FinishPayload {
   action: 'finish'
+  buy_in: number
+  rake_fee: number
+  bot_count: number
   player_rank: number
   player_prize: number
   bot_prizes_total: number
@@ -107,11 +118,11 @@ Deno.serve(async (req) => {
     const payload: Payload = await req.json()
     console.log('[arena-economy] Action:', payload.action, 'Player:', profile.name)
 
-    // ======================== ENTER ========================
+    // ======================== ENTER (validate only, no debits) ========================
     if (payload.action === 'enter') {
       const { buy_in, rake_fee, bot_count } = payload as EnterPayload
 
-      // Validate
+      // Validate params
       if (buy_in <= 0 || rake_fee < 0 || bot_count < 1) {
         return new Response(
           JSON.stringify({ error: 'Invalid arena parameters' }),
@@ -152,9 +163,67 @@ Deno.serve(async (req) => {
         )
       }
 
-      // All checks passed - execute atomically
+      // ✅ Validation passed — return pool WITHOUT debiting anything
+      const totalPool = (bot_count + 1) * (buy_in - rake_fee)
+      console.log(`[arena-economy] ✅ ENTER validated (NO debits). Pool: k$${totalPool.toFixed(2)}, Player: ${profile.name}`)
 
-      // 1. Debit player energy
+      return new Response(
+        JSON.stringify({
+          success: true,
+          player_energy: Number(profile.energy), // unchanged
+          bot_treasury_balance: Number(treasury.balance), // unchanged
+          total_pool: totalPool,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // ======================== FINISH (ALL economy here) ========================
+    if (payload.action === 'finish') {
+      const { 
+        buy_in, rake_fee, bot_count,
+        player_rank, player_prize, bot_prizes_total, 
+        attempts, score, time_remaining, won, 
+        arena_buy_in, arena_pool 
+      } = payload as FinishPayload
+
+      // Validate buy_in/rake_fee/bot_count are present
+      if (!buy_in || buy_in <= 0 || !bot_count || bot_count < 1) {
+        console.error('[arena-economy] FINISH missing arena params:', { buy_in, rake_fee, bot_count })
+        return new Response(
+          JSON.stringify({ error: 'Missing arena parameters in finish' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const botTotalBuyIn = bot_count * buy_in
+      const totalRake = (bot_count + 1) * (rake_fee || 0)
+
+      // Re-validate player balance (might have changed)
+      if (Number(profile.energy) < buy_in) {
+        console.error('[arena-economy] FINISH: Player energy dropped below buy_in during game')
+        return new Response(
+          JSON.stringify({ error: 'Energia insuficiente para finalizar arena' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // Re-validate bot treasury
+      const { data: treasury } = await admin
+        .from('bot_treasury')
+        .select('balance')
+        .eq('id', '00000000-0000-0000-0000-000000000002')
+        .single()
+
+      if (!treasury || Number(treasury.balance) < botTotalBuyIn) {
+        console.error('[arena-economy] FINISH: Bot treasury insufficient for buy-ins')
+        return new Response(
+          JSON.stringify({ error: 'Bot treasury insufficient' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // ── Step 1: Debit player buy-in ──
       const { error: playerDebitError } = await admin.rpc('update_player_energy', {
         p_player_id: profile.id,
         p_amount: -buy_in,
@@ -168,28 +237,27 @@ Deno.serve(async (req) => {
       }
       console.log(`[arena-economy] ✅ Player debited: -k$${buy_in.toFixed(2)}`)
 
-      // 2. Debit bot treasury
-      const { data: newBotBalance, error: botDebitError } = await admin.rpc('update_bot_treasury', {
+      // ── Step 2: Debit bot treasury (buy-ins) ──
+      const { data: newBotBalanceAfterDebit, error: botDebitError } = await admin.rpc('update_bot_treasury', {
         p_amount: -botTotalBuyIn,
         p_description: `Arena entry: ${bot_count} bots × k$${buy_in.toFixed(2)}`,
       })
       if (botDebitError) {
         console.error('[arena-economy] Bot treasury debit failed:', botDebitError)
-        // Rollback player debit
+        // Rollback player
         await admin.rpc('update_player_energy', { p_player_id: profile.id, p_amount: buy_in })
         return new Response(
           JSON.stringify({ error: 'Failed to debit bot treasury' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
-      console.log(`[arena-economy] ✅ Bot treasury debited: -k$${botTotalBuyIn.toFixed(2)} (new balance: k$${newBotBalance})`)
+      console.log(`[arena-economy] ✅ Bot treasury debited: -k$${botTotalBuyIn.toFixed(2)}`)
 
-      // 3. Credit rake to Skema Box
-      const totalRake = (bot_count + 1) * rake_fee
+      // ── Step 3: Credit rake to Skema Box ──
       const { data: newBoxBalance, error: rakeError } = await admin.rpc('update_skema_box', {
         p_amount: totalRake,
         p_type: 'arena_rake',
-        p_description: `Arena rake: ${bot_count + 1} players × k$${rake_fee.toFixed(2)}`,
+        p_description: `Arena rake: ${bot_count + 1} players × k$${(rake_fee || 0).toFixed(2)}`,
       })
       if (rakeError) {
         console.error('[arena-economy] Skema box credit failed:', rakeError)
@@ -201,27 +269,9 @@ Deno.serve(async (req) => {
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
-      console.log(`[arena-economy] ✅ Skema Box rake credited: +k$${totalRake.toFixed(2)} (new balance: k$${newBoxBalance})`)
+      console.log(`[arena-economy] ✅ Skema Box rake credited: +k$${totalRake.toFixed(2)}`)
 
-      const newPlayerEnergy = Number(profile.energy) - buy_in
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          player_energy: newPlayerEnergy,
-          bot_treasury_balance: newBotBalance,
-          skema_box_balance: newBoxBalance,
-          total_pool: (bot_count + 1) * (buy_in - rake_fee),
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // ======================== FINISH ========================
-    if (payload.action === 'finish') {
-      const { player_rank, player_prize, bot_prizes_total, attempts, score, time_remaining, won, arena_buy_in, arena_pool } = payload as FinishPayload
-
-      // 1. Credit player prize (if any)
+      // ── Step 4: Credit player prize (if any) ──
       if (player_prize > 0) {
         const { error: prizeError } = await admin.rpc('update_player_energy', {
           p_player_id: profile.id,
@@ -239,7 +289,7 @@ Deno.serve(async (req) => {
         console.log(`[arena-economy] Player finished rank #${player_rank} - no prize`)
       }
 
-      // 2. Credit bot prizes back to treasury
+      // ── Step 5: Credit bot prizes back to treasury ──
       if (bot_prizes_total > 0) {
         const { data: newBotBalance, error: botCreditError } = await admin.rpc('update_bot_treasury', {
           p_amount: bot_prizes_total,
@@ -255,7 +305,7 @@ Deno.serve(async (req) => {
         console.log(`[arena-economy] ✅ Bot treasury credited: +k$${bot_prizes_total.toFixed(2)} (new balance: k$${newBotBalance})`)
       }
 
-      // 3. Save to game_history (with rank and prize for player statement)
+      // ── Step 6: Save game history ──
       const { error: historyError } = await admin
         .from('game_history')
         .insert({
@@ -267,14 +317,14 @@ Deno.serve(async (req) => {
           time_remaining,
           rank: player_rank,
           prize_won: player_prize,
-          arena_buy_in: arena_buy_in ?? null,
+          arena_buy_in: arena_buy_in ?? buy_in,
           arena_pool: arena_pool ?? null,
         })
       if (historyError) {
         console.warn('[arena-economy] Game history save failed (non-critical):', historyError)
       }
 
-      // 4. Update player stats
+      // ── Step 7: Update player stats ──
       const { data: currentProfile } = await admin
         .from('profiles')
         .select('stats_wins, stats_races, stats_best_time')
@@ -300,6 +350,11 @@ Deno.serve(async (req) => {
         .select('energy')
         .eq('id', profile.id)
         .single()
+
+      // Log summary
+      const netPlayer = -buy_in + player_prize
+      const netBots = -botTotalBuyIn + bot_prizes_total
+      console.log(`[arena-economy] ✅ FINISH complete. Net player: ${netPlayer >= 0 ? '+' : ''}k$${netPlayer.toFixed(2)}, Net bots: ${netBots >= 0 ? '+' : ''}k$${netBots.toFixed(2)}, Rake: +k$${totalRake.toFixed(2)}`)
 
       return new Response(
         JSON.stringify({
