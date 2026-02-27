@@ -96,8 +96,6 @@ export function ReferralHistoryPanel({
           : (type === 'link' ? t.referral.sendToInvitee : `${code} — ${t.referral.sendToInvitee}`),
       });
       setTimeout(() => setCopiedCode(null), 2000);
-    } else {
-      toast({ title: '⚠️ Não foi possível copiar', description: 'Selecione e copie manualmente: ' + textToCopy });
     }
   };
 

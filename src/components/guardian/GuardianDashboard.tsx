@@ -635,8 +635,6 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
         setCopied(shareTarget.type === 'link' ? `link-${shareTarget.code}` : shareTarget.code);
         toast.success(`${shareTarget.type === 'link' ? 'Link' : 'Código'} copiado! Convite para "${name}"`);
         setTimeout(() => setCopied(null), 2000);
-      } else {
-        toast.error('Erro ao copiar — copie manualmente: ' + textToCopy);
       }
     }
     setShareTarget(null);
