@@ -1,0 +1,1 @@
+ALTER TABLE public.investment_blocks ALTER COLUMN percentage SET DEFAULT 1.5;
