@@ -1,59 +1,31 @@
 /**
- * Robust clipboard copy with multiple fallbacks for iframe/preview environments.
- * Returns true if copy succeeded programmatically.
- * If all methods fail, opens a prompt-like UI so the user can copy manually.
+ * Copy text to clipboard with fallback for all environments.
  */
 export async function copyToClipboard(text: string): Promise<boolean> {
-  // Method 1: Modern Clipboard API
-  if (navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      // Fall through
-    }
+  // Method 1: Clipboard API (works on HTTPS + same-origin)
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // blocked in iframes / insecure contexts
   }
 
-  // Method 2: execCommand with textarea
+  // Method 2: Classic execCommand
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
   try {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.setAttribute('readonly', '');
-    textarea.style.position = 'fixed';
-    textarea.style.left = '-9999px';
-    textarea.style.top = '-9999px';
-    textarea.style.opacity = '0';
-    document.body.appendChild(textarea);
-    
-    // iOS requires special handling
-    const range = document.createRange();
-    const selection = window.getSelection();
-    textarea.contentEditable = 'true';
-    textarea.readOnly = false;
-    textarea.focus();
-    textarea.select();
-    textarea.setSelectionRange(0, textarea.value.length);
-    
-    if (selection) {
-      selection.removeAllRanges();
-      range.selectNodeContents(textarea);
-      selection.addRange(range);
-    }
-    
     const ok = document.execCommand('copy');
-    document.body.removeChild(textarea);
+    document.body.removeChild(ta);
     if (ok) return true;
   } catch {
-    // Fall through
+    document.body.removeChild(ta);
   }
 
-  // Method 3: window.prompt fallback — text is pre-selected for Ctrl+C
-  try {
-    window.prompt('Copie o texto abaixo (Ctrl+C / Cmd+C):', text);
-    return true; // User had the chance to copy
-  } catch {
-    // Fall through
-  }
-
-  return false;
+  // Method 3: prompt — user can Ctrl+C from there
+  window.prompt('Copie manualmente (Ctrl+C):', text);
+  return true;
 }
