@@ -18,11 +18,13 @@ const TOTAL_BLOCKS = 10;
 const BLOCK_PCT = 2.5;
 
 const CENARIOS = [
-  { label: 'Conservador', churn: '40%', activePlayers: 360, valuation: 414720, color: 'text-orange-300' },
-  { label: 'Moderado', churn: '25%', activePlayers: 450, valuation: 518400, color: 'text-yellow-300' },
-  { label: 'Meta Base', churn: '15%', activePlayers: 510, valuation: 587520, color: 'text-emerald-300' },
-  { label: 'Otimista', churn: '5%', activePlayers: 570, valuation: 656640, color: 'text-cyan-300' },
-  { label: 'Meta Cheia', churn: '0%', activePlayers: 600, valuation: 691200, color: 'text-green-400' },
+  { label: '600', players: 600, pct: '7,9%', valuation: 691200, color: 'text-yellow-300' },
+  { label: '781', players: 781, pct: '10,3%', valuation: 899712, color: 'text-yellow-200' },
+  { label: '1.562', players: 1562, pct: '20,6%', valuation: 1799424, color: 'text-emerald-300' },
+  { label: '2.734', players: 2734, pct: '36%', valuation: 3149568, color: 'text-emerald-400' },
+  { label: '3.905', players: 3905, pct: '51,4%', valuation: 4499760, color: 'text-cyan-300' },
+  { label: '5.858', players: 5858, pct: '77,1%', valuation: 6748416, color: 'text-cyan-400' },
+  { label: '7.600', players: 7600, pct: '100%', valuation: 8755200, color: 'text-green-400' },
 ];
 
 const SCP_CLAUSES = [
@@ -256,7 +258,7 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
               size="sm"
             >
               <TrendingUp className="w-3.5 h-3.5 mr-1.5" />
-              {showDetails ? 'Ocultar cenários' : 'Cenários de Crescimento (Meta 600)'}
+              {showDetails ? 'Ocultar projeções' : 'Projeções de Crescimento'}
             </Button>
 
             <AnimatePresence>
@@ -268,25 +270,23 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
                   className="overflow-hidden"
                 >
                   <div className="bg-white/5 border border-yellow-500/20 rounded-xl p-3 space-y-1.5 text-[10px]">
-                    <div className="text-xs font-semibold text-yellow-300 mb-2">📊 Meta 600 Players — Cenários por Churn</div>
-                    <div className="grid grid-cols-5 gap-0 text-[9px] text-white/40 font-semibold border-b border-white/10 pb-1 mb-1">
-                      <span>Cenário</span>
-                      <span className="text-center">Churn</span>
-                      <span className="text-center">Ativos</span>
+                    <div className="text-xs font-semibold text-yellow-300 mb-2">📊 Se chegarmos a X players em 6 meses (cap. 7.600)</div>
+                    <div className="grid grid-cols-4 gap-0 text-[9px] text-white/40 font-semibold border-b border-white/10 pb-1 mb-1">
+                      <span>Players</span>
+                      <span className="text-center">% do cap</span>
                       <span className="text-center">Valuation</span>
-                      <span className="text-right">2,5%</span>
+                      <span className="text-right">2,5% vale</span>
                     </div>
                     {CENARIOS.map(c => (
-                      <div key={c.label} className="grid grid-cols-5 gap-0 text-white/60 py-0.5 border-b border-white/5 last:border-0 items-center">
+                      <div key={c.label} className="grid grid-cols-4 gap-0 text-white/60 py-0.5 border-b border-white/5 last:border-0 items-center">
                         <span className={`font-medium ${c.color} text-[10px]`}>{c.label}</span>
-                        <span className="text-center text-red-300/70">{c.churn}</span>
-                        <span className="text-center">{c.activePlayers}</span>
+                        <span className="text-center">{c.pct}</span>
                         <span className="text-center">R$ {(c.valuation / 1000).toFixed(0)}k</span>
-                        <span className={`text-right font-medium ${c.color}`}>R$ {Math.round(c.valuation * 0.025).toLocaleString('pt-BR')}</span>
+                        <span className={`text-right font-bold ${c.color}`}>R$ {Math.round(c.valuation * 0.025).toLocaleString('pt-BR')}</span>
                       </div>
                     ))}
                     <div className="text-[9px] text-white/30 mt-1 pt-1 border-t border-white/5">
-                      * Churn = % de jogadores que saem antes de gerar receita recorrente. Valuation = players ativos × R$ 1.152 (4× receita anual).
+                      * Valuation = players × R$ 1.152 (4× receita anual de R$ 288/player). Investimento por bloco: R$ 15.500.
                     </div>
                   </div>
                 </motion.div>
