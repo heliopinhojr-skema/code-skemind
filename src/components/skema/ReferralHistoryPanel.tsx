@@ -83,27 +83,29 @@ export function ReferralHistoryPanel({
       return;
     }
 
-    // Copy to clipboard
-    const textToCopy = type === 'link' ? inviteUrl : code;
+    // Copy to clipboard — try immediately, then retry with delay
+    const textToCopy = inviteUrl;
 
-    const ok = await copyToClipboard(textToCopy);
+    // First attempt
+    let ok = await copyToClipboard(textToCopy);
+    
+    // Retry after a short delay (helps in iframe environments)
+    if (!ok) {
+      await new Promise(r => setTimeout(r, 300));
+      ok = await copyToClipboard(textToCopy);
+    }
+
     if (ok) {
-      setCopiedCode(type === 'link' ? `link-${code}` : code);
+      setCopiedCode(`link-${code}`);
       toast({
-        title: '✅ ' + (type === 'link' ? t.referral.linkCopied : t.referral.codeCopied),
+        title: '✅ ' + t.referral.linkCopied,
         description: sharedToName 
           ? `${t.referral.inviteFor} "${sharedToName}" — ${t.referral.sendNow}`
-          : (type === 'link' ? t.referral.sendToInvitee : `${code} — ${t.referral.sendToInvitee}`),
+          : t.referral.sendToInvitee,
       });
       setTimeout(() => setCopiedCode(null), 3000);
-    } else {
-      // Clipboard blocked — show toast with the text so user can copy manually
-      toast({
-        title: type === 'link' ? '🔗 Link do convite' : '📋 Código',
-        description: textToCopy,
-        duration: 15000,
-      });
     }
+    // Note: if clipboard fails, the visible link field is already shown by the child component
   };
 
   const handleCancelCode = async (codeId: string) => {
@@ -411,18 +413,21 @@ function InviteCodeItem({
     setInviteeName('');
     setPendingAction(null);
 
-    // For link/code actions, show the link text field immediately
+    // For link actions, show the link text field immediately
     if (action !== 'whatsapp') {
-      const linkText = action === 'link' ? buildInviteUrl(code.code) : code.code;
+      const linkText = buildInviteUrl(code.code);
       setVisibleLink(linkText);
-      // Select it after render
-      setTimeout(() => {
-        linkInputRef.current?.focus();
-        linkInputRef.current?.select();
-      }, 100);
     }
 
     await onShareAndCopy(code.id, code.code, action, name);
+
+    // Always focus and select the visible field after everything settles
+    if (action !== 'whatsapp') {
+      setTimeout(() => {
+        linkInputRef.current?.focus();
+        linkInputRef.current?.select();
+      }, 400);
+    }
   };
 
   const handleCancelInput = () => {
@@ -598,6 +603,25 @@ function InviteCodeItem({
               <Button
                 variant="ghost"
                 size="icon"
+                onClick={async () => {
+                  const ok = await copyToClipboard(visibleLink!);
+                  if (ok) {
+                    toast({ title: '✅ Link copiado!' });
+                    setVisibleLink(null);
+                  } else {
+                    // Select the text so user can Ctrl+C
+                    linkInputRef.current?.focus();
+                    linkInputRef.current?.select();
+                  }
+                }}
+                className="h-7 w-7 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 shrink-0"
+                title="Copiar link"
+              >
+                <Copy className="w-3.5 h-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => setVisibleLink(null)}
                 className="h-6 w-6 text-white/40 hover:text-white shrink-0"
               >
@@ -605,7 +629,7 @@ function InviteCodeItem({
               </Button>
             </div>
             <p className="text-[10px] text-emerald-300/60 mt-1 px-1">
-              ☝️ Toque no link acima → selecione tudo → copie (Ctrl+C)
+              📋 Toque em copiar ou selecione o link acima
             </p>
           </motion.div>
         )}
