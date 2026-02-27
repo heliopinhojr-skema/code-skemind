@@ -56,15 +56,28 @@ function InvestmentBlocksLedger() {
     if (!buyerName.trim()) return;
     setIsSaving(true);
     try {
+      // Auto-generate due dates every 30 days from sold_at
+      const startDate = new Date(soldAt + 'T12:00:00');
+      const autoDetails = INV_MONTHS.map((m, idx) => {
+        const dueDate = new Date(startDate);
+        dueDate.setDate(dueDate.getDate() + idx * 30);
+        return {
+          month: m,
+          due_date: dueDate.toISOString().slice(0, 10),
+          paid: false,
+        };
+      });
+
       const { error } = await supabase.from('investment_blocks').insert({
         buyer_name: buyerName.trim(),
         total_value: parseFloat(totalValue) || 15500,
         sold_at: soldAt,
         notes: notes.trim() || null,
         overbook: isOverbook,
+        installment_details: autoDetails,
       } as any);
       if (error) throw error;
-      toast.success(`Bloco 2,5% registrado para ${buyerName}`);
+      toast.success(`Bloco 2,5% registrado para ${buyerName} — parcelas preenchidas a cada 30 dias`);
       setBuyerName(''); setTotalValue('15500'); setNotes(''); setIsOverbook(false); setShowForm(false);
       refetch();
     } catch (e: any) {
@@ -219,6 +232,42 @@ function InvestmentBlocksLedger() {
                 );
               })}
             </tbody>
+            {/* Column totals footer */}
+            <tfoot>
+              <tr className="border-t border-border/60">
+                <td className="py-1.5 px-1 text-[10px] font-bold text-foreground">TOTAL</td>
+                <td className="text-center py-1.5 px-1 text-[10px] font-bold text-yellow-500">
+                  {blocks.reduce((s: number, b: any) => s + Number(b.total_value) / (b.installments || 6), 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+                </td>
+                {INV_MONTHS.map((_, colIdx) => {
+                  const colTotal = blocks.reduce((sum: number, b: any) => {
+                    const det: any[] = Array.isArray(b.installment_details) ? b.installment_details : [];
+                    const inst = det[colIdx];
+                    if (!inst) return sum;
+                    return sum + Number(b.total_value) / (b.installments || 6);
+                  }, 0);
+                  const paidTotal = blocks.reduce((sum: number, b: any) => {
+                    const det: any[] = Array.isArray(b.installment_details) ? b.installment_details : [];
+                    const inst = det[colIdx];
+                    if (!inst?.paid) return sum;
+                    return sum + Number(b.total_value) / (b.installments || 6);
+                  }, 0);
+                  return (
+                    <td key={colIdx} className="text-center py-1.5 px-0.5">
+                      <div className="text-[9px] font-bold text-foreground">
+                        {colTotal.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+                      </div>
+                      {paidTotal > 0 && (
+                        <div className="text-[8px] text-emerald-400">
+                          ✅ {paidTotal.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+                        </div>
+                      )}
+                    </td>
+                  );
+                })}
+                <td></td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       ) : (
