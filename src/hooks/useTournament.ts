@@ -370,6 +370,9 @@ export function useTournament() {
       const { data, error } = await supabase.functions.invoke('process-arena-economy', {
         body: {
           action: 'finish',
+          buy_in: buyIn,
+          rake_fee: rakeFee,
+          bot_count: botCount,
           player_rank: humanResult.rank,
           player_prize: humanPrize,
           bot_prizes_total: botPrizesTotal,
@@ -390,7 +393,7 @@ export function useTournament() {
     } catch (e) {
       console.error('[TOURNAMENT] Finish error:', e);
     }
-  }, [humanPlayerId, humanSecretCode, arenaPool, calculateBotPrizesTotal]);
+  }, [humanPlayerId, humanSecretCode, arenaPool, buyIn, rakeFee, botCount, calculateBotPrizesTotal]);
   
   const returnToLobby = useCallback(() => {
     initializeLobby();
