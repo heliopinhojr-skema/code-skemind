@@ -809,17 +809,16 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
                   ∑ Total Sistema
                 </p>
                 <p className="text-lg font-bold text-primary">
-                  {formatEnergyUtil(calculatedTotal)}
+                  {formatEnergyUtil(10_000_000)}
                 </p>
-                {systemDelta !== 0 && (
+                {systemDelta !== 0 ? (
                   <p className={cn(
                     "text-[10px] font-medium mt-0.5",
-                    systemDelta < 0 ? "text-destructive" : "text-primary"
+                    systemDelta < 0 ? "text-destructive" : "text-warning"
                   )}>
-                    {systemDelta > 0 ? '+' : ''}{formatEnergyUtil(systemDelta)} delta vs 10M
+                    ⚠️ Calculado: {formatEnergyUtil(calculatedTotal)} ({systemDelta > 0 ? '+' : ''}{formatEnergyUtil(systemDelta)})
                   </p>
-                )}
-                {systemDelta === 0 && (
+                ) : (
                   <p className="text-[10px] text-primary mt-0.5">✅ Soma zero exata</p>
                 )}
               </div>
