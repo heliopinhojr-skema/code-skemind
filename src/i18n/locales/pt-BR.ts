@@ -160,6 +160,8 @@ export const ptBR = {
     unknownDate: 'Data desconhecida',
     invitesNotAvailable: 'Convites não disponíveis para seu tier',
     copyCode: 'Copiar código',
+    shareWhatsApp: 'Enviar pelo WhatsApp',
+    whatsAppMessage: '🎮 Você foi convidado para o SKEMA Universe! Use este link para entrar:',
   },
 
   // Creators Mission Board

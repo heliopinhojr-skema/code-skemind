@@ -7,7 +7,7 @@
 
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Gift, Copy, Check, Clock, Coins, ChevronDown, ChevronUp, Users, Loader2, Share2, Ticket, Dna, Lock, Sparkles, X, UserPlus } from 'lucide-react';
+import { Gift, Copy, Check, Clock, Coins, ChevronDown, ChevronUp, Users, Loader2, Share2, Ticket, Dna, Lock, Sparkles, X, UserPlus, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR as ptBRLocale, enUS as enUSLocale } from 'date-fns/locale';
@@ -48,7 +48,7 @@ export function ReferralHistoryPanel({
   const invitedTierLabel = tierConfig.invitedTierLabel;
   const canInvite = maxInvites > 0;
 
-  const handleShareAndCopy = async (codeId: string, code: string, type: 'code' | 'link', sharedToName?: string) => {
+  const handleShareAndCopy = async (codeId: string, code: string, type: 'code' | 'link' | 'whatsapp', sharedToName?: string) => {
     // Find the code object
     const codeObj = codes.find(c => c.id === codeId);
     const isAlreadyShared = codeObj?.sharedAt;
@@ -67,10 +67,23 @@ export function ReferralHistoryPanel({
       onRefreshProfile(); // Refresh balance
     }
 
+    const inviteUrl = buildInviteUrl(code);
+
+    if (type === 'whatsapp') {
+      const message = `${t.referral.whatsAppMessage}\n\n${inviteUrl}\n\nCódigo: ${code}`;
+      const waUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+      window.open(waUrl, '_blank');
+      toast({
+        title: '✅ WhatsApp',
+        description: sharedToName 
+          ? `${t.referral.inviteFor} "${sharedToName}"`
+          : t.referral.sendToInvitee,
+      });
+      return;
+    }
+
     // Copy to clipboard
-    const textToCopy = type === 'link' 
-      ? buildInviteUrl(code)
-      : code;
+    const textToCopy = type === 'link' ? inviteUrl : code;
 
     try {
       await navigator.clipboard.writeText(textToCopy);
@@ -344,7 +357,7 @@ function InviteCodeItem({
   code: InviteCode; 
   index: number;
   copiedCode: string | null;
-  onShareAndCopy: (codeId: string, code: string, type: 'code' | 'link', sharedToName?: string) => Promise<void>;
+  onShareAndCopy: (codeId: string, code: string, type: 'code' | 'link' | 'whatsapp', sharedToName?: string) => Promise<void>;
   onCancel: (codeId: string) => Promise<void>;
   formatDate: (d: string) => string;
 }) {
@@ -352,7 +365,7 @@ function InviteCodeItem({
   const [isCancelling, setIsCancelling] = useState(false);
   const [showNameInput, setShowNameInput] = useState(false);
   const [inviteeName, setInviteeName] = useState('');
-  const [pendingAction, setPendingAction] = useState<'code' | 'link' | null>(null);
+  const [pendingAction, setPendingAction] = useState<'code' | 'link' | 'whatsapp' | null>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const isUsed = !!code.usedById;
   const isCopied = copiedCode === code.code;
@@ -365,7 +378,7 @@ function InviteCodeItem({
     setIsCancelling(false);
   };
 
-  const handleStartShare = (type: 'code' | 'link') => {
+  const handleStartShare = (type: 'code' | 'link' | 'whatsapp') => {
     setPendingAction(type);
     setShowNameInput(true);
     setTimeout(() => nameInputRef.current?.focus(), 100);
@@ -483,6 +496,15 @@ function InviteCodeItem({
                     {isLinkCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
                   </Button>
                 </motion.div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleStartShare('whatsapp')}
+                  className="h-7 w-7 text-emerald-400/60 hover:text-emerald-400 hover:bg-emerald-500/10"
+                  title={t.referral.shareWhatsApp}
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                </Button>
               </>
             )}
           </div>
