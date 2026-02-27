@@ -14,7 +14,7 @@ import { useSupabasePlayer } from '@/hooks/useSupabasePlayer';
 import { useInviteCodes } from '@/hooks/useInviteCodes';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, Zap, Box, Gift, Trophy, TrendingUp, Copy, Check, Share2, Link, ArrowDownRight, Dna, TreePine, Heart, Loader2, Calendar, Receipt, Radio, UserPlus, Activity, AlertTriangle, Briefcase } from 'lucide-react';
+import { Users, Zap, Box, Gift, Trophy, TrendingUp, Copy, Check, Share2, Link, ArrowDownRight, Dna, TreePine, Heart, Loader2, Calendar, Receipt, Radio, UserPlus, Activity, AlertTriangle, Briefcase, Trash2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { calculateBalanceBreakdown, formatEnergy as formatEnergyUtil, getTierEconomy } from '@/lib/tierEconomy';
@@ -22,6 +22,168 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { GENERATION_COLORS, PlanetFace } from '@/components/skema/GenerationColorPicker';
 import { buildInviteUrl } from '@/lib/inviteUrl';
+
+
+// Sub-component: Investment Blocks Ledger (sold 2.5% blocks)
+function InvestmentBlocksLedger() {
+  const [showForm, setShowForm] = useState(false);
+  const [buyerName, setBuyerName] = useState('');
+  const [totalValue, setTotalValue] = useState('15500');
+  const [soldAt, setSoldAt] = useState(new Date().toISOString().slice(0, 10));
+  const [notes, setNotes] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const { data: blocks, refetch } = useQuery({
+    queryKey: ['investment-blocks'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('investment_blocks')
+        .select('*')
+        .order('sold_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 30_000,
+  });
+
+  const handleAdd = async () => {
+    if (!buyerName.trim()) return;
+    setIsSaving(true);
+    try {
+      const { error } = await supabase.from('investment_blocks').insert({
+        buyer_name: buyerName.trim(),
+        total_value: parseFloat(totalValue) || 15500,
+        sold_at: soldAt,
+        notes: notes.trim() || null,
+      } as any);
+      if (error) throw error;
+      toast.success(`Bloco 2,5% registrado para ${buyerName}`);
+      setBuyerName('');
+      setTotalValue('15500');
+      setNotes('');
+      setShowForm(false);
+      refetch();
+    } catch (e: any) {
+      toast.error('Erro: ' + (e.message || 'desconhecido'));
+    }
+    setIsSaving(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase.from('investment_blocks').delete().eq('id', id);
+    if (error) {
+      toast.error('Erro ao remover');
+    } else {
+      toast.success('Bloco removido');
+      refetch();
+    }
+  };
+
+  const totalSold = blocks?.length || 0;
+  const totalPctSold = totalSold * 2.5;
+  const totalValueSold = blocks?.reduce((s, b) => s + Number(b.total_value), 0) || 0;
+
+  return (
+    <div className="bg-background/60 rounded-lg p-3 border border-yellow-500/20">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
+          📋 Blocos Vendidos ({totalSold}) — {totalPctSold}% captado
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-6 text-[10px] gap-1 px-2"
+          onClick={() => setShowForm(!showForm)}
+        >
+          <Plus className="h-3 w-3" />
+          Registrar venda
+        </Button>
+      </div>
+
+      {/* Formulário de adição */}
+      {showForm && (
+        <div className="bg-muted/20 rounded-lg p-2 mb-2 space-y-2 border border-border/40">
+          <div className="grid grid-cols-3 gap-2">
+            <Input
+              placeholder="Nome do comprador"
+              value={buyerName}
+              onChange={e => setBuyerName(e.target.value)}
+              className="h-7 text-xs"
+            />
+            <Input
+              type="number"
+              placeholder="Valor R$"
+              value={totalValue}
+              onChange={e => setTotalValue(e.target.value)}
+              className="h-7 text-xs"
+            />
+            <Input
+              type="date"
+              value={soldAt}
+              onChange={e => setSoldAt(e.target.value)}
+              className="h-7 text-xs"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Input
+              placeholder="Observações (opcional)"
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              className="h-7 text-xs flex-1"
+            />
+            <Button size="sm" className="h-7 text-xs gap-1" onClick={handleAdd} disabled={isSaving || !buyerName.trim()}>
+              {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+              Salvar
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Lista de blocos */}
+      {blocks && blocks.length > 0 ? (
+        <div className="space-y-1 max-h-[200px] overflow-y-auto pr-1">
+          {blocks.map((b: any) => (
+            <div key={b.id} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded bg-muted/30">
+              <span className="text-yellow-500 font-bold shrink-0">2,5%</span>
+              <span className="font-medium text-foreground truncate flex-1">{b.buyer_name}</span>
+              <span className="text-muted-foreground font-mono shrink-0">
+                R$ {Number(b.total_value).toLocaleString('pt-BR')}
+              </span>
+              <span className="text-muted-foreground text-[10px] shrink-0">
+                {format(new Date(b.sold_at + 'T12:00:00'), "dd/MM/yyyy", { locale: ptBR })}
+              </span>
+              {b.notes && (
+                <span className="text-[9px] text-muted-foreground truncate max-w-[80px]" title={b.notes}>
+                  {b.notes}
+                </span>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 shrink-0 text-destructive/60 hover:text-destructive"
+                onClick={() => handleDelete(b.id)}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-[10px] text-muted-foreground">Nenhum bloco vendido ainda</p>
+      )}
+
+      {/* Total */}
+      {totalSold > 0 && (
+        <div className="mt-2 flex items-center justify-between text-xs px-2 py-1 rounded bg-yellow-500/10 border border-yellow-500/20">
+          <span className="text-muted-foreground font-medium">Total captado</span>
+          <span className="text-yellow-500 font-bold">
+            {totalPctSold}% · R$ {totalValueSold.toLocaleString('pt-BR')}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface GuardianDashboardProps {
   onNavigateTab?: (tab: string) => void;
@@ -799,35 +961,7 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
         ))}
       </div>
 
-      {/* Oportunidade Skema — ao lado de Corridas */}
-      {investorInterest && investorInterest.length > 0 && (
-        <Card className="border border-primary/30 bg-primary/5 backdrop-blur-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <Briefcase className="h-4 w-4 text-primary" />
-              Oportunidade Skema ({investorInterest.length})
-            </CardTitle>
-            <p className="text-[10px] text-muted-foreground">
-              Jogadores que sinalizaram interesse em investir no Universo Skema
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-1 max-h-[200px] overflow-y-auto pr-1">
-              {investorInterest.map(inv => (
-                <div key={inv.id} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded bg-muted/30">
-                  <Briefcase className="h-3 w-3 text-primary shrink-0" />
-                  <span className="font-medium text-foreground truncate flex-1">{inv.player_name}</span>
-                  <span className="text-muted-foreground text-[10px] shrink-0">
-                    {format(new Date(inv.created_at), "dd/MM HH:mm", { locale: ptBR })}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* 1ª Rodada de Negociações — Detalhamento Financeiro */}
+      {/* 1ª Rodada de Negociações — Painel Completo */}
       <Card className="border border-yellow-500/30 bg-yellow-500/5 backdrop-blur-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -835,11 +969,11 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
             1ª Rodada de Negociações — 2,5%
           </CardTitle>
           <p className="text-[10px] text-muted-foreground">
-            Valuation R$ 620.000 · Cota 2,5% = R$ 15.500 em 6 parcelas
+            Valuation R$ 620.000 · Cota 2,5% = R$ 15.500 em 6 parcelas (Mar–Ago 2026)
           </p>
         </CardHeader>
         <CardContent className="space-y-3">
-          {/* Resumo da Rodada */}
+          {/* Resumo */}
           <div className="grid grid-cols-3 gap-2">
             <div className="bg-background/60 rounded-lg p-2 border border-border/40 text-center">
               <p className="text-[10px] text-muted-foreground">Valuation</p>
@@ -855,27 +989,41 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
             </div>
           </div>
 
-          {/* Cronograma de Parcelas */}
+          {/* Interessados em tempo real */}
+          <div className="bg-background/60 rounded-lg p-3 border border-primary/20">
+            <p className="text-[10px] text-muted-foreground mb-2 font-medium flex items-center gap-1">
+              <Users className="h-3 w-3" /> Interessados ({investorInterest?.length || 0})
+            </p>
+            {investorInterest && investorInterest.length > 0 ? (
+              <div className="space-y-1 max-h-[150px] overflow-y-auto pr-1">
+                {investorInterest.map(inv => (
+                  <div key={inv.id} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded bg-muted/30">
+                    <Briefcase className="h-3 w-3 text-primary shrink-0" />
+                    <span className="font-medium text-foreground truncate flex-1">{inv.player_name}</span>
+                    <span className="text-muted-foreground text-[10px] shrink-0">
+                      {format(new Date(inv.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[10px] text-muted-foreground">Nenhum interessado ainda</p>
+            )}
+          </div>
+
+          {/* Blocos Vendidos */}
+          <InvestmentBlocksLedger />
+
+          {/* Cronograma */}
           <div className="bg-background/60 rounded-lg p-3 border border-border/40">
-            <p className="text-[10px] text-muted-foreground mb-2 font-medium">📅 Cronograma de Parcelas</p>
+            <p className="text-[10px] text-muted-foreground mb-2 font-medium">📅 Parcelas</p>
             <div className="grid grid-cols-6 gap-1">
-              {['Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago'].map((mes, i) => (
+              {['Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago'].map((mes) => (
                 <div key={mes} className="text-center p-1.5 rounded bg-muted/30 border border-border/30">
                   <p className="text-[9px] text-muted-foreground">{mes}/26</p>
                   <p className="text-[10px] font-bold text-foreground">R$ 2.583</p>
                 </div>
               ))}
-            </div>
-          </div>
-
-          {/* Premissa Financeira */}
-          <div className="bg-background/60 rounded-lg p-3 border border-border/40">
-            <p className="text-[10px] text-muted-foreground mb-1 font-medium">📊 Premissa Financeira</p>
-            <div className="space-y-0.5 text-xs">
-              <div className="flex justify-between"><span className="text-muted-foreground">Receita/player/mês</span><span>R$ 24</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Receita anual/player</span><span>R$ 288</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Múltiplo 4x</span><span>R$ 1.152/player</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Captação total (25%)</span><span>R$ 155.000</span></div>
             </div>
           </div>
 
