@@ -397,6 +397,11 @@ function InviteCodeItem({
       nameInputRef.current?.focus();
       return;
     }
+    // Blur the name input BEFORE copying so execCommand doesn't copy the input value
+    nameInputRef.current?.blur();
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     await onShareAndCopy(code.id, code.code, pendingAction, name);
     setShowNameInput(false);
     setInviteeName('');

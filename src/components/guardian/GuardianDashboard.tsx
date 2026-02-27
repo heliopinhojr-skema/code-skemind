@@ -609,6 +609,11 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
       inviteeInputRef.current?.focus();
       return;
     }
+    // Blur the name input BEFORE copying so execCommand doesn't copy the input value
+    inviteeInputRef.current?.blur();
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     // Share (mark as shared with name)
     const codeObj = codes.find(c => c.id === shareTarget.codeId);
     if (codeObj && !codeObj.sharedAt) {
