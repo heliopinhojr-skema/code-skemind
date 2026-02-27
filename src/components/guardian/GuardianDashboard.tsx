@@ -25,9 +25,9 @@ import { buildInviteUrl } from '@/lib/inviteUrl';
 
 
 // Sub-component: Investment Blocks Ledger (spreadsheet with dynamic month columns)
-const TARGET_PCT = 15;  // 10 cotas × 1,5% = 15%
+const TARGET_PCT = 25;  // 10 cotas × 2,5% = 25% via SCP
 const NUM_INSTALLMENTS = 6;
-const TOTAL_SLOTS = 10; // 10 cotas de 1,5% a R$15.500 em 6×
+const TOTAL_SLOTS = 10; // 10 blocos de 2,5% a R$15.500 em 6×
 
 /** Generate 6 month labels starting from a date, using Brazilian format */
 function generateMonthLabels(startDate: Date): string[] {
