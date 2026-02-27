@@ -827,6 +827,91 @@ export function GuardianDashboard({ onNavigateTab }: GuardianDashboardProps) {
         </Card>
       )}
 
+      {/* 1ª Rodada de Negociações — Detalhamento Financeiro */}
+      <Card className="border border-yellow-500/30 bg-yellow-500/5 backdrop-blur-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Briefcase className="h-4 w-4 text-yellow-500" />
+            1ª Rodada de Negociações — 2,5%
+          </CardTitle>
+          <p className="text-[10px] text-muted-foreground">
+            Valuation R$ 620.000 · Cota 2,5% = R$ 15.500 em 6 parcelas
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {/* Resumo da Rodada */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-background/60 rounded-lg p-2 border border-border/40 text-center">
+              <p className="text-[10px] text-muted-foreground">Valuation</p>
+              <p className="text-sm font-bold text-foreground">R$ 620.000</p>
+            </div>
+            <div className="bg-background/60 rounded-lg p-2 border border-border/40 text-center">
+              <p className="text-[10px] text-muted-foreground">Cota 2,5%</p>
+              <p className="text-sm font-bold text-yellow-500">R$ 15.500</p>
+            </div>
+            <div className="bg-background/60 rounded-lg p-2 border border-border/40 text-center">
+              <p className="text-[10px] text-muted-foreground">6x parcelas</p>
+              <p className="text-sm font-bold text-foreground">R$ 2.583,33</p>
+            </div>
+          </div>
+
+          {/* Cronograma de Parcelas */}
+          <div className="bg-background/60 rounded-lg p-3 border border-border/40">
+            <p className="text-[10px] text-muted-foreground mb-2 font-medium">📅 Cronograma de Parcelas</p>
+            <div className="grid grid-cols-6 gap-1">
+              {['Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago'].map((mes, i) => (
+                <div key={mes} className="text-center p-1.5 rounded bg-muted/30 border border-border/30">
+                  <p className="text-[9px] text-muted-foreground">{mes}/26</p>
+                  <p className="text-[10px] font-bold text-foreground">R$ 2.583</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Premissa Financeira */}
+          <div className="bg-background/60 rounded-lg p-3 border border-border/40">
+            <p className="text-[10px] text-muted-foreground mb-1 font-medium">📊 Premissa Financeira</p>
+            <div className="space-y-0.5 text-xs">
+              <div className="flex justify-between"><span className="text-muted-foreground">Receita/player/mês</span><span>R$ 24</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Receita anual/player</span><span>R$ 288</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Múltiplo 4x</span><span>R$ 1.152/player</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Captação total (25%)</span><span>R$ 155.000</span></div>
+            </div>
+          </div>
+
+          {/* Faixas de Ativação */}
+          <div className="bg-background/60 rounded-lg p-3 border border-border/40">
+            <p className="text-[10px] text-muted-foreground mb-1 font-medium">📈 Faixas de Ativação (cap. 7.810)</p>
+            <div className="space-y-0.5 text-[11px]">
+              {[
+                { pct: '10%', players: 781, val: 899712 },
+                { pct: '20%', players: 1562, val: 1799424 },
+                { pct: '35%', players: 2734, val: 3149568 },
+                { pct: '50%', players: 3905, val: 4499760 },
+                { pct: '75%', players: 5858, val: 6748416 },
+                { pct: '100%', players: 7810, val: 8997120 },
+              ].map(f => (
+                <div key={f.pct} className="flex items-center justify-between py-0.5 border-b border-border/20 last:border-0">
+                  <span className="text-muted-foreground font-medium">{f.pct} ({f.players.toLocaleString('pt-BR')} pl.)</span>
+                  <span className="text-muted-foreground">Val. R$ {f.val.toLocaleString('pt-BR')}</span>
+                  <span className="text-yellow-500 font-medium">2,5% = R$ {Math.round(f.val * 0.025).toLocaleString('pt-BR')}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Meta 600 */}
+          <div className="bg-emerald-500/10 rounded-lg p-3 border border-emerald-500/20">
+            <p className="text-[10px] text-emerald-400 mb-1 font-medium">🎯 Meta 600 Players — Retorno</p>
+            <div className="space-y-0.5 text-xs">
+              <div className="flex justify-between"><span className="text-muted-foreground">Valuation projetado</span><span className="text-emerald-400">R$ 691.200</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">2,5% valeria</span><span className="text-emerald-400">R$ 17.280</span></div>
+              <div className="flex justify-between font-bold"><span className="text-foreground">Retorno</span><span className="text-emerald-400">+11,5%</span></div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Evolução Diária de Convites */}
       {detailedReferrals && detailedReferrals.length > 0 && (
         <Card className="border border-border/60 bg-card/90 backdrop-blur-sm">

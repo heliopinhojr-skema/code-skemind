@@ -80,8 +80,9 @@ export default function Auth() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Splash screen - show once per session
+  // Splash screen - show once per session, skip if entering via invite link
   const [showSplash, setShowSplash] = useState(() => {
+    if (initialInvite) return false; // Skip splash for invite links
     const shown = sessionStorage.getItem(SPLASH_SHOWN_KEY);
     return !shown;
   });
