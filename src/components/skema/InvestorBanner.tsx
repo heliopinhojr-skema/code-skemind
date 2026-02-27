@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Calendar, Users, TrendingUp, ShoppingCart, FileText } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Users, TrendingUp, ShoppingCart, FileText, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import investorImg from '@/assets/skema-negociacoes.jpeg';
@@ -27,12 +26,37 @@ const FAIXAS = [
   { label: '100%', players: 7810, valuation: 8997120 },
 ];
 
+const SCP_CLAUSES = [
+  { title: 'CLÁUSULA 1 — OBJETO', content: 'O presente contrato tem por objeto a constituição de Sociedade em Conta de Participação (SCP), nos termos dos artigos 991 a 996 do Código Civil Brasileiro, destinada ao financiamento, expansão e desenvolvimento da plataforma Skemania — Projeto Planeta Skema 1, com meta operacional de até 70.000 (setenta mil) jogadores ativos.' },
+  { title: 'CLÁUSULA 2 — NATUREZA DA SCP', items: ['2.1 A SCP não possui personalidade jurídica.', '2.2 A DASET atua como sócia ostensiva, respondendo integralmente perante terceiros.', '2.3 O INVESTIDOR atua como sócio participante oculto, sem representação externa.'] },
+  { title: 'CLÁUSULA 3 — APORTE DE CAPITAL', items: ['3.1 O INVESTIDOR realizará aporte no valor de: R$ 15.500 em 6 parcelas.', '3.2 Cada bloco de investimento corresponde a: R$ 15.500 = 2,5% de participação econômica.', '3.3 O aporte não possui natureza de empréstimo.'] },
+  { title: 'CLÁUSULA 4 — PARTICIPAÇÃO NOS RESULTADOS', items: ['4.1 O INVESTIDOR fará jus a 2,5% dos resultados líquidos da SCP para cada bloco integral de R$ 15.500 investido.', '4.2 A participação será proporcional ao número de blocos adquiridos.', '4.3 A apuração ocorrerá conforme cronograma interno.', '4.4 Não há garantia mínima de retorno.'] },
+  { title: 'CLÁUSULA 5 — RATEIO MENSAL POR BLOCO', items: ['5.1 Cada quota ("Bloco"), correspondente a 2,5% da participação econômica, participará proporcionalmente do custeio operacional do Mês 0 ao Mês 6.', '5.2 Valor por parcela: R$ 2.600/mês. Total por Bloco: R$ 15.500,00.', '5.3 Orçamento global do ciclo inicial: R$ 155.000, distribuído entre 10 Blocos.', '5.5 Recursos destinados exclusivamente a despesas Operacionais, Técnicas, Tecnológicas, Estruturais, Administrativas e Estratégicas.', '5.6 Os valores possuem natureza de investimento operacional estruturado, não configurando mútuo, empréstimo ou obrigação de restituição automática.'] },
+  { title: 'CLÁUSULA 6 — RISCO DO INVESTIMENTO', items: ['6.1 O investimento envolve risco; pode haver perda parcial ou total; não há promessa de rentabilidade.', '6.2 A DASET não garante resultados.'] },
+  { title: 'CLÁUSULA 7 — GESTÃO', items: ['7.1 A administração é exclusiva da DASET.', '7.2 O INVESTIDOR não possui poderes decisórios.'] },
+  { title: 'CLÁUSULA 8 — PRESTAÇÃO DE CONTAS', items: ['8.1 A DASET fornecerá relatórios consolidados.', '8.2 Informações estratégicas são confidenciais.'] },
+  { title: 'CLÁUSULA 9 — CONFIDENCIALIDADE', items: ['9.1 O INVESTIDOR manterá sigilo absoluto.', '9.2 É vedada divulgação de dados internos.'] },
+  { title: 'CLÁUSULA 10 — PRAZO', items: ['10.1 Prazo inicial: 180 dias.', '10.2 Renovável mediante aditivo.'] },
+  { title: 'CLÁUSULA 11 — SAÍDA E RESGATE', items: ['11.1 O INVESTIDOR poderá solicitar saída mediante aviso prévio mínimo de 45 dias.', '11.2 O resgate observará: Política de Liquidez, Fila interna, Disponibilidade financeira.', '11.3 Não há resgate imediato garantido.'] },
+  { title: 'CLÁUSULA 12 — RESPONSABILIDADE', items: ['12.1 A responsabilidade externa é exclusiva da DASET.', '12.2 O INVESTIDOR não responde perante terceiros.'] },
+  { title: 'CLÁUSULA 13 — NATUREZA PRIVADA', items: ['13.1 Este contrato é privado.', '13.2 Não constitui oferta pública de valores mobiliários.'] },
+  { title: 'CLÁUSULA 14 — TRIBUTAÇÃO', items: ['14.1 Cada parte é responsável por seus tributos.', '14.2 Retenções serão feitas quando exigidas por lei.'] },
+  { title: 'CLÁUSULA 15 — RESCISÃO', items: ['15.1 Poderá ocorrer por: Descumprimento, Fraude, Violação contratual, Força maior, Determinação legal.', '15.2 Haverá apuração de haveres.'] },
+  { title: 'CLÁUSULA 16 — FORÇA MAIOR', content: 'Eventos fora de controle afastam responsabilidade.' },
+  { title: 'CLÁUSULA 17 — ALTERAÇÕES', content: 'Somente por escrito e assinadas.' },
+  { title: 'CLÁUSULA 18 — COMUNICAÇÕES', content: 'Preferencialmente por meio eletrônico.' },
+  { title: 'CLÁUSULA 19 — INDEPENDÊNCIA DAS PARTES', content: 'Não gera vínculo trabalhista, previdenciário, societário formal ou representativo.' },
+  { title: 'CLÁUSULA 20 — INTEGRALIDADE', content: 'Este documento constitui o acordo completo entre as partes.' },
+  { title: 'CLÁUSULA 21 — LEI E FORO', content: 'Aplica-se a legislação brasileira. Fica eleito o foro da sede da DASET.' },
+];
+
 export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorBannerProps) {
-  const navigate = useNavigate();
   const [count, setCount] = useState(0);
   const [registered, setRegistered] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [showContract, setShowContract] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [soldBlocks, setSoldBlocks] = useState<{ sold_at: string }[]>([]);
   const [myReservation, setMyReservation] = useState<{ id: string; blocks_wanted: number; status: string } | null>(null);
   const [reserving, setReserving] = useState(false);
@@ -113,6 +137,12 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
       await fetchData();
     } catch { toast.error('Erro ao cancelar'); }
     setReserving(false);
+  };
+
+  const handleAcceptTerms = () => {
+    setTermsAccepted(true);
+    setShowContract(false);
+    toast.success('Termos aceitos! Agora você pode reservar seu bloco.');
   };
 
   return (
@@ -290,8 +320,90 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
               )}
             </Button>
 
-            {/* Reservar bloco — só aparece para quem já registrou interesse */}
-            {registered && availableBlocks > 0 && (
+            {/* Termos e Contrato SCP — toggle inline */}
+            <Button
+              variant="outline"
+              onClick={() => setShowContract(!showContract)}
+              className="w-full border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/10 text-xs"
+              size="sm"
+            >
+              <FileText className="w-3.5 h-3.5 mr-1.5" />
+              {showContract ? 'Ocultar contrato SCP' : 'Termos e Contrato SCP'}
+              {termsAccepted && <CheckCircle2 className="w-3.5 h-3.5 ml-1.5 text-emerald-400" />}
+            </Button>
+
+            <AnimatePresence>
+              {showContract && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="bg-black/60 border border-yellow-500/20 rounded-xl p-4 space-y-3 text-left">
+                    {/* Header */}
+                    <div className="text-center space-y-1">
+                      <div className="text-xs font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-orange-400 to-yellow-300">
+                        CONTRATO DE SOCIEDADE EM CONTA DE PARTICIPAÇÃO (SCP)
+                      </div>
+                      <div className="text-[10px] text-yellow-400/60 uppercase tracking-widest">
+                        SKEMANIA — PLANETA SKEMA 1 · DASET — SÓCIA OSTENSIVA
+                      </div>
+                      <div className="text-[9px] text-white/30">Versão Final Oficial · Última Atualização: 26/02/2026</div>
+                    </div>
+
+                    <hr className="border-yellow-500/20" />
+
+                    {/* PARTES */}
+                    <div className="text-[10px] space-y-1">
+                      <div className="text-[11px] font-bold text-yellow-300">PARTES</div>
+                      <p className="text-white/60"><span className="font-semibold text-white/80">SÓCIA OSTENSIVA:</span> DaSet, pessoa jurídica responsável pela operação da plataforma Skemania.</p>
+                      <p className="text-white/60"><span className="font-semibold text-white/80">SÓCIO PARTICIPANTE (INVESTIDOR):</span> Dados a serem preenchidos na formalização.</p>
+                    </div>
+
+                    <hr className="border-white/5" />
+
+                    {/* Cláusulas */}
+                    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 scrollbar-thin">
+                      {SCP_CLAUSES.map((c, i) => (
+                        <div key={i} className="text-[10px] space-y-0.5">
+                          <div className="text-[10px] font-bold text-yellow-300/80">{c.title}</div>
+                          {c.content && <p className="text-white/50">{c.content}</p>}
+                          {c.items && c.items.map((item, j) => (
+                            <p key={j} className="text-white/50 pl-2">{item}</p>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+
+                    <hr className="border-yellow-500/20" />
+
+                    {/* Aceite */}
+                    {!termsAccepted ? (
+                      <Button
+                        onClick={handleAcceptTerms}
+                        className="w-full bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white font-bold text-xs"
+                        size="sm"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                        Li e aceito os Termos e Condições SCP
+                      </Button>
+                    ) : (
+                      <div className="flex items-center justify-center gap-2 text-emerald-400 text-xs font-semibold">
+                        <CheckCircle2 className="w-4 h-4" />
+                        Termos aceitos
+                      </div>
+                    )}
+                    <p className="text-[9px] text-white/25 text-center">
+                      Ao aceitar, você confirma a leitura integral do contrato SCP e poderá reservar blocos.
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Reservar bloco — só aparece após aceite dos termos + interesse registrado */}
+            {registered && termsAccepted && availableBlocks > 0 && (
               <div className="bg-gradient-to-r from-orange-500/10 to-yellow-500/10 border border-orange-500/30 rounded-xl p-3 space-y-2">
                 {myReservation ? (
                   <div className="space-y-2">
@@ -348,13 +460,13 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
               </div>
             )}
 
-            <button
-              onClick={() => navigate('/contrato-scp')}
-              className="flex items-center justify-center gap-1.5 text-[11px] text-yellow-400/70 hover:text-yellow-300 underline underline-offset-2 transition-colors mx-auto"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              Termos e Contrato SCP
-            </button>
+            {/* Mensagem se ainda não aceitou termos mas já tem interesse */}
+            {registered && !termsAccepted && availableBlocks > 0 && (
+              <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-2 text-[10px] text-yellow-300/70 text-center">
+                📄 Para reservar blocos, leia e aceite o <button onClick={() => setShowContract(true)} className="underline font-semibold hover:text-yellow-200">Contrato SCP</button> acima.
+              </div>
+            )}
+
             <p className="text-[10px] text-white/30 leading-relaxed">
               Sociedade em Conta de Participação (SCP) — DASET.
             </p>
