@@ -24,9 +24,37 @@ import { GENERATION_COLORS, PlanetFace } from '@/components/skema/GenerationColo
 import { buildInviteUrl } from '@/lib/inviteUrl';
 
 
-// Sub-component: Investment Blocks Ledger (spreadsheet with month columns)
-const INV_MONTHS = ['Mar/26', 'Abr/26', 'Mai/26', 'Jun/26', 'Jul/26', 'Ago/26'];
+// Sub-component: Investment Blocks Ledger (spreadsheet with dynamic month columns)
 const TARGET_PCT = 25;
+const NUM_INSTALLMENTS = 6;
+
+/** Generate 6 month labels starting from a date, using Brazilian format */
+function generateMonthLabels(startDate: Date): string[] {
+  const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const labels: string[] = [];
+  for (let i = 0; i < NUM_INSTALLMENTS; i++) {
+    const d = new Date(startDate);
+    d.setMonth(d.getMonth() + i);
+    labels.push(`${months[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`);
+  }
+  return labels;
+}
+
+/** Generate installment details with due dates on same day-of-month, +1 month each */
+function generateInstallments(startDate: Date): any[] {
+  const result: any[] = [];
+  const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  for (let i = 0; i < NUM_INSTALLMENTS; i++) {
+    const d = new Date(startDate);
+    d.setMonth(d.getMonth() + i);
+    result.push({
+      month: `${months[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`,
+      due_date: d.toISOString().slice(0, 10),
+      paid: false,
+    });
+  }
+  return result;
+}
 
 function InvestmentBlocksLedger() {
   const [showForm, setShowForm] = useState(false);
@@ -56,17 +84,8 @@ function InvestmentBlocksLedger() {
     if (!buyerName.trim()) return;
     setIsSaving(true);
     try {
-      // Auto-generate due dates every 30 days from sold_at
       const startDate = new Date(soldAt + 'T12:00:00');
-      const autoDetails = INV_MONTHS.map((m, idx) => {
-        const dueDate = new Date(startDate);
-        dueDate.setDate(dueDate.getDate() + idx * 30);
-        return {
-          month: m,
-          due_date: dueDate.toISOString().slice(0, 10),
-          paid: false,
-        };
-      });
+      const autoDetails = generateInstallments(startDate);
 
       const { error } = await supabase.from('investment_blocks').insert({
         buyer_name: buyerName.trim(),
@@ -97,7 +116,7 @@ function InvestmentBlocksLedger() {
     if (!block) return;
     const details: any[] = Array.isArray((block as any).installment_details)
       ? [...(block as any).installment_details]
-      : INV_MONTHS.map(m => ({ month: m, due_date: null, paid: false }));
+      : generateInstallments(new Date(block.sold_at + 'T12:00:00'));
     details[monthIdx] = { ...details[monthIdx], due_date: dateStr || null };
     await supabase.from('investment_blocks').update({ installment_details: details } as any).eq('id', blockId);
     setEditingDue(null); setDueValue(''); refetch();
@@ -108,7 +127,7 @@ function InvestmentBlocksLedger() {
     if (!block) return;
     const details: any[] = Array.isArray((block as any).installment_details)
       ? [...(block as any).installment_details]
-      : INV_MONTHS.map(m => ({ month: m, due_date: null, paid: false }));
+      : generateInstallments(new Date(block.sold_at + 'T12:00:00'));
     details[monthIdx] = { ...details[monthIdx], paid: !details[monthIdx].paid };
     await supabase.from('investment_blocks').update({ installment_details: details } as any).eq('id', blockId);
     refetch();
@@ -163,14 +182,22 @@ function InvestmentBlocksLedger() {
       )}
 
       {/* Spreadsheet table */}
-      {blocks && blocks.length > 0 ? (
+      {blocks && blocks.length > 0 ? (() => {
+        // Derive column headers from the first block's installment_details
+        const firstDetails: any[] = Array.isArray(blocks[0]?.installment_details)
+          ? blocks[0].installment_details
+          : generateInstallments(new Date(blocks[0]?.sold_at + 'T12:00:00'));
+        const colLabels = firstDetails.map((d: any) => d.month || '—');
+        const numCols = firstDetails.length;
+
+        return (
         <div className="overflow-x-auto -mx-1">
           <table className="w-full text-[10px] min-w-[600px]">
             <thead>
               <tr className="border-b border-border/40">
                 <th className="text-left py-1 px-1 text-muted-foreground font-medium">Comprador</th>
                 <th className="text-center py-1 px-1 text-muted-foreground font-medium">R$/mês</th>
-                {INV_MONTHS.map(m => (
+                {colLabels.map((m: string) => (
                   <th key={m} className="text-center py-1 px-1 text-muted-foreground font-medium whitespace-nowrap">{m}</th>
                 ))}
                 <th className="w-5"></th>
@@ -180,7 +207,7 @@ function InvestmentBlocksLedger() {
               {blocks.map((b: any) => {
                 const details: any[] = Array.isArray(b.installment_details)
                   ? b.installment_details
-                  : INV_MONTHS.map(m => ({ month: m, due_date: null, paid: false }));
+                  : generateInstallments(new Date(b.sold_at + 'T12:00:00'));
                 const parcelaVal = Number(b.total_value) / (b.installments || 6);
                 return (
                   <tr key={b.id} className={cn("border-b border-border/20", b.overbook && "opacity-60 bg-yellow-500/5")}>
@@ -232,24 +259,21 @@ function InvestmentBlocksLedger() {
                 );
               })}
             </tbody>
-            {/* Column totals footer */}
             <tfoot>
               <tr className="border-t border-border/60">
                 <td className="py-1.5 px-1 text-[10px] font-bold text-foreground">TOTAL</td>
                 <td className="text-center py-1.5 px-1 text-[10px] font-bold text-yellow-500">
                   {blocks.reduce((s: number, b: any) => s + Number(b.total_value) / (b.installments || 6), 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
                 </td>
-                {INV_MONTHS.map((_, colIdx) => {
+                {Array.from({ length: numCols }).map((_, colIdx) => {
                   const colTotal = blocks.reduce((sum: number, b: any) => {
                     const det: any[] = Array.isArray(b.installment_details) ? b.installment_details : [];
-                    const inst = det[colIdx];
-                    if (!inst) return sum;
+                    if (colIdx >= det.length) return sum;
                     return sum + Number(b.total_value) / (b.installments || 6);
                   }, 0);
                   const paidTotal = blocks.reduce((sum: number, b: any) => {
                     const det: any[] = Array.isArray(b.installment_details) ? b.installment_details : [];
-                    const inst = det[colIdx];
-                    if (!inst?.paid) return sum;
+                    if (colIdx >= det.length || !det[colIdx]?.paid) return sum;
                     return sum + Number(b.total_value) / (b.installments || 6);
                   }, 0);
                   return (
@@ -270,7 +294,8 @@ function InvestmentBlocksLedger() {
             </tfoot>
           </table>
         </div>
-      ) : (
+        );
+      })() : (
         <p className="text-[10px] text-muted-foreground">Nenhum bloco vendido ainda</p>
       )}
 
