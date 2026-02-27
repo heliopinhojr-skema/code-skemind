@@ -17,13 +17,12 @@ interface InvestorBannerProps {
 const TOTAL_BLOCKS = 10;
 const BLOCK_PCT = 2.5;
 
-const FAIXAS = [
-  { label: '10%', players: 781, valuation: 899712 },
-  { label: '20%', players: 1562, valuation: 1799424 },
-  { label: '35%', players: 2734, valuation: 3149568 },
-  { label: '50%', players: 3905, valuation: 4499760 },
-  { label: '75%', players: 5858, valuation: 6748416 },
-  { label: '100%', players: 7810, valuation: 8997120 },
+const CENARIOS = [
+  { label: 'Conservador', churn: '40%', activePlayers: 360, valuation: 414720, color: 'text-orange-300' },
+  { label: 'Moderado', churn: '25%', activePlayers: 450, valuation: 518400, color: 'text-yellow-300' },
+  { label: 'Meta Base', churn: '15%', activePlayers: 510, valuation: 587520, color: 'text-emerald-300' },
+  { label: 'Otimista', churn: '5%', activePlayers: 570, valuation: 656640, color: 'text-cyan-300' },
+  { label: 'Meta Cheia', churn: '0%', activePlayers: 600, valuation: 691200, color: 'text-green-400' },
 ];
 
 const SCP_CLAUSES = [
@@ -249,7 +248,7 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
               </div>
             </div>
 
-            {/* Botão Faixas */}
+            {/* Cenários de Crescimento */}
             <Button
               variant="outline"
               onClick={() => setShowDetails(!showDetails)}
@@ -257,7 +256,7 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
               size="sm"
             >
               <TrendingUp className="w-3.5 h-3.5 mr-1.5" />
-              {showDetails ? 'Ocultar faixas de ativação' : 'Conhecer o Skema — Faixas de Ativação'}
+              {showDetails ? 'Ocultar cenários' : 'Cenários de Crescimento (Meta 600)'}
             </Button>
 
             <AnimatePresence>
@@ -268,15 +267,27 @@ export function InvestorBanner({ playerId, playerName, playerStatus }: InvestorB
                   exit={{ height: 0, opacity: 0 }}
                   className="overflow-hidden"
                 >
-                  <div className="bg-white/5 border border-yellow-500/20 rounded-xl p-3 space-y-1 text-[10px]">
-                    <div className="text-xs font-semibold text-yellow-300 mb-2">📈 Faixas de Ativação (cap. 7.810)</div>
-                    {FAIXAS.map(f => (
-                      <div key={f.label} className="flex items-center justify-between text-white/60 py-0.5 border-b border-white/5 last:border-0">
-                        <span className="font-medium text-white/80">{f.label} ({f.players.toLocaleString('pt-BR')} players)</span>
-                        <span>Val. R$ {f.valuation.toLocaleString('pt-BR')}</span>
-                        <span className="text-yellow-300 font-medium">2,5% = R$ {Math.round(f.valuation * 0.025).toLocaleString('pt-BR')}</span>
+                  <div className="bg-white/5 border border-yellow-500/20 rounded-xl p-3 space-y-1.5 text-[10px]">
+                    <div className="text-xs font-semibold text-yellow-300 mb-2">📊 Meta 600 Players — Cenários por Churn</div>
+                    <div className="grid grid-cols-5 gap-0 text-[9px] text-white/40 font-semibold border-b border-white/10 pb-1 mb-1">
+                      <span>Cenário</span>
+                      <span className="text-center">Churn</span>
+                      <span className="text-center">Ativos</span>
+                      <span className="text-center">Valuation</span>
+                      <span className="text-right">2,5%</span>
+                    </div>
+                    {CENARIOS.map(c => (
+                      <div key={c.label} className="grid grid-cols-5 gap-0 text-white/60 py-0.5 border-b border-white/5 last:border-0 items-center">
+                        <span className={`font-medium ${c.color} text-[10px]`}>{c.label}</span>
+                        <span className="text-center text-red-300/70">{c.churn}</span>
+                        <span className="text-center">{c.activePlayers}</span>
+                        <span className="text-center">R$ {(c.valuation / 1000).toFixed(0)}k</span>
+                        <span className={`text-right font-medium ${c.color}`}>R$ {Math.round(c.valuation * 0.025).toLocaleString('pt-BR')}</span>
                       </div>
                     ))}
+                    <div className="text-[9px] text-white/30 mt-1 pt-1 border-t border-white/5">
+                      * Churn = % de jogadores que saem antes de gerar receita recorrente. Valuation = players ativos × R$ 1.152 (4× receita anual).
+                    </div>
                   </div>
                 </motion.div>
               )}
